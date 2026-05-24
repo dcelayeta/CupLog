@@ -163,7 +163,19 @@ export default async function BagDetailPage({
           {bag.roaster}
         </p>
         <div className="mt-2">
-          <FreshnessIndicator roastDate={bag.roastDate} />
+          {bag.status === "active" ? (
+            <FreshnessIndicator roastDate={bag.roastDate} />
+          ) : (
+            <span className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-2 h-2 rounded-full"
+                style={{ backgroundColor: "var(--text-secondary)" }}
+              />
+              <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                Finished{bag.finishedDate ? ` · ${bag.finishedDate}` : ""}
+              </span>
+            </span>
+          )}
         </div>
       </div>
 

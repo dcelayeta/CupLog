@@ -63,7 +63,19 @@ export default function BagCard({ bag }: { bag: BagWithOrigins }) {
 
         {/* Meta row */}
         <div className="flex items-center gap-3 flex-wrap mt-0.5">
-          <FreshnessIndicator roastDate={bag.roastDate} />
+          {bag.status === "active" ? (
+            <FreshnessIndicator roastDate={bag.roastDate} />
+          ) : (
+            <span className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: "var(--text-secondary)" }}
+              />
+              <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                Finished{bag.finishedDate ? ` · ${bag.finishedDate}` : ""}
+              </span>
+            </span>
+          )}
           {roastLabel && (
             <span
               className="text-[13px]"
