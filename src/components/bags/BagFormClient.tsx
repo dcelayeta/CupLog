@@ -228,7 +228,7 @@ export default function BagFormClient({
         />
       )}
 
-      <form ref={formRef} action={formAction} className="pb-32">
+      <form ref={formRef} action={formAction} className="pb-48">
         {/* Header */}
         <div
           className="flex items-center justify-between px-4 pt-4 pb-4 sticky top-0 z-10"
@@ -593,11 +593,11 @@ export default function BagFormClient({
           </div>
         </div>
 
-        {/* Sticky Save */}
+        {/* Sticky Save — sits above the floating tab bar (~80px) */}
         <div
-          className="fixed bottom-0 left-0 right-0 px-4"
+          className="fixed left-0 right-0 px-4 pb-4"
           style={{
-            paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
+            bottom: "calc(80px + env(safe-area-inset-bottom))",
             backgroundColor: "var(--bg)",
           }}
         >
