@@ -10,6 +10,7 @@ export type ParsedBagData = {
   roastLevel?: string;
   processingMethod?: string;
   roastDate?: string;
+  purchaseDate?: string;
   purchaseShop?: string;
   price?: number;
   weightG?: number;
@@ -37,7 +38,8 @@ Return ONLY a valid JSON object with these fields (omit fields you cannot confid
   "isDecaf": boolean,          // true if decaffeinated
   "roastLevel": string,        // one of: light, medium_light, medium, medium_dark, dark, unspecified
   "processingMethod": string,  // one of: washed, natural, honey, anaerobic, ea_washed, swiss_water, other, unspecified
-  "roastDate": string,         // ISO date YYYY-MM-DD if visible on bag, otherwise omit
+  "roastDate": string,         // ISO date YYYY-MM-DD if mentioned, otherwise omit
+  "purchaseDate": string,      // ISO date YYYY-MM-DD when it was bought — resolve relative dates like "today", "yesterday", "a few days ago" using today's date
   "purchaseShop": string,      // where it was bought if mentioned
   "price": number,             // price paid if mentioned
   "weightG": number,           // bag weight in grams if shown

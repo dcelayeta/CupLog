@@ -393,7 +393,7 @@ export default function BagFormClient({
                 <input
                   name="purchaseDate"
                   type="date"
-                  defaultValue={mode === "edit" ? (initialData?.purchaseDate ?? "") : ""} // purchase date always blank on add
+                  defaultValue={mode === "edit" ? (initialData?.purchaseDate ?? "") : (aiData?.purchaseDate ?? "")}
                   className="bg-transparent outline-none text-[17px] text-right"
                   style={{ color: "var(--text-secondary)" }}
                 />
