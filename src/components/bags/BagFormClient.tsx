@@ -3,11 +3,13 @@
 import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DuplicateModal from "./DuplicateModal";
+import AIEntryPanel from "./AIEntryPanel";
 import type { BagWithOrigins } from "@/lib/bags/queries";
 import type { createBag } from "@/lib/bags/actions";
+import type { ParsedBagData } from "@/lib/bags/parseWithAI";
+import type { Bag } from "@/db/schema";
 
 type BoundUpdateAction = (_prev: unknown, formData: FormData) => Promise<void>;
-import type { Bag } from "@/db/schema";
 
 type OriginRow = {
   country: string;
@@ -140,19 +142,45 @@ export default function BagFormClient({
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
-  const [isBlend, setIsBlend] = useState(initialData?.isBlend ?? false);
-  const [isDecaf, setIsDecaf] = useState(initialData?.isDecaf ?? false);
+  // aiData + formKey: when AI parses data, we bump formKey to remount
+  // uncontrolled inputs so their defaultValues pick up the new data
+  const [aiData, setAiData] = useState<ParsedBagData | null>(null);
+  const [formKey, setFormKey] = useState(0);
+
+  // Active data source: AI result takes priority over initialData
+  const activeData = aiData ?? initialData;
+
+  const [isBlend, setIsBlend] = useState(activeData?.isBlend ?? false);
+  const [isDecaf, setIsDecaf] = useState(activeData?.isDecaf ?? false);
   const [origins, setOrigins] = useState<OriginRow[]>(
-    initialData?.origins?.length
-      ? initialData.origins.map((o) => ({
+    activeData?.origins?.length
+      ? activeData.origins.map((o) => ({
           country: o.country,
           region: o.region ?? "",
           farm: o.farm ?? "",
           variety: o.variety ?? "",
-          blendPercentage: o.blendPercentage?.toString() ?? "",
+          blendPercentage: ("blendPercentage" in o ? o.blendPercentage?.toString() : "") ?? "",
         }))
       : [{ ...BLANK_ORIGIN }]
   );
+
+  const handleAIParsed = (data: ParsedBagData) => {
+    setAiData(data);
+    setIsBlend(data.isBlend ?? false);
+    setIsDecaf(data.isDecaf ?? false);
+    setOrigins(
+      data.origins?.length
+        ? data.origins.map((o) => ({
+            country: o.country ?? "",
+            region: o.region ?? "",
+            farm: o.farm ?? "",
+            variety: o.variety ?? "",
+            blendPercentage: o.blendPercentage?.toString() ?? "",
+          }))
+        : [{ ...BLANK_ORIGIN }]
+    );
+    setFormKey((k) => k + 1); // remount uncontrolled inputs
+  };
   const [duplicateBag, setDuplicateBag] = useState<Bag | null>(null);
   const [forceMode, setForceMode] = useState<"replace" | "addNew" | null>(null);
 
@@ -254,7 +282,12 @@ export default function BagFormClient({
           <div className="w-16" />
         </div>
 
-        <div className="flex flex-col gap-6">
+        {/* AI Entry — add mode only */}
+        {mode === "add" && (
+          <AIEntryPanel onParsed={handleAIParsed} />
+        )}
+
+        <div key={formKey} className="flex flex-col gap-6">
           {/* Coffee Details */}
           <div>
             <SectionHeader label="Coffee" />
@@ -264,7 +297,7 @@ export default function BagFormClient({
                   name="roaster"
                   type="text"
                   required
-                  defaultValue={initialData?.roaster ?? ""}
+                  defaultValue={activeData?.roaster ?? ""}
                   placeholder="e.g. Metric"
                   className="text-right w-full bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
                   style={{ color: "var(--text-primary)" }}
@@ -276,7 +309,7 @@ export default function BagFormClient({
                   name="name"
                   type="text"
                   required
-                  defaultValue={initialData?.name ?? ""}
+                  defaultValue={activeData?.name ?? ""}
                   placeholder="e.g. Ándale Market"
                   className="text-right w-full bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
                   style={{ color: "var(--text-primary)" }}
@@ -286,7 +319,7 @@ export default function BagFormClient({
               <FieldRow label="Roast Level">
                 <select
                   name="roastLevel"
-                  defaultValue={initialData?.roastLevel ?? "unspecified"}
+                  defaultValue={activeData?.roastLevel ?? "unspecified"}
                   className="bg-transparent outline-none text-[17px] text-right appearance-none pr-1"
                   style={{ color: "var(--text-secondary)" }}
                 >
@@ -303,7 +336,7 @@ export default function BagFormClient({
                 <select
                   name="processingMethod"
                   defaultValue={
-                    initialData?.processingMethod ?? "unspecified"
+                    activeData?.processingMethod ?? "unspecified"
                   }
                   className="bg-transparent outline-none text-[17px] text-right appearance-none pr-1"
                   style={{ color: "var(--text-secondary)" }}
@@ -350,7 +383,7 @@ export default function BagFormClient({
                   name="roastDate"
                   type="date"
                   required
-                  defaultValue={mode === "edit" ? (initialData?.roastDate ?? "") : ""}
+                  defaultValue={mode === "edit" ? (initialData?.roastDate ?? "") : (aiData?.roastDate ?? "")}
                   className="bg-transparent outline-none text-[17px] text-right"
                   style={{ color: "var(--text-secondary)" }}
                 />
@@ -360,7 +393,7 @@ export default function BagFormClient({
                 <input
                   name="purchaseDate"
                   type="date"
-                  defaultValue={mode === "edit" ? (initialData?.purchaseDate ?? "") : ""}
+                  defaultValue={mode === "edit" ? (initialData?.purchaseDate ?? "") : ""} // purchase date always blank on add
                   className="bg-transparent outline-none text-[17px] text-right"
                   style={{ color: "var(--text-secondary)" }}
                 />
@@ -370,7 +403,7 @@ export default function BagFormClient({
                 <input
                   name="purchaseShop"
                   type="text"
-                  defaultValue={initialData?.purchaseShop ?? ""}
+                  defaultValue={activeData?.purchaseShop ?? ""}
                   placeholder="Where you bought it"
                   className="text-right w-full bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
                   style={{ color: "var(--text-primary)" }}
@@ -384,7 +417,7 @@ export default function BagFormClient({
                   inputMode="decimal"
                   step="0.01"
                   min="0"
-                  defaultValue={mode === "edit" ? (initialData?.price ?? "") : ""}
+                  defaultValue={mode === "edit" ? (initialData?.price ?? "") : (aiData?.price ?? "")}
                   placeholder="0.00"
                   className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
                   style={{ color: "var(--text-primary)" }}
@@ -397,7 +430,7 @@ export default function BagFormClient({
                   type="number"
                   inputMode="numeric"
                   min="0"
-                  defaultValue={mode === "edit" ? (initialData?.weightG ?? "") : ""}
+                  defaultValue={mode === "edit" ? (initialData?.weightG ?? "") : (aiData?.weightG ?? "")}
                   placeholder="250"
                   className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
                   style={{ color: "var(--text-primary)" }}
@@ -583,7 +616,7 @@ export default function BagFormClient({
             >
               <textarea
                 name="notes"
-                defaultValue={initialData?.notes ?? ""}
+                defaultValue={activeData?.notes ?? ""}
                 placeholder="Tasting notes, coordinates, anything…"
                 rows={4}
                 className="w-full px-4 py-3 bg-transparent outline-none text-[17px] resize-none placeholder:text-[var(--text-secondary)]"
