@@ -350,7 +350,7 @@ export default function BagFormClient({
                   name="roastDate"
                   type="date"
                   required
-                  defaultValue={initialData?.roastDate ?? ""}
+                  defaultValue={mode === "edit" ? (initialData?.roastDate ?? "") : ""}
                   className="bg-transparent outline-none text-[17px] text-right"
                   style={{ color: "var(--text-secondary)" }}
                 />
@@ -360,7 +360,7 @@ export default function BagFormClient({
                 <input
                   name="purchaseDate"
                   type="date"
-                  defaultValue={initialData?.purchaseDate ?? ""}
+                  defaultValue={mode === "edit" ? (initialData?.purchaseDate ?? "") : ""}
                   className="bg-transparent outline-none text-[17px] text-right"
                   style={{ color: "var(--text-secondary)" }}
                 />
@@ -384,7 +384,7 @@ export default function BagFormClient({
                   inputMode="decimal"
                   step="0.01"
                   min="0"
-                  defaultValue={initialData?.price ?? ""}
+                  defaultValue={mode === "edit" ? (initialData?.price ?? "") : ""}
                   placeholder="0.00"
                   className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
                   style={{ color: "var(--text-primary)" }}
@@ -397,7 +397,7 @@ export default function BagFormClient({
                   type="number"
                   inputMode="numeric"
                   min="0"
-                  defaultValue={initialData?.weightG ?? ""}
+                  defaultValue={mode === "edit" ? (initialData?.weightG ?? "") : ""}
                   placeholder="250"
                   className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
                   style={{ color: "var(--text-primary)" }}
