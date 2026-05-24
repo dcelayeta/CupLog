@@ -61,6 +61,40 @@ If the coffee is clearly from one country/region, set isBlend to false and inclu
 If multiple countries are mentioned, set isBlend to true and include one origin per country.
 Do not guess — only include fields you can reasonably extract from the input.`;
 
+function isUrl(text: string): boolean {
+  const t = text.trim();
+  return /^https?:\/\/\S+$/.test(t);
+}
+
+async function fetchPageText(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; CupLog/1.0)" },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch URL (${res.status})`);
+  const html = await res.text();
+
+  // Strip <script> and <style> blocks with their content
+  const noScripts = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ");
+
+  // Strip remaining HTML tags
+  const noTags = noScripts.replace(/<[^>]+>/g, " ");
+
+  // Decode common HTML entities
+  const decoded = noTags
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+
+  // Collapse whitespace and trim
+  return decoded.replace(/\s+/g, " ").trim().slice(0, 8000); // cap at 8k chars
+}
+
 export async function parseBagWithAI(input: {
   text?: string;
   imageBase64?: string;
@@ -75,6 +109,17 @@ export async function parseBagWithAI(input: {
   }
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  // If the text input is a URL, fetch and use the page content instead
+  let resolvedText = input.text;
+  if (input.text && isUrl(input.text)) {
+    try {
+      resolvedText = await fetchPageText(input.text);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      return { success: false, error: `Could not fetch URL: ${msg}` };
+    }
+  }
 
   try {
     const content: Anthropic.MessageParam["content"] = [];
@@ -94,8 +139,8 @@ export async function parseBagWithAI(input: {
       });
     }
 
-    if (input.text) {
-      content.push({ type: "text", text: input.text });
+    if (resolvedText) {
+      content.push({ type: "text", text: resolvedText });
     } else {
       content.push({
         type: "text",

@@ -151,12 +151,12 @@ export default function AIEntryPanel({
             className="text-[13px] mb-2"
             style={{ color: "var(--text-secondary)" }}
           >
-            Or paste a description, tasting notes, or anything about the bag
+            Paste a URL, description, tasting notes, or anything about the bag
           </p>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="e.g. Metric Coffee — Ándale Market, medium roast blend from Mexico and Guatemala, cherry, nougat, wildflower honey…"
+            placeholder="https://metriccoffee.com/products/andale-market — or paste any description, notes, or text about the bag"
             rows={4}
             className="w-full bg-transparent outline-none text-[17px] resize-none placeholder:text-[var(--text-secondary)]"
             style={{ color: "var(--text-primary)" }}
