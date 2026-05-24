@@ -101,10 +101,11 @@ export async function parseBagWithAI(input: {
       });
     }
 
+    const today = new Date().toISOString().split("T")[0];
     const message = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
+      system: `${SYSTEM_PROMPT}\n\nToday's date is ${today}. When a year is not specified for a date, assume the most recent plausible year (i.e. if the month/day has already passed this year, use this year; if it hasn't occurred yet this year, still use this year unless context suggests otherwise).`,
       messages: [{ role: "user", content }],
     });
 
@@ -113,11 +114,13 @@ export async function parseBagWithAI(input: {
       return { success: false, error: "Unexpected response from Claude." };
     }
 
-    // Strip markdown code fences if present
-    const jsonText = raw.text
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/, "")
-      .trim();
+    // Extract JSON object — find outermost { } regardless of surrounding text
+    const start = raw.text.indexOf("{");
+    const end = raw.text.lastIndexOf("}");
+    if (start === -1 || end === -1) {
+      return { success: false, error: "No JSON found in Claude response." };
+    }
+    const jsonText = raw.text.slice(start, end + 1);
 
     const data: ParsedBagData = JSON.parse(jsonText);
     return { success: true, data };
