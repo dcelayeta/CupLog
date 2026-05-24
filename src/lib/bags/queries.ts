@@ -78,6 +78,8 @@ export async function searchBags(
   status: "active" | "finished" = "active"
 ): Promise<BagWithOrigins[]> {
   const q = `%${query.toLowerCase()}%`;
+
+  // Match on bag fields OR any origin (country, variety)
   const bagRows = await db
     .select()
     .from(bags)
@@ -86,7 +88,17 @@ export async function searchBags(
         eq(bags.status, status),
         or(
           like(sql`lower(${bags.roaster})`, q),
-          like(sql`lower(${bags.name})`, q)
+          like(sql`lower(${bags.name})`, q),
+          like(sql`lower(${bags.roastLevel})`, q),
+          sql`EXISTS (
+            SELECT 1 FROM ${bagOrigins}
+            WHERE ${bagOrigins.bagId} = ${bags.id}
+            AND (
+              lower(${bagOrigins.country}) LIKE ${q}
+              OR lower(coalesce(${bagOrigins.variety}, '')) LIKE ${q}
+              OR lower(coalesce(${bagOrigins.region}, '')) LIKE ${q}
+            )
+          )`
         )
       )
     )
