@@ -1,7 +1,7 @@
 "use client";
 
-const LABELS = ["Very Sour", "Sour", "Balanced", "Bitter", "Very Bitter"];
-const COLORS = ["#FF6B35", "#FFB347", "#34C759", "#FF9500", "#8B5CF6"];
+const LABELS = ["Very Sour", "Sour", "Slightly Sour", "Balanced", "Slightly Bitter", "Bitter", "Very Bitter"];
+const COLORS = ["#FF3B30", "#FF6B35", "#FFB347", "#34C759", "#FF9500", "#8B5CF6", "#6D28D9"];
 
 export default function TasteBalanceControl({
   value,
@@ -16,8 +16,8 @@ export default function TasteBalanceControl({
 }) {
   return (
     <div>
-      <div className="flex gap-2">
-        {[1, 2, 3, 4, 5].map((n, i) => {
+      <div className="flex gap-1.5">
+        {[1, 2, 3, 4, 5, 6, 7].map((n, i) => {
           const active = value === n;
           return (
             <button
@@ -49,7 +49,7 @@ export default function TasteBalanceControl({
         <span className="text-[12px]" style={{ color: value !== null ? COLORS[value - 1] : "var(--text-secondary)" }}>
           {value !== null ? LABELS[value - 1] : ""}
         </span>
-        <span className="text-[12px]" style={{ color: COLORS[4] }}>Bitter</span>
+        <span className="text-[12px]" style={{ color: COLORS[6] }}>Bitter</span>
       </div>
       <input type="hidden" name={name} value={value ?? ""} />
     </div>

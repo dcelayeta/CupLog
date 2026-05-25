@@ -51,6 +51,7 @@ export type ShotDetail = {
   preinfusionSeconds: number | null;
   springWeightLbs: number | null;
   wdtUsed: boolean;
+  distributionToolUsed: boolean;
   grinderRetentionG: number | null;
   acidity: number | null;
   sweetness: number | null;
@@ -223,6 +224,7 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       preinfusionSeconds: shots.preinfusionSeconds,
       springWeightLbs: shots.springWeightLbs,
       wdtUsed: shots.wdtUsed,
+      distributionToolUsed: shots.distributionToolUsed,
       grinderRetentionG: shots.grinderRetentionG,
       acidity: shots.acidity,
       sweetness: shots.sweetness,

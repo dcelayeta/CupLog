@@ -68,7 +68,7 @@ Cross-reference against these standards always. If Diego's database thresholds h
 current_thresholds in the user message contains Diego's configured labels. Use these labels when referring to classifications so your language matches his UI.
 
 ### Balance Scale
-1 → Very Sour, 2 → Sour, 3 → Balanced, 4 → Bitter, 5 → Very Bitter
+1 → Very Sour, 2 → Sour, 3 → Slightly Sour, 4 → Balanced, 5 → Slightly Bitter, 6 → Bitter, 7 → Very Bitter
 
 ### Shot Quality
 1-5 stars — Diego's subjective quality assessment independent of balance. A sour shot on a bright bean can still be a quality shot.
@@ -162,7 +162,7 @@ Meaningful pattern or improvement vs recent history. 1-2 sentences maximum. null
 
 ## Response Format
 
-Return JSON with this exact structure:
+CRITICAL: Respond with ONLY a raw JSON object. No markdown, no code fences, no headers, no explanation before or after. Your entire response must start with { and end with }. Any other format will break the parser.
 
 {
   "summary": "string",
@@ -397,9 +397,10 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
   } = {};
 
   try {
-    // Strip markdown code fences if present
-    const jsonText = rawText.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
-    parsed = JSON.parse(jsonText);
+    // Extract the first {...} JSON block, handling optional code fences or preamble
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON object found");
+    parsed = JSON.parse(jsonMatch[0]);
   } catch {
     // Fallback: store raw text as summary
     parsed = { summary: rawText, overall_verdict: "needs_work" };

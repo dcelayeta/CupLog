@@ -43,18 +43,22 @@ function tasteLabel(balance: number | null): string {
   if (balance === null) return "—";
   if (balance <= 1.4) return "Very Sour";
   if (balance <= 2.4) return "Sour";
-  if (balance <= 3.4) return "Balanced";
-  if (balance <= 4.4) return "Bitter";
+  if (balance <= 3.4) return "Slightly Sour";
+  if (balance <= 4.4) return "Balanced";
+  if (balance <= 5.4) return "Slightly Bitter";
+  if (balance <= 6.4) return "Bitter";
   return "Very Bitter";
 }
 
 function tasteColor(balance: number | null): string {
   if (balance === null) return "var(--text-secondary)";
-  if (balance <= 1.8) return "#FF3B30";
-  if (balance <= 2.4) return "#FF9500";
-  if (balance <= 3.6) return "#34C759";
-  if (balance <= 4.2) return "#FF9500";
-  return "#FF3B30";
+  if (balance <= 1.4) return "#FF3B30";
+  if (balance <= 2.4) return "#FF6B35";
+  if (balance <= 3.4) return "#FFB347";
+  if (balance <= 4.4) return "#34C759";
+  if (balance <= 5.4) return "#FF9500";
+  if (balance <= 6.4) return "#8B5CF6";
+  return "#6D28D9";
 }
 
 function StarRating({ rating }: { rating: number | null }) {

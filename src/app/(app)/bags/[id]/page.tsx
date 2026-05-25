@@ -298,13 +298,39 @@ export default async function BagDetailPage({
                 </div>
               </>
             )}
+            {bag.bestGrindRange != null && (
+              <>
+                <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
+                <div className="flex items-center justify-between px-6 min-h-[52px]">
+                  <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Best Shot Grind</span>
+                  <span className="text-[17px]" style={{ color: "var(--accent)" }}>
+                    {bag.bestGrindRange.min === bag.bestGrindRange.max
+                      ? bag.bestGrindRange.min
+                      : `${bag.bestGrindRange.min} – ${bag.bestGrindRange.max}`}
+                  </span>
+                </div>
+              </>
+            )}
+            {bag.referenceGrindRange != null && (
+              <>
+                <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
+                <div className="flex items-center justify-between px-6 min-h-[52px]">
+                  <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Ref. Grind (prev bag)</span>
+                  <span className="text-[17px]" style={{ color: "var(--text-secondary)" }}>
+                    {bag.referenceGrindRange.min === bag.referenceGrindRange.max
+                      ? bag.referenceGrindRange.min
+                      : `${bag.referenceGrindRange.min} – ${bag.referenceGrindRange.max}`}
+                  </span>
+                </div>
+              </>
+            )}
             {bag.avgTasteBalance != null && (
               <>
                 <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
                 <div className="flex items-center justify-between px-6 min-h-[52px]">
                   <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Avg Taste Balance</span>
                   <span className="text-[17px]" style={{ color: "var(--text-secondary)" }}>
-                    {["", "Very Sour", "Sour", "Balanced", "Bitter", "Very Bitter"][Math.round(bag.avgTasteBalance)] ?? `${bag.avgTasteBalance.toFixed(1)}/5`}
+                    {["", "Very Sour", "Sour", "Slightly Sour", "Balanced", "Slightly Bitter", "Bitter", "Very Bitter"][Math.round(bag.avgTasteBalance)] ?? `${bag.avgTasteBalance.toFixed(1)}/7`}
                   </span>
                 </div>
               </>

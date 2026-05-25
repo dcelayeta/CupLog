@@ -137,6 +137,7 @@ export default function LogFormClient({
       : equipmentProfile?.defaultSpringWeightLbs?.toString() ?? ""
   );
   const [wdtUsed, setWdtUsed] = useState(lastShot ? lastShot.wdtUsed : true);
+  const [distributionToolUsed, setDistributionToolUsed] = useState(false);
   const [grinderRetentionG, setGrinderRetentionG] = useState(
     averageRetention?.toString() ?? ""
   );
@@ -204,6 +205,7 @@ export default function LogFormClient({
         <input type="hidden" name="bagId" value={bagId} />
         <input type="hidden" name="bagRoastDate" value={selectedBag?.roastDate ?? ""} />
         <input type="hidden" name="wdtUsed" value={wdtUsed ? "true" : "false"} />
+        <input type="hidden" name="distributionToolUsed" value={distributionToolUsed ? "true" : "false"} />
         <input type="hidden" name="includeDrink" value={includeDrink ? "true" : "false"} />
         {equipmentProfile && (
           <input type="hidden" name="equipmentProfileId" value={equipmentProfile.id} />
@@ -304,6 +306,20 @@ export default function LogFormClient({
               <span
                 className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transform transition-transform duration-200 mt-[2px]"
                 style={{ marginLeft: wdtUsed ? 22 : 2 }}
+              />
+            </button>
+          </div>
+          <div className="flex items-center px-6 min-h-[52px]">
+            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Distribution Tool</span>
+            <button
+              type="button"
+              onClick={() => setDistributionToolUsed(!distributionToolUsed)}
+              className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200"
+              style={{ backgroundColor: distributionToolUsed ? "var(--accent)" : "#E5E5EA" }}
+            >
+              <span
+                className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transform transition-transform duration-200 mt-[2px]"
+                style={{ marginLeft: distributionToolUsed ? 22 : 2 }}
               />
             </button>
           </div>

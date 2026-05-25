@@ -1,13 +1,17 @@
 import { db } from "@/db/client";
 import { bags, bagOrigins, shots } from "@/db/schema";
-import { eq, sql, and, or, like, ne } from "drizzle-orm";
+import { eq, sql, and, or, like, ne, asc, desc } from "drizzle-orm";
 import type { Bag, BagOrigin } from "@/db/schema";
+
+export type GrindRange = { min: number; max: number };
 
 export type BagWithOrigins = Bag & {
   origins: BagOrigin[];
   shotCount?: number;
   avgTasteBalance?: number | null;
   avgRetentionG?: number | null;
+  bestGrindRange?: GrindRange | null;
+  referenceGrindRange?: GrindRange | null;
   avgShotRating?: number | null;
 };
 
@@ -19,10 +23,10 @@ export async function getBags(
     : eq(bags.status, status);
 
   const orderClause = status === "finished"
-    ? sql`${bags.finishedDate} DESC`
+    ? desc(bags.finishedDate)
     : status === "all"
-    ? sql`${bags.roastDate} DESC`
-    : sql`${bags.roastDate} ASC`;
+    ? desc(bags.roastDate)
+    : asc(bags.roastDate);
 
   const bagRows = await db
     .select()
@@ -98,7 +102,58 @@ export async function getBagById(id: number): Promise<BagWithOrigins | null> {
     .from(shots)
     .where(eq(shots.bagId, id));
 
-  return { ...bag, origins, shotCount: Number(count), avgTasteBalance: avgTasteBalance ?? null, avgRetentionG: avgRetentionG != null ? Math.round(avgRetentionG * 100) / 100 : null, avgShotRating: avgShotRating != null ? Math.round(avgShotRating * 10) / 10 : null };
+  // Best grind range: from shots rated 4+ on this bag; fallback to highest-rated shots
+  const [grindRow] = await db.all(sql`
+    SELECT MIN(grind_setting) as min_grind, MAX(grind_setting) as max_grind
+    FROM shots
+    WHERE bag_id = ${id}
+      AND grind_setting IS NOT NULL
+      AND shot_rating >= COALESCE(
+        NULLIF((SELECT MAX(shot_rating) FROM shots WHERE bag_id = ${id} AND shot_rating >= 4), 0),
+        (SELECT MAX(shot_rating) FROM shots WHERE bag_id = ${id})
+      )
+  `) as { min_grind: number | null; max_grind: number | null }[];
+
+  const bestGrindRange: GrindRange | null =
+    grindRow?.min_grind != null && grindRow?.max_grind != null
+      ? { min: grindRow.min_grind, max: grindRow.max_grind }
+      : null;
+
+  // Reference grind range from previous bags of same coffee (only useful when shotCount === 0)
+  let referenceGrindRange: GrindRange | null = null;
+  if (Number(count) === 0) {
+    const [refRow] = await db.all(sql`
+      SELECT MIN(s.grind_setting) as min_grind, MAX(s.grind_setting) as max_grind
+      FROM shots s
+      JOIN bags b ON s.bag_id = b.id
+      WHERE lower(b.roaster) = lower(${bag.roaster})
+        AND lower(b.name) = lower(${bag.name})
+        AND b.id != ${id}
+        AND s.grind_setting IS NOT NULL
+        AND s.shot_rating >= COALESCE(
+          NULLIF((
+            SELECT MAX(s2.shot_rating) FROM shots s2
+            JOIN bags b2 ON s2.bag_id = b2.id
+            WHERE lower(b2.roaster) = lower(${bag.roaster})
+              AND lower(b2.name) = lower(${bag.name})
+              AND b2.id != ${id}
+              AND s2.shot_rating >= 4
+          ), 0),
+          (
+            SELECT MAX(s2.shot_rating) FROM shots s2
+            JOIN bags b2 ON s2.bag_id = b2.id
+            WHERE lower(b2.roaster) = lower(${bag.roaster})
+              AND lower(b2.name) = lower(${bag.name})
+              AND b2.id != ${id}
+          )
+        )
+    `) as { min_grind: number | null; max_grind: number | null }[];
+    if (refRow?.min_grind != null && refRow?.max_grind != null) {
+      referenceGrindRange = { min: refRow.min_grind, max: refRow.max_grind };
+    }
+  }
+
+  return { ...bag, origins, shotCount: Number(count), avgTasteBalance: avgTasteBalance ?? null, avgRetentionG: avgRetentionG != null ? Math.round(avgRetentionG * 100) / 100 : null, avgShotRating: avgShotRating != null ? Math.round(avgShotRating * 10) / 10 : null, bestGrindRange, referenceGrindRange };
 }
 
 export async function findDuplicateBag(
@@ -155,7 +210,7 @@ export async function searchBags(
         )
       )
     )
-    .orderBy(status === "finished" ? sql`${bags.finishedDate} DESC` : sql`${bags.roastDate} ASC`);
+    .orderBy(status === "finished" ? desc(bags.finishedDate) : asc(bags.roastDate));
 
   if (bagRows.length === 0) return [];
 

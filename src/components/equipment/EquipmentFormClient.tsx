@@ -52,6 +52,11 @@ export default function EquipmentFormClient({ profile }: { profile: EquipmentPro
         <Row label="Machine"><TextInput name="machine" defaultValue={profile.machine} /></Row>
         <Row label="Grinder"><TextInput name="grinder" defaultValue={profile.grinder} /></Row>
         <Row label="Tamper"><TextInput name="tamper" defaultValue={profile.tamper} /></Row>
+        <Row label="Portafilter"><TextInput name="portafilter" defaultValue={profile.portafilter} /></Row>
+        <Row label="Basket"><TextInput name="basket" defaultValue={profile.basket} /></Row>
+        <Row label="Scale"><TextInput name="scale" defaultValue={profile.scale} /></Row>
+        <Row label="WDT Tool"><TextInput name="wdtTool" defaultValue={profile.wdtTool} /></Row>
+        <Row label="Distribution Tool"><TextInput name="distributionTool" defaultValue={profile.distributionTool} /></Row>
         <Row label="Default Spring (lbs)"><NumberInput name="defaultSpringWeightLbs" defaultValue={profile.defaultSpringWeightLbs} /></Row>
         <Row label="Machine Clean (days)"><NumberInput name="machineCleaningIntervalDays" defaultValue={profile.machineCleaningIntervalDays} /></Row>
         <div className="flex items-center px-6 min-h-[52px]">

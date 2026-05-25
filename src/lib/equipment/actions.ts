@@ -19,6 +19,11 @@ export async function updateEquipmentProfile(
     machine: (formData.get("machine") as string) || null,
     grinder: (formData.get("grinder") as string) || null,
     tamper: (formData.get("tamper") as string) || null,
+    portafilter: (formData.get("portafilter") as string) || null,
+    basket: (formData.get("basket") as string) || null,
+    scale: (formData.get("scale") as string) || null,
+    wdtTool: (formData.get("wdtTool") as string) || null,
+    distributionTool: (formData.get("distributionTool") as string) || null,
     defaultSpringWeightLbs: formData.get("defaultSpringWeightLbs")
       ? parseInt(formData.get("defaultSpringWeightLbs") as string, 10)
       : null,
@@ -47,6 +52,11 @@ export async function addEquipmentProfile(
     machine: (formData.get("machine") as string) || null,
     grinder: (formData.get("grinder") as string) || null,
     tamper: (formData.get("tamper") as string) || null,
+    portafilter: (formData.get("portafilter") as string) || null,
+    basket: (formData.get("basket") as string) || null,
+    scale: (formData.get("scale") as string) || null,
+    wdtTool: (formData.get("wdtTool") as string) || null,
+    distributionTool: (formData.get("distributionTool") as string) || null,
     defaultSpringWeightLbs: formData.get("defaultSpringWeightLbs")
       ? parseInt(formData.get("defaultSpringWeightLbs") as string, 10)
       : null,

@@ -57,6 +57,7 @@ export async function logShot(
     ? parseInt(formData.get("springWeightLbs") as string, 10)
     : null;
   const wdtUsed = formData.get("wdtUsed") === "true";
+  const distributionToolUsed = formData.get("distributionToolUsed") === "true";
   const grinderRetentionG = formData.get("grinderRetentionG")
     ? parseFloat(formData.get("grinderRetentionG") as string)
     : null;
@@ -85,6 +86,7 @@ export async function logShot(
       preinfusionSeconds,
       springWeightLbs,
       wdtUsed,
+      distributionToolUsed,
       grinderRetentionG,
       ...tasteFields,
       notes: (formData.get("notes") as string) || null,
@@ -172,6 +174,7 @@ function parseShotFields(formData: FormData) {
     preinfusionSeconds: formData.get("preinfusionSeconds") ? parseInt(formData.get("preinfusionSeconds") as string, 10) : null,
     springWeightLbs: formData.get("springWeightLbs") ? parseInt(formData.get("springWeightLbs") as string, 10) : null,
     wdtUsed: formData.get("wdtUsed") === "true",
+    distributionToolUsed: formData.get("distributionToolUsed") === "true",
     grinderRetentionG: formData.get("grinderRetentionG") ? parseFloat(formData.get("grinderRetentionG") as string) : null,
     acidity: formData.get("acidity") ? parseInt(formData.get("acidity") as string) : null,
     sweetness: formData.get("sweetness") ? parseInt(formData.get("sweetness") as string) : null,
@@ -211,6 +214,7 @@ export async function updateShot(
     preinfusionSeconds: f.preinfusionSeconds,
     springWeightLbs: f.springWeightLbs,
     wdtUsed: f.wdtUsed,
+    distributionToolUsed: f.distributionToolUsed,
     grinderRetentionG: f.grinderRetentionG,
     tasteBalance: f.tasteBalance,
     shotRating: f.shotRating,

@@ -49,6 +49,11 @@ export default function NewEquipmentFormClient() {
         <Row label="Machine"><TextInput name="machine" /></Row>
         <Row label="Grinder"><TextInput name="grinder" /></Row>
         <Row label="Tamper"><TextInput name="tamper" /></Row>
+        <Row label="Portafilter"><TextInput name="portafilter" /></Row>
+        <Row label="Basket"><TextInput name="basket" /></Row>
+        <Row label="Scale"><TextInput name="scale" /></Row>
+        <Row label="WDT Tool"><TextInput name="wdtTool" /></Row>
+        <Row label="Distribution Tool"><TextInput name="distributionTool" /></Row>
         <Row label="Default Spring (lbs)"><NumberInput name="defaultSpringWeightLbs" /></Row>
         <Row label="Machine Clean (days)"><NumberInput name="machineCleaningIntervalDays" defaultValue={30} /></Row>
         <div className="flex items-center px-6 min-h-[52px]">
