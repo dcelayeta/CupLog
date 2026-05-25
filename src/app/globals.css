@@ -1,35 +1,54 @@
 @import "tailwindcss";
 
+/* ── Custom fonts ──────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: "Homosexual Agenda";
+  src: url("/fonts/homosexual_agenda-webfont.woff2") format("woff2"),
+       url("/fonts/homosexual_agenda-webfont.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Homosexual Agenda";
+  src: url("/fonts/homosexual_agenda-bold-webfont.woff2") format("woff2"),
+       url("/fonts/homosexual_agenda-bold-webfont.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
 :root {
-  --bg: #F0EEE9;
+  --bg: #F0F0F5;
   --card: #FFFFFF;
-  --card-secondary: #F0EEE9;
-  --divider: #E5E5EA;
+  --card-secondary: rgba(0,0,0,0.06);
+  --divider: rgba(0,0,0,0.08);
   --text-primary: #000000;
-  --text-secondary: #8E8E93;
+  --text-secondary: #7F7F82;
   --accent: #007AFF;
   --destructive: #FF3B30;
   --warning: #FF9500;
   --success: #34C759;
   --tab-bar-bg: #FFFFFF;
-  --tab-active-bg: #E5E5EA;
+  --tab-active-bg: rgba(0,0,0,0.07);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #000000;
     --card: #1C1C1E;
-    --card-secondary: #2C2C2E;
-    --divider: #38383A;
+    --card-secondary: rgba(255,255,255,0.08);
+    --divider: rgba(255,255,255,0.1);
     --text-primary: #FFFFFF;
     --text-secondary: #8E8E93;
-    --accent: #007AFF;
-    --destructive: #FF3B30;
-    --warning: #FF9500;
-    --success: #34C759;
+    --accent: #0A84FF;
+    --destructive: #FF453A;
+    --warning: #FF9F0A;
+    --success: #30D158;
     --tab-bar-bg: #1C1C1E;
-    --tab-active-bg: #3A3A3C;
+    --tab-active-bg: rgba(255,255,255,0.1);
   }
 }
 
@@ -46,6 +65,11 @@
   --color-success: var(--success);
   --color-tab-bar-bg: var(--tab-bar-bg);
   --color-tab-active-bg: var(--tab-active-bg);
+}
+
+/* ── Display font helper ───────────────────────────────────────────────────── */
+.font-display {
+  font-family: "Homosexual Agenda", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
@@ -79,6 +103,44 @@ select {
 
 input[type="date"] {
   color-scheme: light dark;
+}
+
+/* ── Column-constrained fixed positioning ──────────────────────────────────── */
+/* Use .fixed-col on any fixed/sticky UI element to keep it inside the app column */
+.fixed-col {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+}
+
+/* ── Inset dividers ────────────────────────────────────────────────────────── */
+/* Draws a divider line inset from both edges, matching px-6 (24px) card padding */
+.row-divider {
+  position: relative;
+}
+.row-divider::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background-color: var(--divider);
+}
+
+.row-divider-t {
+  position: relative;
+}
+.row-divider-t::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background-color: var(--divider);
 }
 
 /* ── Scrollbar hide ────────────────────────────────────────────────────────── */

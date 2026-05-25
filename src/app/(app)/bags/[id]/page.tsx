@@ -28,7 +28,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   if (!value || value === "—") return null;
   return (
     <div
-      className="flex items-center justify-between px-4 min-h-[52px]"
+      className="flex items-center justify-between px-6 min-h-[52px]"
     >
       <span
         className="text-[17px]"
@@ -151,7 +151,7 @@ export default async function BagDetailPage({
           )}
         </div>
         <h1
-          className="text-[34px] font-bold leading-tight"
+          className="text-[34px] font-display leading-tight"
           style={{ color: "var(--text-primary)" }}
         >
           {bag.name}
@@ -185,10 +185,10 @@ export default async function BagDetailPage({
           <div>
             <SectionHeader label="Details" />
             <div
-              className="mx-4 rounded-xl overflow-hidden"
+              className="mx-4 rounded-2xl overflow-hidden"
               style={{
                 backgroundColor: "var(--card)",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
               }}
             >
               {infoRows.map((row, i) => (
@@ -206,10 +206,10 @@ export default async function BagDetailPage({
           <div>
             <SectionHeader label={bag.origins.length > 1 ? "Origins" : "Origin"} />
             <div
-              className="mx-4 rounded-xl overflow-hidden"
+              className="mx-4 rounded-2xl overflow-hidden"
               style={{
                 backgroundColor: "var(--card)",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
               }}
             >
               {bag.origins.map((origin, i) => (
@@ -252,15 +252,15 @@ export default async function BagDetailPage({
         <div>
           <SectionHeader label="History" />
           <div
-            className="mx-4 rounded-xl overflow-hidden"
+            className="mx-4 rounded-2xl overflow-hidden"
             style={{
               backgroundColor: "var(--card)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
             }}
           >
             <Link
               href={`/history?bagId=${bag.id}`}
-              className="flex items-center justify-between px-4 min-h-[52px] active:opacity-70 transition-opacity"
+              className="flex items-center justify-between px-6 min-h-[52px] active:opacity-70 transition-opacity"
             >
               <span
                 className="text-[17px]"
@@ -287,6 +287,37 @@ export default async function BagDetailPage({
                 </svg>
               </span>
             </Link>
+            {bag.avgShotRating != null && (
+              <>
+                <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
+                <div className="flex items-center justify-between px-6 min-h-[52px]">
+                  <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Avg Shot Rating</span>
+                  <span className="text-[17px]" style={{ color: "#FF9500" }}>
+                    {"★".repeat(Math.round(bag.avgShotRating))}{"☆".repeat(5 - Math.round(bag.avgShotRating))} {bag.avgShotRating}
+                  </span>
+                </div>
+              </>
+            )}
+            {bag.avgTasteBalance != null && (
+              <>
+                <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
+                <div className="flex items-center justify-between px-6 min-h-[52px]">
+                  <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Avg Taste Balance</span>
+                  <span className="text-[17px]" style={{ color: "var(--text-secondary)" }}>
+                    {["", "Very Sour", "Sour", "Balanced", "Bitter", "Very Bitter"][Math.round(bag.avgTasteBalance)] ?? `${bag.avgTasteBalance.toFixed(1)}/5`}
+                  </span>
+                </div>
+              </>
+            )}
+            {bag.avgRetentionG != null && (
+              <>
+                <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
+                <div className="flex items-center justify-between px-6 min-h-[52px]">
+                  <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Avg Retention</span>
+                  <span className="text-[17px]" style={{ color: "var(--text-secondary)" }}>{bag.avgRetentionG}g</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -295,10 +326,10 @@ export default async function BagDetailPage({
           <div>
             <SectionHeader label="Notes" />
             <div
-              className="mx-4 rounded-xl px-4 py-3"
+              className="mx-4 rounded-2xl px-4 py-3"
               style={{
                 backgroundColor: "var(--card)",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
               }}
             >
               <p
@@ -310,6 +341,17 @@ export default async function BagDetailPage({
             </div>
           </div>
         )}
+
+        {/* Add same coffee shortcut */}
+        <div>
+          <Link
+            href={`/bags/new?from=${bag.id}`}
+            className="mx-4 flex items-center justify-center py-3 rounded-full text-[17px] font-medium active:opacity-70 transition-opacity"
+            style={{ backgroundColor: "var(--card)", color: "var(--accent)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+          >
+            + New bag of same coffee
+          </Link>
+        </div>
 
         {/* Actions */}
         {bag.status !== "removed" && (

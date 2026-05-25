@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function Root() {
-  redirect("/log");
+export default function RootPage() {
+  redirect("/home");
 }

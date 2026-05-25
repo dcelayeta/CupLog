@@ -59,11 +59,11 @@ export default function AIEntryPanel({
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="w-full py-3.5 rounded-xl text-[17px] font-medium flex items-center justify-center gap-2"
+          className="w-full py-3.5 rounded-full text-[17px] font-medium flex items-center justify-center gap-2"
           style={{
             backgroundColor: "var(--card)",
             color: "var(--accent)",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
           }}
         >
           <svg
@@ -89,16 +89,15 @@ export default function AIEntryPanel({
   return (
     <div className="px-4 mb-2">
       <div
-        className="rounded-xl overflow-hidden"
+        className="rounded-2xl overflow-hidden"
         style={{
           backgroundColor: "var(--card)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
         }}
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-4 py-3"
-          style={{ borderBottom: "1px solid var(--divider)" }}
+          className="row-divider flex items-center justify-between px-4 py-3"
         >
           <span
             className="text-[15px] font-semibold"
@@ -123,8 +122,7 @@ export default function AIEntryPanel({
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="w-full flex items-center justify-between px-4 min-h-[52px] active:opacity-70 transition-opacity"
-          style={{ borderBottom: "1px solid var(--divider)" }}
+          className="row-divider w-full flex items-center justify-between px-6 min-h-[52px] active:opacity-70 transition-opacity"
         >
           <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>
             Photo of bag
@@ -146,7 +144,7 @@ export default function AIEntryPanel({
         </button>
 
         {/* Text paste */}
-        <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--divider)" }}>
+        <div className="px-6 py-3 row-divider">
           <p
             className="text-[13px] mb-2"
             style={{ color: "var(--text-secondary)" }}
@@ -178,7 +176,7 @@ export default function AIEntryPanel({
             type="button"
             onClick={handleParse}
             disabled={!canParse}
-            className="w-full py-3 rounded-xl text-[17px] font-medium transition-opacity disabled:opacity-40"
+            className="w-full py-3 rounded-full text-[17px] font-medium transition-opacity disabled:opacity-40"
             style={{
               backgroundColor: "var(--accent)",
               color: "#FFFFFF",

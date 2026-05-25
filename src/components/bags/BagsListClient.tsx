@@ -11,7 +11,7 @@ export default function BagsListClient({
   query,
 }: {
   bags: BagWithOrigins[];
-  status: "active" | "finished";
+  status: "active" | "finished" | "all";
   query: string;
 }) {
   const router = useRouter();
@@ -39,8 +39,8 @@ export default function BagsListClient({
       {/* Search bar */}
       <div className="px-4 mb-3">
         <div
-          className="flex items-center gap-2 px-3 rounded-xl"
-          style={{ backgroundColor: "var(--card-secondary)", height: "44px" }}
+          className="flex items-center gap-2 px-4 rounded-full"
+          style={{ backgroundColor: "var(--card)", height: "44px", boxShadow: "0 1px 3px rgba(0,0,0,0.07)" }}
         >
           <svg
             width="16"
@@ -70,26 +70,21 @@ export default function BagsListClient({
       {/* Filter tabs */}
       <div className="px-4 mb-4">
         <div
-          className="flex rounded-xl p-1 gap-1"
+          className="flex rounded-full p-1 gap-1"
           style={{ backgroundColor: "var(--card-secondary)" }}
         >
-          {(["active", "finished"] as const).map((s) => (
+          {(["active", "finished", "all"] as const).map((s) => (
             <button
               key={s}
               onClick={() => updateUrl(s, query)}
-              className="flex-1 py-1.5 rounded-[10px] text-[14px] font-medium transition-colors capitalize"
+              className="flex-1 py-1.5 rounded-full text-[14px] font-medium transition-colors capitalize"
               style={{
-                backgroundColor:
-                  status === s ? "var(--card)" : "transparent",
-                color:
-                  status === s ? "var(--text-primary)" : "var(--text-secondary)",
-                boxShadow:
-                  status === s
-                    ? "0 1px 3px rgba(0,0,0,0.12)"
-                    : "none",
+                backgroundColor: status === s ? "var(--card)" : "transparent",
+                color: status === s ? "var(--text-primary)" : "var(--text-secondary)",
+                boxShadow: status === s ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
               }}
             >
-              {s === "active" ? "Active" : "Finished"}
+              {s === "active" ? "Active" : s === "finished" ? "Finished" : "All"}
             </button>
           ))}
         </div>
@@ -103,16 +98,16 @@ export default function BagsListClient({
             style={{ color: "var(--text-secondary)" }}
           >
             {query
-              ? `No ${status} bags matching "${query}"`
-              : `No ${status} bags`}
+              ? `No ${status === "all" ? "" : status + " "}bags matching "${query}"`
+              : status === "all" ? "No bags yet" : `No ${status} bags`}
           </p>
         </div>
       ) : (
         <div
-          className="mx-4 rounded-xl overflow-hidden"
+          className="mx-4 rounded-2xl overflow-hidden"
           style={{
             backgroundColor: "var(--card)",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
           }}
         >
           {bags.map((bag, i) => (

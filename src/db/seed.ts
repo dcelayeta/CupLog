@@ -9,9 +9,7 @@ import {
   bagOrigins,
   equipmentProfiles,
   extractionThresholds,
-  additions,
-  recipes,
-  recipeComponents,
+  shots,
 } from "./schema";
 
 const client = createClient({
@@ -41,88 +39,9 @@ async function seed() {
   ]);
   console.log("✓ Extraction thresholds");
 
-  // ── Additions ─────────────────────────────────────────────────────────────
-
-  const additionRows = await db.insert(additions).values([
-    // Syrups
-    { name: "Vanilla Syrup", category: "syrup" },
-    { name: "Caramel Syrup", category: "syrup" },
-    { name: "Hazelnut Syrup", category: "syrup" },
-    { name: "Brown Sugar Syrup", category: "syrup" },
-    { name: "Lavender Syrup", category: "syrup" },
-    // Spices
-    { name: "Cinnamon", category: "spice" },
-    { name: "Nutmeg", category: "spice" },
-    { name: "Cardamom", category: "spice" },
-    { name: "Cocoa Powder", category: "spice" },
-    // Supplements
-    { name: "Collagen", category: "supplement" },
-    { name: "Protein Powder", category: "supplement" },
-    { name: "Ashwagandha", category: "supplement" },
-    // Flavors
-    { name: "Chai Concentrate", category: "flavor" },
-    { name: "Matcha", category: "flavor" },
-    { name: "Pumpkin Spice", category: "flavor" },
-    { name: "Peppermint", category: "flavor" },
-  ]).returning();
-  console.log("✓ Additions");
-
-  const chaiId = additionRows.find((a) => a.name === "Chai Concentrate")!.id;
-
-  // ── Recipes ───────────────────────────────────────────────────────────────
-
-  const recipeRows = await db.insert(recipes).values([
-    { name: "Espresso", description: "Single shot", totalVolumeMl: 30 },
-    { name: "Doppio", description: "Double shot", totalVolumeMl: 60 },
-    { name: "Americano", description: "Espresso with hot water", totalVolumeMl: 150 },
-    { name: "Cortado", description: "Equal parts espresso and steamed milk", totalVolumeMl: 60 },
-    { name: "Flat White", description: "Espresso with velvety steamed milk, smaller than a latte", totalVolumeMl: 150 },
-    { name: "Latte", description: "Espresso with a large pour of steamed milk", totalVolumeMl: 270 },
-    { name: "Cappuccino", description: "Equal parts espresso, steamed milk, and foam", totalVolumeMl: 150 },
-    { name: "Macchiato", description: "Espresso with a small amount of milk foam", totalVolumeMl: 45 },
-    { name: "Iced Latte", description: "Espresso over ice with cold milk", totalVolumeMl: 270 },
-    { name: "Dirty Chai", description: "Espresso with chai concentrate and steamed milk", totalVolumeMl: 210 },
-  ]).returning();
-  console.log("✓ Recipes");
-
-  const r = (name: string) => recipeRows.find((rec) => rec.name === name)!.id;
-
-  await db.insert(recipeComponents).values([
-    // Espresso
-    { recipeId: r("Espresso"), name: "Espresso", sortOrder: 1 },
-    // Doppio
-    { recipeId: r("Doppio"), name: "Espresso", sortOrder: 1 },
-    // Americano
-    { recipeId: r("Americano"), name: "Espresso", sortOrder: 1 },
-    { recipeId: r("Americano"), name: "Hot Water", minQuantity: 100, maxQuantity: 150, unit: "ml", sortOrder: 2 },
-    // Cortado — 1:1 to 1:2 espresso:milk, ~20–60ml milk
-    { recipeId: r("Cortado"), name: "Espresso", sortOrder: 1 },
-    { recipeId: r("Cortado"), name: "Steamed Milk", minQuantity: 20, maxQuantity: 60, unit: "ml", isMilkComponent: true, sortOrder: 2 },
-    // Flat White — 80–150ml steamed milk
-    { recipeId: r("Flat White"), name: "Espresso", sortOrder: 1 },
-    { recipeId: r("Flat White"), name: "Steamed Milk", minQuantity: 80, maxQuantity: 150, unit: "ml", isMilkComponent: true, sortOrder: 2 },
-    // Latte — 180–300ml steamed milk
-    { recipeId: r("Latte"), name: "Espresso", sortOrder: 1 },
-    { recipeId: r("Latte"), name: "Steamed Milk", minQuantity: 180, maxQuantity: 300, unit: "ml", isMilkComponent: true, sortOrder: 2 },
-    // Cappuccino — 40–80ml steamed milk, hot
-    { recipeId: r("Cappuccino"), name: "Espresso", sortOrder: 1 },
-    { recipeId: r("Cappuccino"), name: "Steamed Milk", minQuantity: 40, maxQuantity: 80, unit: "ml", isMilkComponent: true, sortOrder: 2 },
-    // Macchiato — up to 30ml milk foam
-    { recipeId: r("Macchiato"), name: "Espresso", sortOrder: 1 },
-    { recipeId: r("Macchiato"), name: "Milk Foam", minQuantity: 5, maxQuantity: 30, unit: "ml", isMilkComponent: true, sortOrder: 2 },
-    // Iced Latte — cold milk 180–300ml
-    { recipeId: r("Iced Latte"), name: "Espresso", sortOrder: 1 },
-    { recipeId: r("Iced Latte"), name: "Cold Milk", minQuantity: 180, maxQuantity: 300, unit: "ml", isMilkComponent: true, sortOrder: 2 },
-    // Dirty Chai — requires chai addition + milk 120–240ml
-    { recipeId: r("Dirty Chai"), name: "Espresso", sortOrder: 1 },
-    { recipeId: r("Dirty Chai"), name: "Steamed Milk", minQuantity: 100, maxQuantity: 200, unit: "ml", isMilkComponent: true, sortOrder: 2 },
-    { recipeId: r("Dirty Chai"), name: "Chai Concentrate", requiredAdditionId: chaiId, sortOrder: 3 },
-  ]);
-  console.log("✓ Recipe components");
-
   // ── Equipment profile ─────────────────────────────────────────────────────
 
-  await db.insert(equipmentProfiles).values({
+  const [equipmentProfile] = await db.insert(equipmentProfiles).values({
     name: "Home Setup",
     machine: "Breville Bambino",
     grinder: "Baratza Encore ESP Pro",
@@ -132,7 +51,7 @@ async function seed() {
     grinderCleaningIntervalDays: 14,
     isActive: true,
     notes: "No 3-way solenoid valve — expect 6-8g drip lag after pump stop. Always stop pump before target yield to account for lag. 10 min warmup + blank flush before pulling shots.",
-  });
+  }).returning();
   console.log("✓ Equipment profile");
 
   // ── Seed bags ─────────────────────────────────────────────────────────────
@@ -191,6 +110,130 @@ async function seed() {
     { bagId: bag3.id, country: "Colombia", region: "Huila", variety: "Pink Bourbon" },
   ]);
   console.log("✓ Bag origins");
+
+  // ── Seed shots ────────────────────────────────────────────────────────────
+
+  await db.insert(shots).values([
+    // Shot 1 — Bag 1 (Ándale), 15lb spring, no WDT, sour
+    {
+      bagId: bag1.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-07T08:00:00", grindSetting: 37.0,
+      doseG: 18.0, yieldG: 36.0, shotTimeSeconds: 36,
+      springWeightLbs: 15, wdtUsed: false, preinfusionSeconds: 10,
+      acidity: 4, sweetness: 2, bitterness: 1, body: 2, aroma: 2, tasteBalance: 2, shotRating: 1,
+      notes: "Sour. Early shot, still learning workflow. Using 15lb spring, no WDT yet. Extended manual preinfusion ~10 seconds.",
+    },
+    // Shot 2 — uneven flow, drip lag
+    {
+      bagId: bag1.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-08T08:00:00", grindSetting: 36.5,
+      doseG: 18.0, yieldG: 38.0, shotTimeSeconds: 25,
+      springWeightLbs: 15, wdtUsed: false, preinfusionSeconds: 10,
+      acidity: 4, sweetness: 2, bitterness: 1, body: 2, aroma: 2, tasteBalance: 2, shotRating: 1,
+      notes: "Still sour. Flow all over the place, more on one spout than the other. Stopped machine at ~30g, significant drip lag to 38g.",
+    },
+    // Shot 3 — WDT introduced, over-extracted
+    {
+      bagId: bag1.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-09T08:00:00", grindSetting: 34.5,
+      doseG: 18.1, yieldG: 43.3, shotTimeSeconds: 43,
+      springWeightLbs: 15, wdtUsed: true, preinfusionSeconds: 10,
+      acidity: 4, sweetness: 2, bitterness: 2, body: 2, aroma: 2, tasteBalance: 2, shotRating: 1,
+      notes: "Went finer to address sourness. Flow restricted at first, just dripping. Over-extracted. Still sour. WDT introduced this session. Extended preinfusion still in use.",
+    },
+    // Shot 4 — 30lb spring, no preinfusion, best so far
+    {
+      bagId: bag1.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-10T08:00:00", grindSetting: 35.5,
+      doseG: 18.0, yieldG: 37.5, shotTimeSeconds: 35,
+      springWeightLbs: 30, wdtUsed: true, preinfusionSeconds: 0,
+      acidity: 3, sweetness: 3, bitterness: 2, body: 2, aroma: 3, tasteBalance: 2, shotRating: 2,
+      notes: "Switched to 30lb spring. No manual preinfusion. Flow even from both spouts. Slightly sour but noticeably more balanced than previous shots. Best shot so far.",
+    },
+    // Shot 5 — getting closer
+    {
+      bagId: bag1.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-11T08:00:00", grindSetting: 34.5,
+      doseG: 18.1, yieldG: 39.6, shotTimeSeconds: 31,
+      springWeightLbs: 30, wdtUsed: true, preinfusionSeconds: 0,
+      acidity: 3, sweetness: 3, bitterness: 2, body: 3, aroma: 3, tasteBalance: 2, shotRating: 3,
+      notes: "Slightly sour but really good with milk. Both spouts but concentrated in one for a while mid-shot. Puck intact. Getting closer.",
+    },
+    // Shot 6 — possibly best on this bean
+    {
+      bagId: bag1.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-12T08:00:00", grindSetting: 33.0,
+      doseG: 18.1, yieldG: 39.6, shotTimeSeconds: 31,
+      springWeightLbs: 30, wdtUsed: true, preinfusionSeconds: 0,
+      acidity: 3, sweetness: 3, bitterness: 2, body: 3, aroma: 3, tasteBalance: 2, shotRating: 3,
+      notes: "Slightly sour, less than other shots. Came through both spouts but not the whole time — concentrated in one for a while. Really good with milk. Possibly best shot yet on this bean.",
+    },
+    // Shot 7 — aging bean, fast shot
+    {
+      bagId: bag1.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-13T08:00:00", grindSetting: 34.0,
+      doseG: 18.1, yieldG: 38.0, shotTimeSeconds: 23,
+      springWeightLbs: 30, wdtUsed: true, preinfusionSeconds: 0,
+      acidity: 4, sweetness: 2, bitterness: 1, body: 2, aroma: 2, tasteBalance: 2, shotRating: 2,
+      notes: "Sour. Fast shot at 23 seconds. Stopped at ~30g. Bean getting older at 16 days — may need finer grind as it ages.",
+    },
+    // Shot 8 — Gaby's affogato (single, coarse, no time logged)
+    {
+      bagId: bag1.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-14T15:00:00", grindSetting: 39.5,
+      doseG: 9.0, yieldG: 40.0, shotTimeSeconds: null,
+      springWeightLbs: 30, wdtUsed: false, preinfusionSeconds: 0,
+      acidity: 2, sweetness: 3, bitterness: 3, body: 2, aroma: 2, tasteBalance: 3, shotRating: 3,
+      notes: "Gaby's shot. Single 9g dose for affogato. Much more balanced — likely due to very long ratio (1:4.4) diluting acidity. Coarse grind 39.5.",
+    },
+    // Shot 9 — Diego single shot test, fast and bitter
+    {
+      bagId: bag1.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-14T15:30:00", grindSetting: null,
+      doseG: 8.0, yieldG: 21.0, shotTimeSeconds: 16,
+      springWeightLbs: 30, wdtUsed: true, preinfusionSeconds: 0,
+      acidity: 2, sweetness: 2, bitterness: 4, body: 2, aroma: 2, tasteBalance: 4, shotRating: 2,
+      notes: "8g single shot test for affogato. 21g in 16 seconds — very fast, slightly bitter. Small dose + no 3-way solenoid made drip lag proportionally huge. Difficult on the Bambino.",
+    },
+    // Shot 10 — overextraction test, no yield/time logged
+    {
+      bagId: bag1.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-15T08:00:00", grindSetting: 31.5,
+      doseG: 18.0, yieldG: null, shotTimeSeconds: null,
+      springWeightLbs: 30, wdtUsed: true, preinfusionSeconds: 0,
+      acidity: 2, sweetness: 2, bitterness: 4, body: 3, aroma: 2, tasteBalance: 4, shotRating: 2,
+      notes: "Went very fine (31-32 range) to test limits. Over-extracted and slightly bitter. Flow uneven. Useful to identify the over-extraction end of the spectrum on this bean.",
+    },
+    // Shot 11 — first Maomi, no scale
+    {
+      bagId: bag2.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-16T08:00:00", grindSetting: 34.0,
+      doseG: 18.0, yieldG: null, shotTimeSeconds: null,
+      springWeightLbs: 30, wdtUsed: true, preinfusionSeconds: 0,
+      acidity: 2, sweetness: 3, bitterness: 4, body: 3, aroma: 3, tasteBalance: 4, shotRating: 2,
+      notes: "First shot on Maomi. Purged ~20g first to clear Ándale from burrs. Slightly bitter but not too bad. Did not log scale — no yield or time recorded.",
+    },
+    // Shot 12 — Maomi, accidental preinfusion, no yield
+    {
+      bagId: bag2.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-16T08:30:00", grindSetting: 35.0,
+      doseG: 18.0, yieldG: null, shotTimeSeconds: 40,
+      springWeightLbs: 30, wdtUsed: true, preinfusionSeconds: 10,
+      acidity: 4, sweetness: 2, bitterness: 2, body: 2, aroma: 2, tasteBalance: 2, shotRating: 1,
+      notes: "Went coarser to 35. Accidentally used 10 second manual preinfusion — old habit. Over-extracted at 40 seconds. Flow restricted. Sour. Identified preinfusion as ongoing variable causing inconsistency.",
+    },
+    // Shot 13 — Maomi best shot
+    {
+      bagId: bag2.id, equipmentProfileId: equipmentProfile.id,
+      pulledAt: "2026-05-16T09:00:00", grindSetting: 35.0,
+      doseG: 18.1, yieldG: 37.4, shotTimeSeconds: 33,
+      springWeightLbs: 30, wdtUsed: true, preinfusionSeconds: 0,
+      grinderRetentionG: 0.1,
+      acidity: 3, sweetness: 3, bitterness: 2, body: 3, aroma: 3, tasteBalance: 2, shotRating: 3,
+      notes: "Best shot yet. No manual preinfusion. Flow came out more on right spout then started on left halfway through — mild channeling. Acid taste that does not linger much. Really good with milk. Grinder retention 0.1g.",
+    },
+  ]);
+  console.log("✓ Shots (13)");
 
   console.log("\nSeed complete.");
   process.exit(0);

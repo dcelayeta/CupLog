@@ -4,7 +4,6 @@ import {
   real,
   sqliteTable,
   text,
-  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 // ─── bags ────────────────────────────────────────────────────────────────────
@@ -117,8 +116,9 @@ export const shots = sqliteTable("shots", {
   pulledAt: text("pulled_at").notNull(), // ISO datetime
   grindSetting: real("grind_setting"),
   doseG: real("dose_g").notNull(),
-  yieldG: real("yield_g").notNull(),
-  shotTimeSeconds: integer("shot_time_seconds").notNull(),
+  yieldG: real("yield_g"),
+  shotTimeSeconds: integer("shot_time_seconds"),
+  lagG: real("lag_g"), // grams that drip through after pressing stop (no 3-way valve)
   preinfusionSeconds: integer("preinfusion_seconds"),
   springWeightLbs: integer("spring_weight_lbs"),
   wdtUsed: integer("wdt_used", { mode: "boolean" }).notNull().default(false),
@@ -128,66 +128,9 @@ export const shots = sqliteTable("shots", {
   bitterness: integer("bitterness"),
   body: integer("body"),
   aroma: integer("aroma"),
+  tasteBalance: integer("taste_balance"), // 1=very sour, 3=balanced, 5=very bitter
+  shotRating: integer("shot_rating"), // 1–5 stars
   notes: text("notes"),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-});
-
-// ─── additions ───────────────────────────────────────────────────────────────
-
-export const additions = sqliteTable("additions", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  category: text("category", {
-    enum: ["syrup", "spice", "supplement", "flavor", "other"],
-  }).notNull(),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-});
-
-// ─── recipes ─────────────────────────────────────────────────────────────────
-
-export const recipes = sqliteTable("recipes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  description: text("description"),
-  totalVolumeMl: integer("total_volume_ml"), // display only
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-});
-
-// ─── recipe_components ───────────────────────────────────────────────────────
-
-export const recipeComponents = sqliteTable("recipe_components", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  recipeId: integer("recipe_id")
-    .notNull()
-    .references(() => recipes.id),
-  name: text("name").notNull(),
-  minQuantity: real("min_quantity"), // null = presence-only (e.g. "Espresso")
-  maxQuantity: real("max_quantity"),
-  unit: text("unit", { enum: ["ml", "g", "shots", "pumps", "tsp", "tbsp"] }),
-  isMilkComponent: integer("is_milk_component", { mode: "boolean" })
-    .notNull()
-    .default(false), // used to match against drink.milk_quantity_ml
-  requiredAdditionId: integer("required_addition_id").references(
-    () => additions.id
-  ), // if set, this component matches a specific addition
-  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),
@@ -207,10 +150,9 @@ export const drinks = sqliteTable("drinks", {
     enum: ["whole", "oat", "almond", "soy", "coconut", "skim", "half_and_half", "none"],
   }),
   milkQuantityMl: integer("milk_quantity_ml"),
-  milkTemperature: text("milk_temperature", {
-    enum: ["hot", "cold", "iced", "room_temperature"],
-  }),
-  detectedRecipeId: integer("detected_recipe_id").references(() => recipes.id),
+  foamMl: integer("foam_ml"),
+  hotWaterMl: integer("hot_water_ml"),
+  detectedDrinkName: text("detected_drink_name"),
   overallRating: integer("overall_rating"),
   notes: text("notes"),
   createdAt: text("created_at")
@@ -221,17 +163,40 @@ export const drinks = sqliteTable("drinks", {
     .default(sql`(datetime('now'))`),
 });
 
-// ─── drink_additions ─────────────────────────────────────────────────────────
+// ─── coaching_state ──────────────────────────────────────────────────────────
+// Single row, always id=1. Upserted after every recent shot analysis.
 
-export const drinkAdditions = sqliteTable("drink_additions", {
+export const coachingState = sqliteTable("coaching_state", {
+  id: integer("id").primaryKey(),
+  experienceLevel: text("experience_level").notNull().default("beginner"),
+  currentFocus: text("current_focus"),
+  knownPatterns: text("known_patterns"),
+  lastRecommendation: text("last_recommendation"),
+  lastAnalysisDate: text("last_analysis_date"),
+  lastAnalyzedShotId: integer("last_analyzed_shot_id").references(() => shots.id),
+  beanContexts: text("bean_contexts"), // JSON array stored as text
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+// ─── shot_analyses ────────────────────────────────────────────────────────────
+// Persists every analysis result so it can be re-read without re-calling the API.
+
+export const shotAnalyses = sqliteTable("shot_analyses", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  drinkId: integer("drink_id")
+  shotId: integer("shot_id")
     .notNull()
-    .references(() => drinks.id),
-  additionId: integer("addition_id")
-    .notNull()
-    .references(() => additions.id),
-  quantity: text("quantity"), // free text e.g. "2 pumps"
+    .references(() => shots.id),
+  analysisMode: text("analysis_mode", { enum: ["recent", "historical"] }).notNull(),
+  summary: text("summary"),
+  numbers: text("numbers"),
+  recommendationAction: text("recommendation_action"),
+  recommendationReason: text("recommendation_reason"),
+  beanContext: text("bean_context"),
+  progressNote: text("progress_note"),
+  overallVerdict: text("overall_verdict"),
+  rawResponse: text("raw_response"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),
@@ -248,9 +213,7 @@ export type NewEquipmentProfile = typeof equipmentProfiles.$inferInsert;
 export type ExtractionThreshold = typeof extractionThresholds.$inferSelect;
 export type Shot = typeof shots.$inferSelect;
 export type NewShot = typeof shots.$inferInsert;
-export type Addition = typeof additions.$inferSelect;
-export type Recipe = typeof recipes.$inferSelect;
-export type RecipeComponent = typeof recipeComponents.$inferSelect;
 export type Drink = typeof drinks.$inferSelect;
 export type NewDrink = typeof drinks.$inferInsert;
-export type DrinkAddition = typeof drinkAdditions.$inferSelect;
+export type CoachingState = typeof coachingState.$inferSelect;
+export type ShotAnalysis = typeof shotAnalyses.$inferSelect;

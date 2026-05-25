@@ -67,7 +67,7 @@ function FieldRow({
 }) {
   return (
     <div
-      className="flex items-center px-4 min-h-[52px] gap-4"
+      className="flex items-center px-6 min-h-[52px] gap-4"
       style={{ color: "var(--text-primary)" }}
     >
       <span className="text-[17px] flex-shrink-0 w-36">{label}</span>
@@ -88,10 +88,10 @@ function Divider() {
 function GroupedCard({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="mx-4 rounded-xl overflow-hidden"
+      className="mx-4 rounded-2xl overflow-hidden"
       style={{
         backgroundColor: "var(--card)",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
       }}
     >
       {children}
@@ -446,16 +446,15 @@ export default function BagFormClient({
               {origins.map((origin, i) => (
                 <div
                   key={i}
-                  className="rounded-xl overflow-hidden"
+                  className="rounded-2xl overflow-hidden"
                   style={{
                     backgroundColor: "var(--card)",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
                   }}
                 >
                   {/* Origin header */}
                   <div
-                    className="flex items-center justify-between px-4 py-2"
-                    style={{ borderBottom: "1px solid var(--divider)" }}
+                    className="row-divider flex items-center justify-between px-4 py-2"
                   >
                     <span
                       className="text-[13px] font-medium uppercase tracking-wide"
@@ -476,7 +475,7 @@ export default function BagFormClient({
                   </div>
 
                   {/* Country */}
-                  <div className="flex items-center px-4 min-h-[52px] gap-4">
+                  <div className="flex items-center px-6 min-h-[52px] gap-4">
                     <span
                       className="text-[17px] flex-shrink-0 w-28"
                       style={{ color: "var(--text-primary)" }}
@@ -505,7 +504,7 @@ export default function BagFormClient({
                   />
 
                   {/* Region */}
-                  <div className="flex items-center px-4 min-h-[52px] gap-4">
+                  <div className="flex items-center px-6 min-h-[52px] gap-4">
                     <span
                       className="text-[17px] flex-shrink-0 w-28"
                       style={{ color: "var(--text-primary)" }}
@@ -533,7 +532,7 @@ export default function BagFormClient({
                   />
 
                   {/* Variety */}
-                  <div className="flex items-center px-4 min-h-[52px] gap-4">
+                  <div className="flex items-center px-6 min-h-[52px] gap-4">
                     <span
                       className="text-[17px] flex-shrink-0 w-28"
                       style={{ color: "var(--text-primary)" }}
@@ -561,7 +560,7 @@ export default function BagFormClient({
                           backgroundColor: "var(--divider)",
                         }}
                       />
-                      <div className="flex items-center px-4 min-h-[52px] gap-4">
+                      <div className="flex items-center px-6 min-h-[52px] gap-4">
                         <span
                           className="text-[17px] flex-shrink-0 w-28"
                           style={{ color: "var(--text-primary)" }}
@@ -591,11 +590,11 @@ export default function BagFormClient({
                 <button
                   type="button"
                   onClick={addOrigin}
-                  className="w-full py-3 rounded-xl text-[17px] font-medium"
+                  className="w-full py-3 rounded-full text-[17px] font-medium"
                   style={{
                     backgroundColor: "var(--card)",
                     color: "var(--accent)",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
                   }}
                 >
                   + Add Origin
@@ -608,10 +607,10 @@ export default function BagFormClient({
           <div>
             <SectionHeader label="Notes" />
             <div
-              className="mx-4 rounded-xl overflow-hidden"
+              className="mx-4 rounded-2xl overflow-hidden"
               style={{
                 backgroundColor: "var(--card)",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
               }}
             >
               <textarea
@@ -637,11 +636,11 @@ export default function BagFormClient({
           <button
             type="submit"
             disabled={isPending}
-            className="w-full py-4 rounded-xl text-[17px] font-medium transition-opacity disabled:opacity-50"
+            className="w-full py-4 rounded-full text-[17px] font-medium transition-opacity disabled:opacity-50"
             style={{
               backgroundColor: "var(--card)",
               color: "var(--accent)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
             }}
           >
             {isPending ? "Saving…" : "Save Bag"}

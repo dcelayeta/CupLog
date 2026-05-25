@@ -50,7 +50,7 @@ export default function DuplicateModal({
         <div className="px-4 pb-5 flex flex-col gap-2">
           <button
             onClick={onReplace}
-            className="w-full py-3 rounded-xl text-[17px] font-medium"
+            className="w-full py-3 rounded-full text-[17px] font-medium"
             style={{
               backgroundColor: "var(--card-secondary)",
               color: "var(--destructive)",
@@ -60,7 +60,7 @@ export default function DuplicateModal({
           </button>
           <button
             onClick={onAddNew}
-            className="w-full py-3 rounded-xl text-[17px] font-medium"
+            className="w-full py-3 rounded-full text-[17px] font-medium"
             style={{
               backgroundColor: "var(--card-secondary)",
               color: "var(--accent)",
@@ -70,7 +70,7 @@ export default function DuplicateModal({
           </button>
           <button
             onClick={onCancel}
-            className="w-full py-3 rounded-xl text-[17px] font-medium"
+            className="w-full py-3 rounded-full text-[17px] font-medium"
             style={{
               backgroundColor: "var(--card-secondary)",
               color: "var(--text-primary)",

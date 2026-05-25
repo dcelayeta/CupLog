@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { markBagFinished, removeBag, reactivateBag } from "@/lib/bags/actions";
 
 export default function BagActions({
@@ -26,43 +25,22 @@ export default function BagActions({
   };
 
   return (
-    <div className="px-4 pb-8 flex flex-col gap-3">
-      {/* Always visible */}
-      <Link
-        href={`/bags/new?from=${bagId}`}
-        className="w-full py-4 rounded-xl text-[17px] font-medium text-center block"
-        style={{
-          backgroundColor: "var(--card)",
-          color: "var(--accent)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-        }}
-      >
-        New Bag of Same Coffee
-      </Link>
-
+    <div className="px-4 pb-8 flex flex-col items-center gap-4">
       {status === "active" && (
         <>
           <button
             onClick={handleFinish}
-            className="w-full py-4 rounded-xl text-[17px] font-medium"
-            style={{
-              backgroundColor: "var(--card)",
-              color: "var(--warning)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-            }}
+            className="text-[15px] font-medium"
+            style={{ color: "var(--warning)" }}
           >
             Mark as Finished
           </button>
           <button
             onClick={handleRemove}
-            className="w-full py-4 rounded-xl text-[17px] font-medium"
-            style={{
-              backgroundColor: "var(--card)",
-              color: "var(--destructive)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-            }}
+            className="text-[15px] font-medium"
+            style={{ color: "var(--destructive)" }}
           >
-            Remove Bag
+            Delete Bag
           </button>
         </>
       )}
@@ -70,25 +48,17 @@ export default function BagActions({
         <>
           <button
             onClick={handleReactivate}
-            className="w-full py-4 rounded-xl text-[17px] font-medium"
-            style={{
-              backgroundColor: "var(--card)",
-              color: "var(--accent)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-            }}
+            className="text-[15px] font-medium"
+            style={{ color: "var(--accent)" }}
           >
             Reactivate
           </button>
           <button
             onClick={handleRemove}
-            className="w-full py-4 rounded-xl text-[17px] font-medium"
-            style={{
-              backgroundColor: "var(--card)",
-              color: "var(--destructive)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-            }}
+            className="text-[15px] font-medium"
+            style={{ color: "var(--destructive)" }}
           >
-            Remove Bag
+            Delete Bag
           </button>
         </>
       )}

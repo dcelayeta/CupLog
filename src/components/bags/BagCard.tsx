@@ -92,6 +92,11 @@ export default function BagCard({ bag }: { bag: BagWithOrigins }) {
               {countries}
             </span>
           )}
+          {bag.avgShotRating != null && (
+            <span className="text-[13px]" style={{ color: "#FF9500" }}>
+              {"★".repeat(Math.round(bag.avgShotRating))}{"☆".repeat(5 - Math.round(bag.avgShotRating))} {bag.avgShotRating}
+            </span>
+          )}
         </div>
       </div>
     </Link>

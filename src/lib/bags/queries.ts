@@ -6,16 +6,29 @@ import type { Bag, BagOrigin } from "@/db/schema";
 export type BagWithOrigins = Bag & {
   origins: BagOrigin[];
   shotCount?: number;
+  avgTasteBalance?: number | null;
+  avgRetentionG?: number | null;
+  avgShotRating?: number | null;
 };
 
 export async function getBags(
-  status: "active" | "finished" = "active"
+  status: "active" | "finished" | "all" = "active"
 ): Promise<BagWithOrigins[]> {
+  const whereClause = status === "all"
+    ? sql`${bags.status} != ${"removed"}`
+    : eq(bags.status, status);
+
+  const orderClause = status === "finished"
+    ? sql`${bags.finishedDate} DESC`
+    : status === "all"
+    ? sql`${bags.roastDate} DESC`
+    : sql`${bags.roastDate} ASC`;
+
   const bagRows = await db
     .select()
     .from(bags)
-    .where(eq(bags.status, status))
-    .orderBy(sql`${bags.roastDate} DESC`);
+    .where(whereClause)
+    .orderBy(orderClause);
 
   if (bagRows.length === 0) return [];
 
@@ -29,10 +42,31 @@ export async function getBags(
       )})`
     );
 
-  return bagRows.map((bag) => ({
+  const ratingRows = await db.all(sql`
+    SELECT bag_id, ROUND(AVG(shot_rating), 1) as avg_shot_rating
+    FROM shots
+    WHERE bag_id IN (${sql.join(bagRows.map((b) => sql`${b.id}`), sql`, `)})
+    GROUP BY bag_id
+  `) as { bag_id: number; avg_shot_rating: number | null }[];
+
+  const ratingMap = Object.fromEntries(ratingRows.map((r) => [r.bag_id, r.avg_shot_rating]));
+
+  const result = bagRows.map((bag) => ({
     ...bag,
     origins: originRows.filter((o) => o.bagId === bag.id),
+    avgShotRating: ratingMap[bag.id] ?? null,
   }));
+
+  if (status === "all") {
+    result.sort((a, b) => {
+      if (a.avgShotRating == null && b.avgShotRating == null) return 0;
+      if (a.avgShotRating == null) return 1;
+      if (b.avgShotRating == null) return -1;
+      return b.avgShotRating - a.avgShotRating;
+    });
+  }
+
+  return result;
 }
 
 export async function getBagById(id: number): Promise<BagWithOrigins | null> {
@@ -49,7 +83,22 @@ export async function getBagById(id: number): Promise<BagWithOrigins | null> {
     .from(shots)
     .where(eq(shots.bagId, id));
 
-  return { ...bag, origins, shotCount: Number(count) };
+  const [{ avgTasteBalance }] = await db
+    .select({ avgTasteBalance: sql<number | null>`avg(${shots.tasteBalance})` })
+    .from(shots)
+    .where(eq(shots.bagId, id));
+
+  const [{ avgRetentionG }] = await db
+    .select({ avgRetentionG: sql<number | null>`avg(${shots.grinderRetentionG})` })
+    .from(shots)
+    .where(eq(shots.bagId, id));
+
+  const [{ avgShotRating }] = await db
+    .select({ avgShotRating: sql<number | null>`avg(${shots.shotRating})` })
+    .from(shots)
+    .where(eq(shots.bagId, id));
+
+  return { ...bag, origins, shotCount: Number(count), avgTasteBalance: avgTasteBalance ?? null, avgRetentionG: avgRetentionG != null ? Math.round(avgRetentionG * 100) / 100 : null, avgShotRating: avgShotRating != null ? Math.round(avgShotRating * 10) / 10 : null };
 }
 
 export async function findDuplicateBag(
@@ -75,9 +124,13 @@ export async function findDuplicateBag(
 
 export async function searchBags(
   query: string,
-  status: "active" | "finished" = "active"
+  status: "active" | "finished" | "all" = "active"
 ): Promise<BagWithOrigins[]> {
   const q = `%${query.toLowerCase()}%`;
+
+  const statusClause = status === "all"
+    ? sql`${bags.status} != ${"removed"}`
+    : eq(bags.status, status);
 
   // Match on bag fields OR any origin (country, variety)
   const bagRows = await db
@@ -85,7 +138,7 @@ export async function searchBags(
     .from(bags)
     .where(
       and(
-        eq(bags.status, status),
+        statusClause,
         or(
           like(sql`lower(${bags.roaster})`, q),
           like(sql`lower(${bags.name})`, q),
@@ -102,7 +155,7 @@ export async function searchBags(
         )
       )
     )
-    .orderBy(sql`${bags.roastDate} DESC`);
+    .orderBy(status === "finished" ? sql`${bags.finishedDate} DESC` : sql`${bags.roastDate} ASC`);
 
   if (bagRows.length === 0) return [];
 
@@ -116,8 +169,29 @@ export async function searchBags(
       )})`
     );
 
-  return bagRows.map((bag) => ({
+  const ratingRows = await db.all(sql`
+    SELECT bag_id, ROUND(AVG(shot_rating), 1) as avg_shot_rating
+    FROM shots
+    WHERE bag_id IN (${sql.join(bagRows.map((b) => sql`${b.id}`), sql`, `)})
+    GROUP BY bag_id
+  `) as { bag_id: number; avg_shot_rating: number | null }[];
+
+  const ratingMap = Object.fromEntries(ratingRows.map((r) => [r.bag_id, r.avg_shot_rating]));
+
+  const result = bagRows.map((bag) => ({
     ...bag,
     origins: originRows.filter((o) => o.bagId === bag.id),
+    avgShotRating: ratingMap[bag.id] ?? null,
   }));
+
+  if (status === "all") {
+    result.sort((a, b) => {
+      if (a.avgShotRating == null && b.avgShotRating == null) return 0;
+      if (a.avgShotRating == null) return 1;
+      if (b.avgShotRating == null) return -1;
+      return b.avgShotRating - a.avgShotRating;
+    });
+  }
+
+  return result;
 }
