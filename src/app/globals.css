@@ -56,6 +56,42 @@
   }
 }
 
+/* Force light — overrides media query */
+:root[data-theme="light"] {
+  --drink-espresso: #271812;
+  --drink-chai: #462c21;
+  --bg: #F0F0F5;
+  --card: #FFFFFF;
+  --card-secondary: rgba(0,0,0,0.06);
+  --divider: rgba(0,0,0,0.08);
+  --text-primary: #000000;
+  --text-secondary: #7F7F82;
+  --accent: #007AFF;
+  --destructive: #FF3B30;
+  --warning: #FF9500;
+  --success: #34C759;
+  --tab-bar-bg: #FFFFFF;
+  --tab-active-bg: rgba(0,0,0,0.07);
+}
+
+/* Force dark — overrides media query */
+:root[data-theme="dark"] {
+  --drink-espresso: #4a2415;
+  --drink-chai: #6b4232;
+  --bg: #000000;
+  --card: #1C1C1E;
+  --card-secondary: rgba(255,255,255,0.08);
+  --divider: rgba(255,255,255,0.1);
+  --text-primary: #FFFFFF;
+  --text-secondary: #8E8E93;
+  --accent: #0A84FF;
+  --destructive: #FF453A;
+  --warning: #FF9F0A;
+  --success: #30D158;
+  --tab-bar-bg: #1C1C1E;
+  --tab-active-bg: rgba(255,255,255,0.1);
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-card: var(--card);

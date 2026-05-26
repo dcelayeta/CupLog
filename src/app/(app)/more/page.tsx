@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getActiveEquipmentProfile } from "@/lib/equipment/queries";
+import ThemeSelector from "@/components/ThemeSelector";
 
 function daysSince(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -87,6 +88,14 @@ export default async function MorePage() {
       >
         <NavRow href="/more/drinks" label="Drink History" description="Browse all logged drinks" />
         <NavRow href="/more/recipes" label="Drink Reference" description="Espresso drink guide and proportions" />
+      </div>
+
+      <SectionHeader title="Appearance" />
+      <div
+        className="mx-4 rounded-2xl overflow-hidden"
+        style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+      >
+        <ThemeSelector />
       </div>
 
       <SectionHeader title="Equipment" />
