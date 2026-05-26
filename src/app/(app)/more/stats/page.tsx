@@ -1,0 +1,483 @@
+import Link from "next/link";
+import { db } from "@/db/client";
+import { sql } from "drizzle-orm";
+
+// ─── Queries ──────────────────────────────────────────────────────────────────
+
+async function getRatingDistribution(): Promise<Record<number, number>> {
+  const rows = await db.all(sql`
+    SELECT shot_rating, COUNT(*) as count
+    FROM shots
+    WHERE shot_rating IS NOT NULL
+    GROUP BY shot_rating
+  `) as { shot_rating: number; count: number }[];
+  const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  for (const row of rows) dist[Number(row.shot_rating)] = Number(row.count);
+  return dist;
+}
+
+async function getTasteDistribution(): Promise<Record<number, number>> {
+  const rows = await db.all(sql`
+    SELECT
+      CASE
+        WHEN taste_balance <= 1.4 THEN 1
+        WHEN taste_balance <= 2.4 THEN 2
+        WHEN taste_balance <= 3.4 THEN 3
+        WHEN taste_balance <= 4.4 THEN 4
+        WHEN taste_balance <= 5.4 THEN 5
+        WHEN taste_balance <= 6.4 THEN 6
+        ELSE 7
+      END as bucket,
+      COUNT(*) as count
+    FROM shots
+    WHERE taste_balance IS NOT NULL
+    GROUP BY bucket
+  `) as { bucket: number; count: number }[];
+  const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
+  for (const row of rows) dist[Number(row.bucket)] = Number(row.count);
+  return dist;
+}
+
+interface ScatterPoint { x: number; y: number; rating: number | null; }
+
+async function getScatterData(): Promise<ScatterPoint[][]> {
+  const rows = await db.all(sql`
+    SELECT dose_g, yield_g, shot_time_seconds, taste_balance, shot_rating
+    FROM shots
+    WHERE taste_balance IS NOT NULL
+  `) as {
+    dose_g: number | null; yield_g: number | null;
+    shot_time_seconds: number | null; taste_balance: number; shot_rating: number | null;
+  }[];
+  const ratioPoints: ScatterPoint[] = [];
+  const timePoints: ScatterPoint[] = [];
+  for (const r of rows) {
+    const tb = Number(r.taste_balance);
+    const rating = r.shot_rating !== null ? Number(r.shot_rating) : null;
+    if (r.dose_g && r.yield_g && Number(r.dose_g) > 0)
+      ratioPoints.push({ x: Number(r.yield_g) / Number(r.dose_g), y: tb, rating });
+    if (r.shot_time_seconds !== null)
+      timePoints.push({ x: Number(r.shot_time_seconds), y: tb, rating });
+  }
+  return [ratioPoints, timePoints];
+}
+
+interface RatingTrendPoint { rating: number; tasteBalance: number | null; }
+
+async function getRatingTrend(): Promise<RatingTrendPoint[]> {
+  const rows = await db.all(sql`
+    SELECT shot_rating, taste_balance
+    FROM shots
+    WHERE shot_rating IS NOT NULL
+    ORDER BY pulled_at ASC
+  `) as { shot_rating: number; taste_balance: number | null }[];
+  return rows.map(r => ({
+    rating: Number(r.shot_rating),
+    tasteBalance: r.taste_balance !== null ? Number(r.taste_balance) : null,
+  }));
+}
+
+async function getFreshnessVsTaste(): Promise<ScatterPoint[]> {
+  const rows = await db.all(sql`
+    SELECT s.taste_balance, s.shot_rating, s.pulled_at, b.roast_date
+    FROM shots s
+    JOIN bags b ON s.bag_id = b.id
+    WHERE s.taste_balance IS NOT NULL AND b.roast_date IS NOT NULL
+  `) as { taste_balance: number; shot_rating: number | null; pulled_at: string; roast_date: string }[];
+  return rows.flatMap(r => {
+    const days = Math.floor(
+      (new Date(r.pulled_at).getTime() - new Date(r.roast_date + "T00:00:00").getTime()) / 86400000
+    );
+    if (days < 0 || days > 90) return [];
+    return [{ x: days, y: Number(r.taste_balance), rating: r.shot_rating !== null ? Number(r.shot_rating) : null }];
+  });
+}
+
+async function getRetentionTrend(): Promise<number[]> {
+  const rows = await db.all(sql`
+    SELECT grinder_retention_g
+    FROM shots
+    WHERE grinder_retention_g IS NOT NULL
+    ORDER BY pulled_at ASC
+  `) as { grinder_retention_g: number }[];
+  return rows.map(r => Number(r.grinder_retention_g));
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const RATING_COLORS: Record<number, string> = {
+  1: "#FF3B30", 2: "#FF9500", 3: "#FFD60A", 4: "#34C759", 5: "#30D158",
+};
+
+const TASTE_ZONE_COLORS = [
+  "#FF3B30", "#FF6B35", "#FFB347", "#34C759", "#FF9500", "#8B5CF6", "#6D28D9",
+];
+
+function tasteBalanceColor(tb: number | null): string {
+  if (tb === null) return "#8E8E93";
+  if (tb <= 1.4) return TASTE_ZONE_COLORS[0];
+  if (tb <= 2.4) return TASTE_ZONE_COLORS[1];
+  if (tb <= 3.4) return TASTE_ZONE_COLORS[2];
+  if (tb <= 4.4) return TASTE_ZONE_COLORS[3];
+  if (tb <= 5.4) return TASTE_ZONE_COLORS[4];
+  if (tb <= 6.4) return TASTE_ZONE_COLORS[5];
+  return TASTE_ZONE_COLORS[6];
+}
+
+function catmullRomPath(pts: [number, number][]): string {
+  if (pts.length < 2) return "";
+  const p = [pts[0], ...pts, pts[pts.length - 1]];
+  let d = `M ${p[1][0]} ${p[1][1]}`;
+  for (let i = 1; i < p.length - 2; i++) {
+    const [x0, y0] = p[i - 1], [x1, y1] = p[i], [x2, y2] = p[i + 1], [x3, y3] = p[i + 2];
+    const cp1x = x1 + (x2 - x0) / 6, cp1y = y1 + (y2 - y0) / 6;
+    const cp2x = x2 - (x3 - x1) / 6, cp2y = y2 - (y3 - y1) / 6;
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)},${cp2x.toFixed(1)} ${cp2y.toFixed(1)},${x2} ${y2}`;
+  }
+  return d;
+}
+
+// ─── Chart components ─────────────────────────────────────────────────────────
+
+interface BarSpec { label: string; count: number; color: string; }
+
+function BarChart({ bars, title, subtitle, labelFontSize = 9 }: {
+  bars: BarSpec[]; title: string; subtitle: string; labelFontSize?: number;
+}) {
+  const n = bars.length;
+  const W = 280, H = 110, padL = 8, padR = 8, padTop = 22, padBottom = 22;
+  const chartW = W - padL - padR, chartH = H - padTop - padBottom;
+  const baseY = padTop + chartH;
+  const slotW = chartW / n;
+  const barW = Math.min(22, slotW * 0.55);
+  const maxCount = Math.max(...bars.map(b => b.count), 1);
+  const computed = bars.map((b, i) => {
+    const cx = padL + slotW * i + slotW / 2;
+    const barH = (b.count / maxCount) * chartH;
+    return { ...b, cx, barH, y: baseY - barH };
+  });
+  return (
+    <div className="rounded-2xl overflow-hidden mb-4"
+      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+      <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
+        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
+      </div>
+      <div className="px-2 pb-3">
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+          {computed.map(b => b.barH > 0 && (
+            <rect key={b.label} x={b.cx - barW / 2} y={b.y} width={barW} height={b.barH}
+              rx={4} fill={b.color} opacity={0.85} />
+          ))}
+          {computed.map(b => b.count > 0 && (
+            <text key={`cnt-${b.label}`} x={b.cx} y={b.y - 5} textAnchor="middle" fontSize={9}
+              fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+              {b.count}
+            </text>
+          ))}
+          {computed.map(b => (
+            <text key={`lbl-${b.label}`} x={b.cx} y={H - 5} textAnchor="middle" fontSize={labelFontSize}
+              fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+              {b.label}
+            </text>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function ScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, xFormat }: {
+  points: ScatterPoint[]; title: string; subtitle: string;
+  xMin: number; xMax: number; xTicks: number[]; xFormat: (v: number) => string;
+}) {
+  const W = 300, H = 190, padL = 34, padR = 10, padT = 12, padB = 28;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const xPos = (v: number) => padL + (v - xMin) / (xMax - xMin) * plotW;
+  const yPos = (tb: number) => padT + (7 - tb) / 6 * plotH;
+  const bandY1 = yPos(4.4), bandY2 = yPos(3.5);
+
+  return (
+    <div className="rounded-2xl overflow-hidden mb-4"
+      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+      <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
+        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
+      </div>
+      {points.length === 0 ? (
+        <div className="px-4 py-8 text-center">
+          <p className="text-[15px]" style={{ color: "var(--text-secondary)" }}>No data yet</p>
+        </div>
+      ) : (
+        <>
+          <div className="px-2">
+            <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+              <rect x={padL} y={bandY1} width={plotW} height={bandY2 - bandY1} fill="#30D158" opacity={0.08} />
+              {[1, 2, 3, 4, 5, 6, 7].map(tb => (
+                <line key={tb} x1={padL} y1={yPos(tb)} x2={padL + plotW} y2={yPos(tb)}
+                  stroke="var(--divider)" strokeWidth={tb === 4 ? 1 : 0.5} />
+              ))}
+              {[{ tb: 1, label: "Sour" }, { tb: 4, label: "Bal." }, { tb: 7, label: "Bitter" }].map(({ tb, label }) => (
+                <text key={tb} x={padL - 4} y={yPos(tb) + 3.5} textAnchor="end" fontSize={8}
+                  fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+                  {label}
+                </text>
+              ))}
+              {xTicks.map(v => (
+                <g key={v}>
+                  <line x1={xPos(v)} y1={padT + plotH} x2={xPos(v)} y2={padT + plotH + 4}
+                    stroke="var(--divider)" strokeWidth={1} />
+                  <text x={xPos(v)} y={H - 5} textAnchor="middle" fontSize={8}
+                    fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+                    {xFormat(v)}
+                  </text>
+                </g>
+              ))}
+              {points.map((pt, i) => {
+                const cx = xPos(pt.x), cy = yPos(pt.y);
+                if (cx < padL || cx > padL + plotW || cy < padT || cy > padT + plotH) return null;
+                return <circle key={i} cx={cx} cy={cy} r={3.5}
+                  fill={pt.rating !== null ? RATING_COLORS[pt.rating] : "#8E8E93"} opacity={0.72} />;
+              })}
+            </svg>
+          </div>
+          <div className="px-4 pb-3 flex items-center gap-3 flex-wrap">
+            {[5, 4, 3, 2, 1].map(r => (
+              <span key={r} className="flex items-center gap-1">
+                <svg width="8" height="8" style={{ flexShrink: 0 }}><circle cx="4" cy="4" r="3.5" fill={RATING_COLORS[r]} /></svg>
+                <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{r}★</span>
+              </span>
+            ))}
+            <span className="flex items-center gap-1">
+              <svg width="8" height="8" style={{ flexShrink: 0 }}><circle cx="4" cy="4" r="3.5" fill="#8E8E93" /></svg>
+              <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>unrated</span>
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TrendChart({ points, title, subtitle, yMin, yMax, yTicks, yFormat, connectLine = false, rollingWindow = 0, legend }: {
+  points: Array<{ y: number; color: string }>;
+  title: string; subtitle: string;
+  yMin: number; yMax: number;
+  yTicks: number[]; yFormat: (v: number) => string;
+  connectLine?: boolean;
+  rollingWindow?: number;
+  legend?: React.ReactNode;
+}) {
+  const W = 300, H = 170, padL = 34, padR = 10, padT = 12, padB = 28;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const n = points.length;
+
+  const xPos = (i: number) => padL + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
+  const yPos = (v: number) => padT + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+
+  // Rolling average
+  const rollingPts: [number, number][] = rollingWindow > 1
+    ? points.map((_, i) => {
+        const half = Math.floor(rollingWindow / 2);
+        const s = Math.max(0, i - half), e = Math.min(n, i + half + 1);
+        const avg = points.slice(s, e).reduce((a, p) => a + p.y, 0) / (e - s);
+        return [xPos(i), yPos(avg)];
+      })
+    : [];
+
+  const linePath = connectLine && n > 1
+    ? points.map((p, i) => `${i === 0 ? "M" : "L"} ${xPos(i).toFixed(1)} ${yPos(p.y).toFixed(1)}`).join(" ")
+    : "";
+
+  // X axis: show first, mid, last
+  const xLabels = n < 2 ? [0] : [...new Set([0, Math.round((n - 1) / 2), n - 1])];
+
+  return (
+    <div className="rounded-2xl overflow-hidden mb-4"
+      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+      <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
+        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
+      </div>
+      {n < 3 ? (
+        <div className="px-4 py-8 text-center">
+          <p className="text-[15px]" style={{ color: "var(--text-secondary)" }}>Not enough data yet</p>
+        </div>
+      ) : (
+        <>
+          <div className="px-2">
+            <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+              {yTicks.map(v => (
+                <line key={v} x1={padL} y1={yPos(v)} x2={padL + plotW} y2={yPos(v)}
+                  stroke="var(--divider)" strokeWidth={0.5} />
+              ))}
+              {yTicks.map(v => (
+                <text key={`lbl-${v}`} x={padL - 4} y={yPos(v) + 3.5} textAnchor="end" fontSize={8}
+                  fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+                  {yFormat(v)}
+                </text>
+              ))}
+              {xLabels.map(i => (
+                <text key={i} x={xPos(i)} y={H - 5} textAnchor="middle" fontSize={8}
+                  fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+                  #{i + 1}
+                </text>
+              ))}
+              {linePath && (
+                <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth={1} opacity={0.2} />
+              )}
+              {rollingPts.length > 1 && (
+                <path d={catmullRomPath(rollingPts)} fill="none" stroke="var(--accent)"
+                  strokeWidth={1.5} opacity={0.55} strokeLinecap="round" strokeLinejoin="round" />
+              )}
+              {points.map((pt, i) => (
+                <circle key={i} cx={xPos(i)} cy={yPos(pt.y)} r={3} fill={pt.color} opacity={0.78} />
+              ))}
+            </svg>
+          </div>
+          {legend && <div className="px-4 pb-3">{legend}</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default async function StatsPage() {
+  const [
+    ratingDist, tasteDist,
+    [ratioPoints, timePoints],
+    ratingTrend, freshnessPoints, retentionValues,
+  ] = await Promise.all([
+    getRatingDistribution(),
+    getTasteDistribution(),
+    getScatterData(),
+    getRatingTrend(),
+    getFreshnessVsTaste(),
+    getRetentionTrend(),
+  ]);
+
+  const ratingBars: BarSpec[] = [
+    { label: "1★", count: ratingDist[1], color: "#FF3B30" },
+    { label: "2★", count: ratingDist[2], color: "#FF9500" },
+    { label: "3★", count: ratingDist[3], color: "#FFD60A" },
+    { label: "4★", count: ratingDist[4], color: "#34C759" },
+    { label: "5★", count: ratingDist[5], color: "#30D158" },
+  ];
+
+  const tasteBars: BarSpec[] = [
+    { label: "V.Sour",    count: tasteDist[1], color: "var(--accent)" },
+    { label: "Sour",      count: tasteDist[2], color: "var(--accent)" },
+    { label: "Sl.Sour",   count: tasteDist[3], color: "var(--accent)" },
+    { label: "Balanced",  count: tasteDist[4], color: "var(--accent)" },
+    { label: "Sl.Bitter", count: tasteDist[5], color: "var(--accent)" },
+    { label: "Bitter",    count: tasteDist[6], color: "var(--accent)" },
+    { label: "V.Bitter",  count: tasteDist[7], color: "var(--accent)" },
+  ];
+
+  const totalRated = ratingBars.reduce((a, b) => a + b.count, 0);
+  const totalTaste = tasteBars.reduce((a, b) => a + b.count, 0);
+
+  // Rating trend — dots colored by taste balance, rolling avg overlay
+  const ratingWindow = Math.max(5, Math.round(ratingTrend.length / 8));
+  const ratingTrendPoints = ratingTrend.map(p => ({
+    y: p.rating, color: tasteBalanceColor(p.tasteBalance),
+  }));
+
+  // Freshness scatter — auto-scale X to data
+  const maxFreshnessDay = freshnessPoints.length > 0
+    ? Math.min(90, Math.ceil(Math.max(...freshnessPoints.map(p => p.x)) / 10) * 10)
+    : 60;
+  const freshnessTicks = [10, 20, 30, 40, 50, 60, 70, 80, 90].filter(t => t <= maxFreshnessDay);
+
+  // Retention trend — auto-scale Y
+  const retentionPoints = retentionValues.map((y, i) => ({ y, color: "var(--accent)" }));
+  let retYMin = 0, retYMax = 1, retTicks: number[] = [0, 0.5, 1];
+  if (retentionValues.length >= 3) {
+    const lo = Math.min(...retentionValues), hi = Math.max(...retentionValues);
+    const pad = Math.max(0.05, (hi - lo) * 0.2);
+    retYMin = Math.max(0, lo - pad);
+    retYMax = hi + pad;
+    const range = retYMax - retYMin;
+    const step = range < 0.5 ? 0.1 : range < 1.5 ? 0.2 : range < 3 ? 0.5 : 1;
+    retTicks = [];
+    const start = Math.ceil(retYMin / step) * step;
+    for (let t = start; t <= retYMax + step * 0.01; t += step)
+      retTicks.push(Math.round(t * 100) / 100);
+  }
+
+  const tasteLegend = (
+    <div className="flex items-center gap-2 flex-wrap">
+      {["V.Sour", "Sour", "Sl.Sour", "Balanced", "Sl.Bitter", "Bitter", "V.Bitter"].map((label, i) => (
+        <span key={label} className="flex items-center gap-1">
+          <svg width="8" height="8" style={{ flexShrink: 0 }}><circle cx="4" cy="4" r="3.5" fill={TASTE_ZONE_COLORS[i]} /></svg>
+          <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{label}</span>
+        </span>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="pt-4 pb-24">
+      <div className="px-4 mb-2">
+        <Link href="/more" className="text-[17px] flex items-center gap-1" style={{ color: "var(--accent)" }}>
+          <svg width="10" height="17" viewBox="0 0 10 17" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 1L1 8.5L9 16" />
+          </svg>
+          More
+        </Link>
+      </div>
+      <h1 className="text-[34px] font-display px-4 mb-4" style={{ color: "var(--text-primary)" }}>
+        Stats
+      </h1>
+      <div className="px-4">
+        <BarChart bars={ratingBars} title="Shot ratings" subtitle={`${totalRated} rated`} />
+        <BarChart bars={tasteBars} title="Taste balance" subtitle={`${totalTaste} logged`} labelFontSize={8} />
+        <ScatterPlot
+          points={ratioPoints}
+          title="Ratio vs taste"
+          subtitle={`${ratioPoints.length} shots`}
+          xMin={1.0} xMax={3.0}
+          xTicks={[1.5, 2.0, 2.5, 3.0]}
+          xFormat={v => `1:${v % 1 === 0 ? v : v.toFixed(1)}`}
+        />
+        <ScatterPlot
+          points={timePoints}
+          title="Time vs taste"
+          subtitle={`${timePoints.length} shots`}
+          xMin={15} xMax={55}
+          xTicks={[20, 30, 40, 50]}
+          xFormat={v => `${v}s`}
+        />
+        <TrendChart
+          points={ratingTrendPoints}
+          title="Rating over time"
+          subtitle={`${ratingTrend.length} rated`}
+          yMin={0.5} yMax={5.5}
+          yTicks={[1, 2, 3, 4, 5]}
+          yFormat={v => `${v}★`}
+          rollingWindow={ratingWindow}
+          legend={tasteLegend}
+        />
+        <ScatterPlot
+          points={freshnessPoints}
+          title="Roast age vs taste"
+          subtitle={`${freshnessPoints.length} shots`}
+          xMin={0} xMax={maxFreshnessDay}
+          xTicks={freshnessTicks}
+          xFormat={v => `${v}d`}
+        />
+        <TrendChart
+          points={retentionPoints}
+          title="Grinder retention"
+          subtitle={`${retentionValues.length} logged`}
+          yMin={retYMin} yMax={retYMax}
+          yTicks={retTicks}
+          yFormat={v => `${v}g`}
+          connectLine
+        />
+      </div>
+    </div>
+  );
+}

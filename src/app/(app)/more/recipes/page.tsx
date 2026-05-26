@@ -111,8 +111,8 @@ function DrinkBar({ volumes }: { volumes: DrinkVolumes }) {
   const empty = Math.max(0, MAX_ML - filled);
 
   const segments: { ml: number; color: string }[] = [
-    { ml: volumes.espresso, color: "#271812" },
-    { ml: volumes.chai,     color: "#462c21" },
+    { ml: volumes.espresso, color: "var(--drink-espresso)" },
+    { ml: volumes.chai,     color: "var(--drink-chai)" },
     { ml: volumes.chocolate,color: "#79564d" },
     { ml: volumes.hotWater, color: "#a0cee7" },
     { ml: volumes.milk,     color: "#f3f2f6" },

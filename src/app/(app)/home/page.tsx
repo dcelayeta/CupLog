@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { db } from "@/db/client";
 import { sql } from "drizzle-orm";
+import { getBags } from "@/lib/bags/queries";
+import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
+import { getActiveEquipmentProfile } from "@/lib/equipment/queries";
 
 async function getStats() {
   const [row] = await db.all(sql`
@@ -37,6 +40,32 @@ async function getLastShot() {
     LIMIT 1
   `) as Record<string, string | number | null>[];
   return row ?? null;
+}
+
+function MiniFreshnessBar({ days, peakStart, peakEnd }: {
+  days: number; peakStart: number; peakEnd: number;
+}) {
+  const mid = (peakStart + peakEnd) / 2;
+  const total = peakEnd + 15;
+  const clamp = (d: number) => Math.min(Math.max(d, 0), total);
+  const seg = (from: number, to: number) =>
+    ((clamp(to) - clamp(from)) / total * 100).toFixed(2) + "%";
+  const todayPct = (clamp(days) / total * 100).toFixed(2) + "%";
+
+  return (
+    <div style={{ position: "relative", height: 6, borderRadius: 3, overflow: "hidden", display: "flex" }}>
+      <div style={{ flexShrink: 0, width: seg(0, peakStart), backgroundColor: "#8E8E93", opacity: 0.35 }} />
+      <div style={{ flexShrink: 0, width: seg(peakStart, mid), backgroundColor: "#30D158", opacity: 0.75 }} />
+      <div style={{ flexShrink: 0, width: seg(mid, peakEnd), backgroundColor: "#248A3D", opacity: 0.75 }} />
+      <div style={{ flexShrink: 0, width: seg(peakEnd, peakEnd + 10), backgroundColor: "#FF9500", opacity: 0.75 }} />
+      <div style={{ flexShrink: 0, width: seg(peakEnd + 10, total), backgroundColor: "#FF3B30", opacity: 0.75 }} />
+      <div style={{
+        position: "absolute", left: todayPct, top: 0, bottom: 0, width: 2,
+        backgroundColor: "white", transform: "translateX(-50%)", borderRadius: 1,
+        boxShadow: "0 0 3px rgba(0,0,0,0.5)",
+      }} />
+    </div>
+  );
 }
 
 function tasteLabel(balance: number | null): string {
@@ -82,7 +111,9 @@ function formatDate(pulledAt: string | null): string {
 }
 
 export default async function HomePage() {
-  const [stats, lastShot] = await Promise.all([getStats(), getLastShot()]);
+  const [stats, lastShot, activeBags, equipment] = await Promise.all([
+    getStats(), getLastShot(), getBags("active"), getActiveEquipmentProfile(),
+  ]);
 
   const totalShots = Number(stats?.total_shots ?? 0);
 
@@ -96,6 +127,44 @@ export default async function HomePage() {
           ? "No shots logged yet."
           : `${totalShots} shot${totalShots !== 1 ? "s" : ""} pulled`}
       </p>
+
+      {(() => {
+        if (!equipment) return null;
+        const daysSince = (d: string | null) => d ? Math.floor((Date.now() - new Date(d).getTime()) / 86400000) : null;
+        const machineDays = daysSince(equipment.machineLastCleanedAt);
+        const grinderDays = daysSince(equipment.grinderLastCleanedAt);
+        const machineInterval = equipment.machineCleaningIntervalDays ?? 30;
+        const grinderInterval = equipment.grinderCleaningIntervalDays ?? 14;
+        const machineOverdue = machineDays === null || machineDays >= machineInterval;
+        const grinderOverdue = grinderDays === null || grinderDays >= grinderInterval;
+        if (!machineOverdue && !grinderOverdue) return null;
+
+        const items = [
+          machineOverdue && `Machine${machineDays !== null ? ` (${machineDays}d ago)` : ""}`,
+          grinderOverdue && `Grinder${grinderDays !== null ? ` (${grinderDays}d ago)` : ""}`,
+        ].filter(Boolean).join(" · ");
+
+        return (
+          <Link
+            href="/more/equipment"
+            className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-4 active:opacity-70 transition-opacity"
+            style={{ backgroundColor: "var(--destructive)", opacity: 1 }}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 2L2 17h16L10 2z" />
+              <path d="M10 8v4" />
+              <circle cx="10" cy="14.5" r="0.5" fill="white" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-white">Cleaning overdue</p>
+              <p className="text-[12px] text-white opacity-80">{items}</p>
+            </div>
+            <svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+              <path d="M1 1l6 5.5L1 12" />
+            </svg>
+          </Link>
+        );
+      })()}
 
       {totalShots > 0 && (
         <>
@@ -215,6 +284,46 @@ export default async function HomePage() {
             </Link>
           )}
         </>
+      )}
+
+      {/* Active beans freshness */}
+      {activeBags.length > 0 && (
+        <div
+          className="rounded-2xl overflow-hidden mb-4"
+          style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+        >
+          <div className="px-4 pt-3 pb-1">
+            <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+              Active beans
+            </p>
+          </div>
+          {activeBags.map((bag, i) => {
+            const days = getDaysSinceRoast(bag.roastDate);
+            const peakStart = bag.peakStartDay ?? 7;
+            const peakEnd = bag.peakEndDay ?? 35;
+            const label = getFreshnessLabel(days, peakStart, peakEnd);
+            const color = getFreshnessColor(days, peakStart, peakEnd);
+            return (
+              <Link
+                key={bag.id}
+                href={`/bags/${bag.id}`}
+                className="block px-4 pt-3 pb-3 active:opacity-70 transition-opacity"
+                style={{ borderTop: i > 0 ? "1px solid var(--divider)" : undefined }}
+              >
+                <p className="text-[15px] font-medium mb-2" style={{ color: "var(--text-primary)" }}>
+                  {bag.roaster} — {bag.name}
+                </p>
+                <MiniFreshnessBar days={days} peakStart={peakStart} peakEnd={peakEnd} />
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[12px]" style={{ color: FRESHNESS_CSS[color] }}>{label}</span>
+                  {days >= 0 && (
+                    <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{days}d</span>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       )}
 
       {/* CTA */}

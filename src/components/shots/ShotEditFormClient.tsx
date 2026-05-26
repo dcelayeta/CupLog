@@ -24,8 +24,8 @@ function LiveDrinkBar({ espressoMl, milkMl, foamMl, hotWaterMl, hasChocolate, ha
   const filled = espressoMl + chaiMl + chocolateMl + hotWaterMl + milkMl + iceCreamMl + foamMl;
   const empty = Math.max(0, MAX_DRINK_ML - filled);
   const segments = [
-    { ml: espressoMl, color: "#271812" },
-    { ml: chaiMl, color: "#462c21" },
+    { ml: espressoMl, color: "var(--drink-espresso)" },
+    { ml: chaiMl, color: "var(--drink-chai)" },
     { ml: chocolateMl, color: "#79564d" },
     { ml: hotWaterMl, color: "#a0cee7" },
     { ml: milkMl, color: "#f3f2f6" },

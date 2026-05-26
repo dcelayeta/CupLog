@@ -72,6 +72,14 @@ export default async function MorePage() {
         More
       </h1>
 
+      <SectionHeader title="Insights" />
+      <div
+        className="mx-4 rounded-2xl overflow-hidden"
+        style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+      >
+        <NavRow href="/more/stats" label="Stats" description="Rating and taste distributions" />
+      </div>
+
       <SectionHeader title="Drinks" />
       <div
         className="mx-4 rounded-2xl overflow-hidden"

@@ -21,6 +21,8 @@
 
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
 :root {
+  --drink-espresso: #271812;
+  --drink-chai: #462c21;
   --bg: #F0F0F5;
   --card: #FFFFFF;
   --card-secondary: rgba(0,0,0,0.06);
@@ -37,6 +39,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    --drink-espresso: #4a2415;
+    --drink-chai: #6b4232;
     --bg: #000000;
     --card: #1C1C1E;
     --card-secondary: rgba(255,255,255,0.08);
