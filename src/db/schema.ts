@@ -136,7 +136,7 @@ export const shots = sqliteTable("shots", {
   bitterness: integer("bitterness"),
   body: integer("body"),
   aroma: integer("aroma"),
-  tasteBalance: integer("taste_balance"), // 1=very sour, 3=balanced, 5=very bitter
+  tasteBalance: integer("taste_balance"), // 1=very sour … 4=balanced … 7=very bitter
   shotRating: integer("shot_rating"), // 1–5 stars
   notes: text("notes"),
   createdAt: text("created_at")

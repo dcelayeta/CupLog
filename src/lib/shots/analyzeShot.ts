@@ -423,16 +423,21 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
   const { userMessage, shot, analysisMode } = await assembleUserMessage(shotId);
 
   const client = new Anthropic();
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 3000,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: JSON.stringify(userMessage) }],
-  });
-
-  const content = message.content[0];
-  if (content.type !== "text") return null;
-  const rawText = content.text;
+  let rawText: string;
+  try {
+    const message = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 3000,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: JSON.stringify(userMessage) }],
+    });
+    const content = message.content[0];
+    if (content.type !== "text") return null;
+    rawText = content.text;
+  } catch (err) {
+    console.error("Anthropic API error:", err);
+    return null;
+  }
 
   // Parse JSON response
   let parsed: {

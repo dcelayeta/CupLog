@@ -8,7 +8,7 @@ import {
   shotAnalyses,
   equipmentProfiles,
 } from "@/db/schema";
-import { eq, desc, lt, lte, and, sql, not } from "drizzle-orm";
+import { eq, desc, lt, and, sql, not } from "drizzle-orm";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
