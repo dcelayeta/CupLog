@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getShotById } from "@/lib/shots/queries";
+import { getShotById, getLatestShotId } from "@/lib/shots/queries";
+import { getShotPositionInHistory } from "@/lib/analysis/queries";
+import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
 import { getAnalysisForShot } from "@/lib/analysis/queries";
 import ClassificationBadge from "@/components/shots/ClassificationBadge";
 import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
@@ -19,11 +21,11 @@ function formatDateTime(iso: string) {
   });
 }
 
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailRow({ label, value, noDivider }: { label: string; value: React.ReactNode; noDivider?: boolean }) {
   if (value === null || value === undefined || value === "") return null;
   return (
     <div
-      className="row-divider flex items-center px-6 min-h-[52px]"
+      className={`${noDivider ? "" : "row-divider "}flex items-center px-6 min-h-[52px]`}
     >
       <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>
         {label}
@@ -31,6 +33,36 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
       <span className="text-[17px]" style={{ color: "var(--text-secondary)" }}>
         {value}
       </span>
+    </div>
+  );
+}
+
+const MAX_DRINK_ML = 300;
+
+function DrinkCompositionBar({ espressoMl, milkMl, foamMl, hotWaterMl, hasChocolate, hasIceCream, hasChai }: {
+  espressoMl: number; milkMl: number; foamMl: number; hotWaterMl: number;
+  hasChocolate: boolean; hasIceCream: boolean; hasChai: boolean;
+}) {
+  const chaiMl = hasChai ? 30 : 0;
+  const chocolateMl = hasChocolate ? 10 : 0;
+  const iceCreamMl = hasIceCream ? 60 : 0;
+  const filled = espressoMl + chaiMl + chocolateMl + hotWaterMl + milkMl + iceCreamMl + foamMl;
+  const empty = Math.max(0, MAX_DRINK_ML - filled);
+  const segments = [
+    { ml: espressoMl, color: "#271812" },
+    { ml: chaiMl,     color: "#462c21" },
+    { ml: chocolateMl,color: "#79564d" },
+    { ml: hotWaterMl, color: "#a0cee7" },
+    { ml: milkMl,     color: "#f3f2f6" },
+    { ml: iceCreamMl, color: "#d2d3c4" },
+    { ml: foamMl,     color: "#fefce6" },
+    { ml: empty,      color: "#c9c9ce" },
+  ].filter((s) => s.ml > 0);
+  return (
+    <div className="flex overflow-hidden rounded-full" style={{ height: 12 }}>
+      {segments.map((seg, i) => (
+        <div key={i} style={{ width: `${(seg.ml / MAX_DRINK_ML) * 100}%`, backgroundColor: seg.color, flexShrink: 0 }} />
+      ))}
     </div>
   );
 }
@@ -51,16 +83,19 @@ export default async function ShotDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [shot, existingAnalysis] = await Promise.all([
+  const [shot, existingAnalysis, latestShotId] = await Promise.all([
     getShotById(Number(id)),
     getAnalysisForShot(Number(id)),
+    getLatestShotId(),
   ]);
   if (!shot) notFound();
-
+  const { shotNumber } = await getShotPositionInHistory(Number(id), shot.pulledAt);
   const brewRatio = shot.yieldG != null ? shot.yieldG / shot.doseG : null;
   const daysSinceRoast = getDaysSinceRoast(shot.bagRoastDate);
-  const freshnessColor = FRESHNESS_CSS[getFreshnessColor(daysSinceRoast)];
-  const freshnessLabel = getFreshnessLabel(daysSinceRoast);
+  const peakStart = shot.bagPeakStartDay ?? undefined;
+  const peakEnd = shot.bagPeakEndDay ?? undefined;
+  const freshnessColor = FRESHNESS_CSS[getFreshnessColor(daysSinceRoast, peakStart, peakEnd)];
+  const freshnessLabel = getFreshnessLabel(daysSinceRoast, peakStart, peakEnd);
 
   return (
     <div className="pt-4 pb-24">
@@ -87,7 +122,10 @@ export default async function ShotDetailPage({
           {shot.roasterName} · {shot.bagName}
         </h1>
         <p className="text-[15px] mt-1" style={{ color: "var(--text-secondary)" }}>
-          {formatDateTime(shot.pulledAt)}
+          {formatDateTime(shot.pulledAt)}{" "}
+          <span style={{ color: shot.id === latestShotId ? "#007AFF" : "var(--text-secondary)" }}>
+            (Shot {shotNumber}{shot.id === latestShotId ? " — Latest shot" : ""})
+          </span>
         </p>
       </div>
 
@@ -210,8 +248,27 @@ export default async function ShotDetailPage({
             style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
           >
             {shot.drink.detectedDrinkName && (
-              <DetailRow label="Drink" value={shot.drink.detectedDrinkName} />
+              <DetailRow label="Drink" value={shot.drink.detectedDrinkName} noDivider />
             )}
+            {/* Composition bar — no dividers above or below */}
+            <div className="px-6 py-3">
+              {(() => {
+                const defaults = shot.drink!.detectedDrinkName
+                  ? DRINK_DEFAULTS[shot.drink!.detectedDrinkName as keyof typeof DRINK_DEFAULTS]
+                  : null;
+                return (
+                  <DrinkCompositionBar
+                    espressoMl={shot.yieldG ?? 0}
+                    milkMl={shot.drink!.milkQuantityMl ?? 0}
+                    foamMl={shot.drink!.foamMl ?? 0}
+                    hotWaterMl={shot.drink!.hotWaterMl ?? 0}
+                    hasChocolate={defaults?.hasChocolate ?? false}
+                    hasIceCream={defaults?.hasIceCream ?? false}
+                    hasChai={defaults?.hasChai ?? false}
+                  />
+                );
+              })()}
+            </div>
             {shot.drink.milkType && (
               <DetailRow label="Milk" value={shot.drink.milkType} />
             )}

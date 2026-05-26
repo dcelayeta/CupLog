@@ -86,6 +86,19 @@ Diego writes notes describing taste and flow. These are often the most diagnosti
 
 Always read and reference notes. Never ignore them in favor of numbers alone.
 
+## Freshness Interpretation
+
+Each bag has its own peak_start_day and peak_end_day stored in the database, auto-estimated from roast level and processing method. The freshness badge in the app already uses these per-bag values. Bean context includes these fields when available.
+
+General guidelines by roast level and process:
+- **Light roasts**: need more rest. "Too fresh" extends to ~14 days. Peak window is roughly 14–42 days.
+- **Medium roasts**: peak around 7–35 days.
+- **Dark roasts**: degas fast. Ready in 3–4 days. Past peak by ~21–28 days.
+- **Natural / anaerobic processed**: add ~4 days to the too-fresh window.
+- **Decaf (EA Washed / Swiss Water)**: ready sooner (day 4) and goes stale faster (day 21).
+
+If shots suggest extraction issues consistent with wrong freshness stage (e.g., channeling + sour on a supposedly "peak" bag), consider whether the estimated window fits and suggest overriding it in bag settings if appropriate.
+
 ## Decaf Handling
 
 EA Washed decaf beans extract more easily than regular beans due to decaffeination opening the bean structure. Always recommend starting 1-2 grind settings coarser than equivalent regular beans. Note this explicitly when the current bean is_decaf.
@@ -160,6 +173,13 @@ Meaningful pattern or improvement vs recent history. 1-2 sentences maximum. null
 - Never repeat data already visible in the UI — add interpretation only
 - When a shot is good, say so clearly and recommend stopping the chase
 
+## Bean Context Size Limits
+
+bean_contexts is your persistent memory — keep it tight or it will overflow. Rules:
+- notes field: max 120 characters. One crisp sentence with the key learning. No padding.
+- profile field: max 80 characters. Roast level, origin, 2-3 flavor words only.
+- Finished beans: only update if there is a new learning. Do not re-write unchanged entries.
+
 ## Response Format
 
 CRITICAL: Respond with ONLY a raw JSON object. No markdown, no code fences, no headers, no explanation before or after. Your entire response must start with { and end with }. Any other format will break the parser.
@@ -198,6 +218,33 @@ CRITICAL: Respond with ONLY a raw JSON object. No markdown, no code fences, no h
 }
 
 IMPORTANT: For historical shot analysis (Mode 2), return updated_coaching_state as null — never overwrite current coaching state with a historical analysis.`;
+
+// ─── Bean Context Trimming ────────────────────────────────────────────────────
+
+/**
+ * Keeps the coaching context lean so responses stay within token budget.
+ * - Active/dialing-in/resting: sent in full (current bags, need all details)
+ * - Finished: only the 3 most-used, fields compacted, notes capped at 120 chars
+ */
+function trimBeanContexts(contexts: import("@/lib/analysis/queries").BeanContext[]) {
+  const active = contexts.filter((c) => c.status !== "finished");
+  const finished = contexts
+    .filter((c) => c.status === "finished")
+    .sort((a, b) => b.shots_pulled - a.shots_pulled)
+    .slice(0, 3)
+    .map((c) => ({
+      bag_id: c.bag_id,
+      name: c.name,
+      status: c.status,
+      dialed_in_grind: c.dialed_in_grind,
+      dialed_in_yield_g: c.dialed_in_yield_g,
+      current_grind: null,
+      shots_pulled: c.shots_pulled,
+      profile: c.profile.slice(0, 80),
+      notes: c.notes.slice(0, 120),
+    }));
+  return [...active, ...finished];
+}
 
 // ─── User Message Assembly ────────────────────────────────────────────────────
 
@@ -258,7 +305,9 @@ async function assembleUserMessage(shotId: number) {
     shot_number: position.shotNumber,
     total_shots: position.totalShots,
 
-    coaching_state: coachingStateData,
+    coaching_state: coachingStateData
+      ? { ...coachingStateData, bean_contexts: trimBeanContexts(coachingStateData.bean_contexts ?? []) }
+      : null,
 
     current_thresholds: {
       time: timeThresholds,
@@ -376,7 +425,7 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
   const client = new Anthropic();
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 1500,
+    max_tokens: 3000,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: JSON.stringify(userMessage) }],
   });
@@ -420,9 +469,13 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
     rawResponse: rawText,
   });
 
-  // Upsert coaching_state for recent shots only
+  // Upsert coaching_state for recent shots only — trim before saving to prevent DB bloat
   if (analysisMode === "recent" && parsed.updated_coaching_state) {
-    await upsertCoachingState(parsed.updated_coaching_state);
+    const cs = parsed.updated_coaching_state;
+    await upsertCoachingState({
+      ...cs,
+      bean_contexts: trimBeanContexts(cs.bean_contexts ?? []),
+    });
   }
 
   return getAnalysisForShot(shotId);

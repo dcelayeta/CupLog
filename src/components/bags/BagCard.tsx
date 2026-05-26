@@ -64,7 +64,7 @@ export default function BagCard({ bag }: { bag: BagWithOrigins }) {
         {/* Meta row */}
         <div className="flex items-center gap-3 flex-wrap mt-0.5">
           {bag.status === "active" ? (
-            <FreshnessIndicator roastDate={bag.roastDate} />
+            <FreshnessIndicator roastDate={bag.roastDate} peakStartDay={bag.peakStartDay} peakEndDay={bag.peakEndDay} />
           ) : (
             <span className="flex items-center gap-1.5">
               <span

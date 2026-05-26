@@ -33,6 +33,8 @@ export const bags = sqliteTable("bags", {
     .notNull()
     .default("active"),
   finishedDate: text("finished_date"),
+  peakStartDay: integer("peak_start_day"),
+  peakEndDay: integer("peak_end_day"),
   notes: text("notes"),
   createdAt: text("created_at")
     .notNull()
@@ -159,6 +161,7 @@ export const drinks = sqliteTable("drinks", {
   foamMl: integer("foam_ml"),
   hotWaterMl: integer("hot_water_ml"),
   detectedDrinkName: text("detected_drink_name"),
+  isIced: integer("is_iced", { mode: "boolean" }).notNull().default(false),
   overallRating: integer("overall_rating"),
   notes: text("notes"),
   createdAt: text("created_at")

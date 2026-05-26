@@ -11,6 +11,9 @@ export type DrinkRow = {
   bagName: string;
   milkType: string | null;
   milkQuantityMl: number | null;
+  foamMl: number | null;
+  hotWaterMl: number | null;
+  yieldG: number | null;
   overallRating: number | null;
   notes: string | null;
   detectedDrinkName: string | null;
@@ -27,6 +30,9 @@ export async function getDrinksForList(): Promise<DrinkRow[]> {
       bagName: bags.name,
       milkType: drinks.milkType,
       milkQuantityMl: drinks.milkQuantityMl,
+      foamMl: drinks.foamMl,
+      hotWaterMl: drinks.hotWaterMl,
+      yieldG: shots.yieldG,
       overallRating: drinks.overallRating,
       notes: drinks.notes,
       detectedDrinkName: drinks.detectedDrinkName,

@@ -7,14 +7,20 @@ import {
 
 export default function FreshnessIndicator({
   roastDate,
+  peakStartDay,
+  peakEndDay,
   showDays = true,
 }: {
   roastDate: string;
+  peakStartDay?: number | null;
+  peakEndDay?: number | null;
   showDays?: boolean;
 }) {
   const days = getDaysSinceRoast(roastDate);
-  const color = getFreshnessColor(days);
-  const label = getFreshnessLabel(days);
+  const start = peakStartDay ?? 7;
+  const end = peakEndDay ?? 35;
+  const color = getFreshnessColor(days, start, end);
+  const label = getFreshnessLabel(days, start, end);
   const cssColor = FRESHNESS_CSS[color];
 
   return (

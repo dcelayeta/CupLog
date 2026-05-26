@@ -12,6 +12,36 @@ import PillRating from "./PillRating";
 
 const MILK_TYPES = ["Whole", "Oat", "Almond", "Skim", "Soy", "Coconut", "Half & Half"];
 
+const MAX_DRINK_ML = 300;
+
+function LiveDrinkBar({ espressoMl, milkMl, foamMl, hotWaterMl, hasChocolate, hasIceCream, hasChai }: {
+  espressoMl: number; milkMl: number; foamMl: number; hotWaterMl: number;
+  hasChocolate: boolean; hasIceCream: boolean; hasChai: boolean;
+}) {
+  const chaiMl = hasChai ? 30 : 0;
+  const chocolateMl = hasChocolate ? 10 : 0;
+  const iceCreamMl = hasIceCream ? 60 : 0;
+  const filled = espressoMl + chaiMl + chocolateMl + hotWaterMl + milkMl + iceCreamMl + foamMl;
+  const empty = Math.max(0, MAX_DRINK_ML - filled);
+  const segments = [
+    { ml: espressoMl, color: "#271812" },
+    { ml: chaiMl, color: "#462c21" },
+    { ml: chocolateMl, color: "#79564d" },
+    { ml: hotWaterMl, color: "#a0cee7" },
+    { ml: milkMl, color: "#f3f2f6" },
+    { ml: iceCreamMl, color: "#d2d3c4" },
+    { ml: foamMl, color: "#fefce6" },
+    { ml: empty, color: "#c9c9ce" },
+  ].filter((s) => s.ml > 0);
+  return (
+    <div className="flex overflow-hidden rounded-full" style={{ height: 12 }}>
+      {segments.map((seg, i) => (
+        <div key={i} style={{ width: `${(seg.ml / MAX_DRINK_ML) * 100}%`, backgroundColor: seg.color, flexShrink: 0 }} />
+      ))}
+    </div>
+  );
+}
+
 function parseNum(v: string) {
   const n = parseFloat(v);
   return isNaN(n) ? null : n;
@@ -139,6 +169,7 @@ export default function ShotEditFormClient({
   const [hasChocolate, setHasChocolate] = useState(false);
   const [hasIceCream, setHasIceCream] = useState(false);
   const [hasChai, setHasChai] = useState(false);
+  const [isIced, setIsIced] = useState(shot.drink?.isIced ?? false);
   const [manualDrinkName, setManualDrinkName] = useState<string | null>(shot.drink?.detectedDrinkName ?? null);
   const [showDrinkPicker, setShowDrinkPicker] = useState(false);
   const [overallRating, setOverallRating] = useState<number | null>(shot.drink?.overallRating ?? null);
@@ -280,6 +311,7 @@ export default function ShotEditFormClient({
               <input type="hidden" name="hasChocolate" value={hasChocolate ? "true" : "false"} />
               <input type="hidden" name="hasIceCream" value={hasIceCream ? "true" : "false"} />
               <input type="hidden" name="hasChai" value={hasChai ? "true" : "false"} />
+              <input type="hidden" name="isIced" value={isIced ? "true" : "false"} />
 
               {/* Predicted Drink */}
               <div className="row-divider-t flex items-center px-6 min-h-[52px]">
@@ -351,6 +383,25 @@ export default function ShotEditFormClient({
                 </div>
               )}
 
+              {/* Live drink composition bar */}
+              <div className="px-6 py-3">
+                <LiveDrinkBar
+                  espressoMl={parseNum(yieldG) ?? 0}
+                  milkMl={parseNum(milkQuantityMl) ?? 0}
+                  foamMl={parseNum(foamMl) ?? 0}
+                  hotWaterMl={parseNum(hotWaterMl) ?? 0}
+                  hasChocolate={hasChocolate}
+                  hasIceCream={hasIceCream}
+                  hasChai={hasChai}
+                />
+              </div>
+
+              {/* Milk (ml) */}
+              <div className="flex items-center px-6 min-h-[52px]">
+                <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Milk (ml)</span>
+                <NumberInput name="milkQuantityMl" value={milkQuantityMl} onChange={setMilkQuantityMl} placeholder="—" step="10" min="0" />
+              </div>
+
               {/* Milk Type (only when milk > 0) */}
               {parseNum(milkQuantityMl) !== null && parseNum(milkQuantityMl)! > 0 && (
                 <div className="row-divider-t flex items-center px-6 min-h-[52px]">
@@ -361,12 +412,6 @@ export default function ShotEditFormClient({
                   </select>
                 </div>
               )}
-
-              {/* Milk (ml) */}
-              <div className="row-divider-t flex items-center px-6 min-h-[52px]">
-                <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Milk (ml)</span>
-                <NumberInput name="milkQuantityMl" value={milkQuantityMl} onChange={setMilkQuantityMl} placeholder="—" step="10" min="0" />
-              </div>
 
               {/* Foam (ml) */}
               <div className="row-divider-t flex items-center px-6 min-h-[52px]">
@@ -401,6 +446,14 @@ export default function ShotEditFormClient({
                 <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Chai Concentrate</span>
                 <button type="button" onClick={() => setHasChai(!hasChai)} className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200" style={{ backgroundColor: hasChai ? "var(--accent)" : "#E5E5EA" }}>
                   <span className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transform transition-transform duration-200 mt-[2px]" style={{ marginLeft: hasChai ? 22 : 2 }} />
+                </button>
+              </div>
+
+              {/* Iced / Hot toggle */}
+              <div className="row-divider-t flex items-center px-6 min-h-[52px]">
+                <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Iced</span>
+                <button type="button" onClick={() => setIsIced(!isIced)} className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200" style={{ backgroundColor: isIced ? "var(--accent)" : "#E5E5EA" }}>
+                  <span className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transform transition-transform duration-200 mt-[2px]" style={{ marginLeft: isIced ? 22 : 2 }} />
                 </button>
               </div>
 

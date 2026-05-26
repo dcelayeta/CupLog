@@ -3,6 +3,37 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import type { DrinkRow } from "@/lib/drinks/queries";
+import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
+
+const MAX_DRINK_ML = 300;
+
+function DrinkCompositionBar({ espressoMl, milkMl, foamMl, hotWaterMl, hasChocolate, hasIceCream, hasChai }: {
+  espressoMl: number; milkMl: number; foamMl: number; hotWaterMl: number;
+  hasChocolate: boolean; hasIceCream: boolean; hasChai: boolean;
+}) {
+  const chaiMl = hasChai ? 30 : 0;
+  const chocolateMl = hasChocolate ? 10 : 0;
+  const iceCreamMl = hasIceCream ? 60 : 0;
+  const filled = espressoMl + chaiMl + chocolateMl + hotWaterMl + milkMl + iceCreamMl + foamMl;
+  const empty = Math.max(0, MAX_DRINK_ML - filled);
+  const segments = [
+    { ml: espressoMl, color: "#271812" },
+    { ml: chaiMl,     color: "#462c21" },
+    { ml: chocolateMl,color: "#79564d" },
+    { ml: hotWaterMl, color: "#a0cee7" },
+    { ml: milkMl,     color: "#f3f2f6" },
+    { ml: iceCreamMl, color: "#d2d3c4" },
+    { ml: foamMl,     color: "#fefce6" },
+    { ml: empty,      color: "#c9c9ce" },
+  ].filter((s) => s.ml > 0);
+  return (
+    <div className="flex overflow-hidden rounded-full" style={{ height: 10 }}>
+      {segments.map((seg, i) => (
+        <div key={i} style={{ width: `${(seg.ml / MAX_DRINK_ML) * 100}%`, backgroundColor: seg.color, flexShrink: 0 }} />
+      ))}
+    </div>
+  );
+}
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -140,6 +171,26 @@ export default function DrinkListClient({
                         {milkDesc}
                       </span>
                     )}
+                  </div>
+
+                  {/* Composition bar */}
+                  <div className="mt-2.5">
+                    {(() => {
+                      const defaults = drink.detectedDrinkName
+                        ? DRINK_DEFAULTS[drink.detectedDrinkName as keyof typeof DRINK_DEFAULTS]
+                        : null;
+                      return (
+                        <DrinkCompositionBar
+                          espressoMl={drink.yieldG ?? 0}
+                          milkMl={drink.milkQuantityMl ?? 0}
+                          foamMl={drink.foamMl ?? 0}
+                          hotWaterMl={drink.hotWaterMl ?? 0}
+                          hasChocolate={defaults?.hasChocolate ?? false}
+                          hasIceCream={defaults?.hasIceCream ?? false}
+                          hasChai={defaults?.hasChai ?? false}
+                        />
+                      );
+                    })()}
                   </div>
 
                   {drink.notes && (

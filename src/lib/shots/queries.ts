@@ -65,6 +65,8 @@ export type ShotDetail = {
   bagName: string;
   roasterName: string;
   bagRoastDate: string;
+  bagPeakStartDay: number | null;
+  bagPeakEndDay: number | null;
   timeClassification: Classification;
   ratioClassification: Classification;
   drink: {
@@ -73,6 +75,7 @@ export type ShotDetail = {
     milkQuantityMl: number | null;
     foamMl: number | null;
     hotWaterMl: number | null;
+    isIced: boolean;
     overallRating: number | null;
     notes: string | null;
     detectedDrinkName: string | null;
@@ -110,6 +113,15 @@ export type LastShotDefaults = {
   springWeightLbs: number | null;
   wdtUsed: boolean;
 };
+
+export async function getLatestShotId(): Promise<number | null> {
+  const [row] = await db
+    .select({ id: shots.id })
+    .from(shots)
+    .orderBy(desc(shots.pulledAt))
+    .limit(1);
+  return row?.id ?? null;
+}
 
 export async function getLastShotDefaults(): Promise<LastShotDefaults | null> {
   const [row] = await db
@@ -238,6 +250,8 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       bagName: bags.name,
       roasterName: bags.roaster,
       bagRoastDate: bags.roastDate,
+      bagPeakStartDay: bags.peakStartDay,
+      bagPeakEndDay: bags.peakEndDay,
     })
     .from(shots)
     .innerJoin(bags, eq(shots.bagId, bags.id))
@@ -253,6 +267,7 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       milkQuantityMl: drinks.milkQuantityMl,
       foamMl: drinks.foamMl,
       hotWaterMl: drinks.hotWaterMl,
+      isIced: drinks.isIced,
       overallRating: drinks.overallRating,
       notes: drinks.notes,
       detectedDrinkName: drinks.detectedDrinkName,
@@ -275,6 +290,7 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
           milkQuantityMl: drink.milkQuantityMl ?? null,
           foamMl: drink.foamMl ?? null,
           hotWaterMl: drink.hotWaterMl ?? null,
+          isIced: drink.isIced,
           overallRating: drink.overallRating ?? null,
           notes: drink.notes ?? null,
           detectedDrinkName: drink.detectedDrinkName ?? null,

@@ -185,7 +185,7 @@ export default function ThresholdsClient({
             className="w-full py-2.5 rounded-full text-[15px] font-medium"
             style={{ backgroundColor: "transparent", color: "var(--text-secondary)", pointerEvents: "auto" }}
           >
-            Restore Defaults
+            Reset to Industry Standards
           </button>
         ) : (
           <div className="flex gap-2">

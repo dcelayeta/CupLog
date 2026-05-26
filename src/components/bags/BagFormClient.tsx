@@ -439,6 +439,41 @@ export default function BagFormClient({
             </GroupedCard>
           </div>
 
+          {/* Peak Freshness Window */}
+          <div>
+            <SectionHeader label="Peak Freshness Window" />
+            <GroupedCard>
+              <FieldRow label="Peak Start (day)">
+                <input
+                  name="peakStartDay"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  defaultValue={initialData?.peakStartDay ?? ""}
+                  placeholder="Auto"
+                  className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
+                  style={{ color: "var(--text-primary)" }}
+                />
+              </FieldRow>
+              <Divider />
+              <FieldRow label="Peak End (day)">
+                <input
+                  name="peakEndDay"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  defaultValue={initialData?.peakEndDay ?? ""}
+                  placeholder="Auto"
+                  className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
+                  style={{ color: "var(--text-primary)" }}
+                />
+              </FieldRow>
+            </GroupedCard>
+            <p className="px-4 mt-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+              Leave blank to auto-estimate from roast level and process.
+            </p>
+          </div>
+
           {/* Origins */}
           <div>
             <SectionHeader label="Origins" />

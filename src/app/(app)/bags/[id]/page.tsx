@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getBagById } from "@/lib/bags/queries";
 import FreshnessIndicator from "@/components/bags/FreshnessIndicator";
 import BagActions from "@/components/bags/BagActions";
+import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 
 const ROAST_LABELS: Record<string, string> = {
   light: "Light",
@@ -52,6 +53,266 @@ function Divider() {
       className="ml-4"
       style={{ height: "1px", backgroundColor: "var(--divider)" }}
     />
+  );
+}
+
+function describePeakWindow(
+  roastLevel: string,
+  processingMethod: string,
+  isDecaf: boolean,
+  peakStartDay: number,
+  peakEndDay: number
+): string {
+  const windowDays = peakEndDay - peakStartDay;
+
+  // Decaf path
+  if (isDecaf || processingMethod === "ea_washed" || processingMethod === "swiss_water") {
+    const name =
+      processingMethod === "ea_washed" ? "EA Washed" :
+      processingMethod === "swiss_water" ? "Swiss Water Process" :
+      "Decaffeinated";
+    return `Auto-estimated. ${name} coffee degasses faster than regular beans — the decaffeination process opens the bean structure, reducing CO₂ content and accelerating flavor development. Peak freshness starts around day ${peakStartDay} and holds through day ${peakEndDay} (${windowDays} day window).`;
+  }
+
+  // Roast-level baselines (before any processing adjustment)
+  const bases: Record<string, { start: number; end: number; intro: string }> = {
+    light:        { start: 14, end: 42, intro: "Light roasts need significantly more rest — the dense cell structure degasses slowly" },
+    medium_light: { start: 10, end: 38, intro: "Medium-light roasts benefit from a longer rest than medium before reaching peak flavor" },
+    medium:       { start:  7, end: 35, intro: "Medium roasts follow typical degassing curves" },
+    medium_dark:  { start:  5, end: 28, intro: "Medium-dark roasts degas faster due to higher roast temperatures" },
+    dark:         { start:  3, end: 21, intro: "Dark roasts degas very quickly — high temperatures break down cell structure and release CO₂ rapidly" },
+  };
+  const base = bases[roastLevel] ?? null;
+
+  // Processing adjustments
+  const adjustments: Partial<Record<string, { days: number; reason: string }>> = {
+    natural:   { days: 4, reason: "fermentation compounds and higher mucilage content require more degassing time" },
+    anaerobic: { days: 4, reason: "intense fermentation produces more CO₂ and requires additional degassing time" },
+    honey:     { days: 2, reason: "partial mucilage retention means slightly more degassing time than washed" },
+  };
+  const adj = adjustments[processingMethod] ?? null;
+
+  // Unspecified roast level
+  if (!base) {
+    if (adj) {
+      return `Auto-estimated. Roast level not specified, medium defaults applied — baseline peak from day 7–35. The ${processingMethod.replace("_", " ")} process adds ~${adj.days} days — ${adj.reason} — shifting the window to days ${peakStartDay}–${peakEndDay}.`;
+    }
+    return `Auto-estimated. Roast level not specified, medium defaults applied — peak freshness estimated days ${peakStartDay}–${peakEndDay} after roasting (${windowDays} day window).`;
+  }
+
+  if (adj) {
+    const baseWindowDays = base.end - base.start;
+    return `Auto-estimated. ${base.intro}, with a baseline peak from day ${base.start}–${base.end} (${baseWindowDays} days). The ${processingMethod.replace("_", " ")} process adds ~${adj.days} days — ${adj.reason} — shifting the window to days ${peakStartDay}–${peakEndDay}.`;
+  }
+
+  return `Auto-estimated. ${base.intro} — peak freshness from day ${peakStartDay}–${peakEndDay} after roasting, a ${windowDays} day window.`;
+}
+
+function FreshnessTimeline({
+  peakStartDay,
+  peakEndDay,
+  daysSinceRoast,
+  isUserDefined,
+  roastLevel,
+  processingMethod,
+  isDecaf,
+}: {
+  peakStartDay: number;
+  peakEndDay: number;
+  daysSinceRoast: number;
+  isUserDefined: boolean;
+  roastLevel: string;
+  processingMethod: string;
+  isDecaf: boolean;
+}) {
+  const midPeak = Math.round((peakStartDay + peakEndDay) / 2);
+  const useSoonEnd = peakEndDay + 10;
+  const total = peakEndDay + 14;
+  const pct = (d: number) =>
+    `${((Math.min(d, total) / total) * 100).toFixed(2)}%`;
+  const todayClipped = Math.min(Math.max(daysSinceRoast, 0), total);
+  const showToday = daysSinceRoast >= 0;
+
+  const freshnessLabel = getFreshnessLabel(daysSinceRoast, peakStartDay, peakEndDay);
+  const freshnessColorKey = getFreshnessColor(daysSinceRoast, peakStartDay, peakEndDay);
+  const freshnessColor = FRESHNESS_CSS[freshnessColorKey];
+  const autoDescription = isUserDefined ? null : describePeakWindow(roastLevel, processingMethod, isDecaf, peakStartDay, peakEndDay);
+
+  return (
+    <div className="px-4 pt-3 pb-4">
+      {/* Current freshness status legend */}
+      <div className="flex items-center gap-2 mb-4">
+        <span
+          className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: freshnessColor }}
+        />
+        <span className="text-[15px] font-medium" style={{ color: freshnessColor }}>
+          {freshnessLabel}
+        </span>
+        <span className="text-[15px]" style={{ color: "var(--text-secondary)" }}>
+          ({daysSinceRoast} days since roast)
+        </span>
+      </div>
+
+      {/* Today label above bar */}
+      {showToday && (
+        <div className="relative" style={{ height: 18, marginBottom: 4 }}>
+          <span
+            className="absolute text-[11px] font-medium whitespace-nowrap"
+            style={{
+              left: pct(todayClipped),
+              bottom: 0,
+              transform: "translateX(-50%)",
+              color: "var(--text-primary)",
+            }}
+          >
+            Today
+          </span>
+        </div>
+      )}
+
+      {/* Bar + circles */}
+      <div className="relative" style={{ height: 16 }}>
+        {/* Base gray */}
+        <div
+          className="absolute rounded-full"
+          style={{ left: 0, right: 0, top: 4, height: 8, backgroundColor: "#8E8E93" }}
+        />
+        {/* Peak window: peakStart → midPeak (bright green) */}
+        <div
+          className="absolute"
+          style={{
+            left: pct(peakStartDay),
+            width: `${((midPeak - peakStartDay) / total) * 100}%`,
+            top: 4, height: 8,
+            backgroundColor: "#30D158",
+          }}
+        />
+        {/* Still excellent: midPeak → peakEnd (darker green) */}
+        <div
+          className="absolute"
+          style={{
+            left: pct(midPeak),
+            width: `${((peakEndDay - midPeak) / total) * 100}%`,
+            top: 4, height: 8,
+            backgroundColor: "#248A3D",
+          }}
+        />
+        {/* Use soon: peakEnd → useSoonEnd (orange) */}
+        <div
+          className="absolute"
+          style={{
+            left: pct(peakEndDay),
+            width: `${((useSoonEnd - peakEndDay) / total) * 100}%`,
+            top: 4, height: 8,
+            backgroundColor: "#FF9500",
+          }}
+        />
+        {/* Past peak: useSoonEnd → total (red) */}
+        <div
+          className="absolute"
+          style={{
+            left: pct(useSoonEnd),
+            right: 0,
+            top: 4, height: 8,
+            borderRadius: "0 4px 4px 0",
+            backgroundColor: "#FF3B30",
+          }}
+        />
+
+        {/* Circle at peak start */}
+        <div
+          className="absolute"
+          style={{
+            left: pct(peakStartDay),
+            top: 0,
+            transform: "translateX(-50%)",
+            width: 16, height: 16,
+            borderRadius: "50%",
+            backgroundColor: "#30D158",
+            border: "2px solid var(--card)",
+            zIndex: 1,
+          }}
+        />
+        {/* Circle at peak end */}
+        <div
+          className="absolute"
+          style={{
+            left: pct(peakEndDay),
+            top: 0,
+            transform: "translateX(-50%)",
+            width: 16, height: 16,
+            borderRadius: "50%",
+            backgroundColor: "#248A3D",
+            border: "2px solid var(--card)",
+            zIndex: 1,
+          }}
+        />
+
+        {/* Today marker (white vertical line) */}
+        {showToday && (
+          <div
+            className="absolute"
+            style={{
+              left: pct(todayClipped),
+              top: 0,
+              height: 16,
+              width: 2,
+              backgroundColor: "white",
+              transform: "translateX(-50%)",
+              borderRadius: 1,
+              zIndex: 2,
+              boxShadow: "0 0 3px rgba(0,0,0,0.5)",
+            }}
+          />
+        )}
+      </div>
+
+      {/* Day labels below bar */}
+      <div className="relative mt-2" style={{ height: 16 }}>
+        <span
+          className="absolute text-[11px]"
+          style={{
+            left: pct(peakStartDay),
+            transform: "translateX(-50%)",
+            color: "#30D158",
+          }}
+        >
+          Day {peakStartDay}
+        </span>
+        <span
+          className="absolute text-[11px]"
+          style={{
+            left: pct(midPeak),
+            transform: "translateX(-50%)",
+            color: "#248A3D",
+          }}
+        >
+          Day {midPeak}
+        </span>
+        <span
+          className="absolute text-[11px]"
+          style={{
+            left: pct(peakEndDay),
+            transform: "translateX(-50%)",
+            color: "#248A3D",
+          }}
+        >
+          Day {peakEndDay}
+        </span>
+      </div>
+
+      {/* Description + source */}
+      {isUserDefined ? (
+        <p className="text-[13px] mt-3" style={{ color: "var(--text-secondary)" }}>
+          User-defined peak freshness: Days {peakStartDay}–{peakEndDay} after roast ({peakEndDay - peakStartDay} days)
+        </p>
+      ) : (
+        <p className="text-[13px] mt-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+          {autoDescription}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -164,7 +425,7 @@ export default async function BagDetailPage({
         </p>
         <div className="mt-2">
           {bag.status === "active" ? (
-            <FreshnessIndicator roastDate={bag.roastDate} />
+            <FreshnessIndicator roastDate={bag.roastDate} peakStartDay={bag.peakStartDay} peakEndDay={bag.peakEndDay} />
           ) : (
             <span className="flex items-center gap-1.5">
               <span
@@ -244,6 +505,30 @@ export default async function BagDetailPage({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Freshness Timeline */}
+        {bag.status === "active" && (
+          <div>
+            <SectionHeader label="Freshness Window" />
+            <div
+              className="mx-4 rounded-2xl overflow-hidden"
+              style={{
+                backgroundColor: "var(--card)",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+              }}
+            >
+              <FreshnessTimeline
+                peakStartDay={bag.peakStartDay ?? 7}
+                peakEndDay={bag.peakEndDay ?? 35}
+                daysSinceRoast={getDaysSinceRoast(bag.roastDate)}
+                isUserDefined={bag.peakStartDay != null}
+                roastLevel={bag.roastLevel}
+                processingMethod={bag.processingMethod}
+                isDecaf={bag.isDecaf}
+              />
             </div>
           </div>
         )}

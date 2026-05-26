@@ -19,7 +19,7 @@ export default async function ThresholdsPage() {
         Thresholds
       </h1>
       <p className="px-4 mb-4 text-[15px]" style={{ color: "var(--text-secondary)" }}>
-        Classification ranges for shot time and brew ratio.
+        Classification ranges for shot time, brew ratio, and bean freshness.
       </p>
       <ThresholdsClient thresholds={thresholds} />
     </div>

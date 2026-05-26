@@ -110,6 +110,7 @@ export async function logShot(
     const hasChocolate = formData.get("hasChocolate") === "true";
     const hasIceCream = formData.get("hasIceCream") === "true";
     const hasChai = formData.get("hasChai") === "true";
+    const isIced = formData.get("isIced") === "true";
 
     detectedDrinkName = detectDrink({
       doseG,
@@ -128,6 +129,7 @@ export async function logShot(
       milkQuantityMl,
       foamMl,
       hotWaterMl,
+      isIced,
       detectedDrinkName,
       overallRating: formData.get("overallRating")
         ? parseInt(formData.get("overallRating") as string)
@@ -238,6 +240,7 @@ export async function updateShot(
     const hasChocolate = formData.get("hasChocolate") === "true";
     const hasIceCream = formData.get("hasIceCream") === "true";
     const hasChai = formData.get("hasChai") === "true";
+    const isIced = formData.get("isIced") === "true";
 
     const { doseG: updateDoseG, yieldG: updateYieldG } = f;
     const detectedDrinkName = detectDrink({
@@ -256,6 +259,7 @@ export async function updateShot(
       milkQuantityMl,
       foamMl,
       hotWaterMl,
+      isIced,
       detectedDrinkName,
       overallRating: formData.get("overallRating") ? parseInt(formData.get("overallRating") as string) : null,
       notes: (formData.get("drinkNotes") as string) || null,
