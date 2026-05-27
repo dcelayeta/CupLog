@@ -93,6 +93,30 @@ async function getFreshnessVsTaste(): Promise<ScatterPoint[]> {
   });
 }
 
+async function getFlowRateDistribution(): Promise<Record<string, number>> {
+  const rows = await db.all(sql`
+    SELECT
+      ROUND(CAST(yield_g AS REAL) / shot_time_seconds / 0.2) * 0.2 AS bucket,
+      COUNT(*) as count
+    FROM shots
+    WHERE yield_g IS NOT NULL
+      AND shot_time_seconds IS NOT NULL
+      AND shot_time_seconds > 0
+    GROUP BY bucket
+    ORDER BY bucket
+  `) as { bucket: number; count: number }[];
+
+  const BUCKETS = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2];
+  const dist: Record<string, number> = Object.fromEntries(BUCKETS.map(b => [b.toFixed(1), 0]));
+
+  for (const row of rows) {
+    const b = Math.round(Number(row.bucket) * 10) / 10;
+    const key = b < 0.4 ? "0.4" : b > 2.2 ? "2.2" : b.toFixed(1);
+    dist[key] = (dist[key] ?? 0) + Number(row.count);
+  }
+  return dist;
+}
+
 async function getRetentionTrend(): Promise<number[]> {
   const rows = await db.all(sql`
     SELECT grinder_retention_g
@@ -348,7 +372,7 @@ export default async function StatsPage() {
   const [
     ratingDist, tasteDist,
     [ratioPoints, timePoints],
-    ratingTrend, freshnessPoints, retentionValues,
+    ratingTrend, freshnessPoints, retentionValues, flowRateDist,
   ] = await Promise.all([
     getRatingDistribution(),
     getTasteDistribution(),
@@ -356,6 +380,7 @@ export default async function StatsPage() {
     getRatingTrend(),
     getFreshnessVsTaste(),
     getRetentionTrend(),
+    getFlowRateDistribution(),
   ]);
 
   const ratingBars: BarSpec[] = [
@@ -378,6 +403,21 @@ export default async function StatsPage() {
 
   const totalRated = ratingBars.reduce((a, b) => a + b.count, 0);
   const totalTaste = tasteBars.reduce((a, b) => a + b.count, 0);
+
+  const flowZoneColor = (bucket: number) => {
+    if (bucket < 0.8) return "#FF3B30";
+    if (bucket < 1.0) return "#FF9500";
+    if (bucket < 1.6) return "#34C759";
+    if (bucket < 2.0) return "#FF9500";
+    return "#FF3B30";
+  };
+  const FLOW_BUCKETS = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2];
+  const flowBars: BarSpec[] = FLOW_BUCKETS.map((b) => ({
+    label: b === 2.2 ? "2.2+" : b.toFixed(1),
+    count: flowRateDist[b.toFixed(1)] ?? 0,
+    color: flowZoneColor(b),
+  }));
+  const totalFlowRated = flowBars.reduce((a, b) => a + b.count, 0);
 
   // Rating trend — dots colored by taste balance, rolling avg overlay
   const ratingWindow = Math.max(5, Math.round(ratingTrend.length / 8));
@@ -434,6 +474,7 @@ export default async function StatsPage() {
       <div className="px-4">
         <BarChart bars={ratingBars} title="Shot ratings" subtitle={`${totalRated} rated`} />
         <BarChart bars={tasteBars} title="Taste balance" subtitle={`${totalTaste} logged`} labelFontSize={8} />
+        <BarChart bars={flowBars} title="Flow rate distribution" subtitle={`${totalFlowRated} shots · g/s`} labelFontSize={7} />
         <ScatterPlot
           points={ratioPoints}
           title="Ratio vs taste"

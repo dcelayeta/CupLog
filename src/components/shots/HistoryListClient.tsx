@@ -5,7 +5,7 @@ import { useCallback, useTransition, useState, useMemo } from "react";
 import Link from "next/link";
 import type { ShotRow, BagOption } from "@/lib/shots/queries";
 import ClassificationBadge from "./ClassificationBadge";
-import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
+import { getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -317,7 +317,9 @@ export default function HistoryListClient({
         <div className="px-4 flex flex-col gap-2">
           {filtered.map((shot) => {
             const brewRatio = shot.yieldG != null ? shot.yieldG / shot.doseG : null;
-            const days = getDaysSinceRoast(shot.bagRoastDate);
+            const shotDate = new Date(shot.pulledAt.slice(0, 10) + "T00:00:00");
+            const roastDate = new Date(shot.bagRoastDate + "T00:00:00");
+            const days = Math.floor((shotDate.getTime() - roastDate.getTime()) / (1000 * 60 * 60 * 24));
             const freshnessColor = FRESHNESS_CSS[getFreshnessColor(days)];
             const freshnessLabel = getFreshnessLabel(days);
             return (
@@ -341,8 +343,8 @@ export default function HistoryListClient({
                         {formatDate(shot.pulledAt)} at {formatTime(shot.pulledAt)}
                       </p>
                     </div>
-                    {shot.drink?.overallRating != null && (
-                      <StarRating value={shot.drink.overallRating} />
+                    {shot.shotRating != null && (
+                      <StarRating value={shot.shotRating} />
                     )}
                   </div>
 
@@ -359,6 +361,11 @@ export default function HistoryListClient({
                     {shot.shotTimeSeconds != null && (
                       <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
                         {shot.shotTimeSeconds}s
+                      </span>
+                    )}
+                    {shot.yieldG != null && shot.shotTimeSeconds != null && shot.shotTimeSeconds > 0 && (
+                      <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                        {(shot.yieldG / shot.shotTimeSeconds).toFixed(2)} g/s
                       </span>
                     )}
                     {shot.grindSetting && (

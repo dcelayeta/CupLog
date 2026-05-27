@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db/client";
-import { shots, drinks, type NewDrink } from "@/db/schema";
+import { shots, drinks, type NewDrink, type NewShot } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -53,6 +53,9 @@ export async function logShot(
   const preinfusionSeconds = formData.get("preinfusionSeconds")
     ? parseInt(formData.get("preinfusionSeconds") as string, 10)
     : null;
+  const temperatureC = formData.get("temperatureC")
+    ? parseFloat(formData.get("temperatureC") as string)
+    : null;
   const springWeightLbs = formData.get("springWeightLbs")
     ? parseInt(formData.get("springWeightLbs") as string, 10)
     : null;
@@ -68,6 +71,7 @@ export async function logShot(
   const tasteFields = {
     tasteBalance: formData.get("tasteBalance") ? parseInt(formData.get("tasteBalance") as string) : null,
     shotRating: formData.get("shotRating") ? parseInt(formData.get("shotRating") as string) : null,
+    flowCharacteristics: ((formData.get("flowCharacteristics") as string) || null) as NewShot["flowCharacteristics"],
   };
 
   const pulledAt = (formData.get("pulledAt") as string) || new Date().toISOString();
@@ -84,6 +88,7 @@ export async function logShot(
       shotTimeSeconds,
       lagG,
       preinfusionSeconds,
+      temperatureC,
       springWeightLbs,
       wdtUsed,
       distributionToolUsed,
@@ -174,6 +179,7 @@ function parseShotFields(formData: FormData) {
     grindSetting: formData.get("grindSetting") ? parseFloat(formData.get("grindSetting") as string) : null,
     lagG: formData.get("lagG") ? parseFloat(formData.get("lagG") as string) : null,
     preinfusionSeconds: formData.get("preinfusionSeconds") ? parseInt(formData.get("preinfusionSeconds") as string, 10) : null,
+    temperatureC: formData.get("temperatureC") ? parseFloat(formData.get("temperatureC") as string) : null,
     springWeightLbs: formData.get("springWeightLbs") ? parseInt(formData.get("springWeightLbs") as string, 10) : null,
     wdtUsed: formData.get("wdtUsed") === "true",
     distributionToolUsed: formData.get("distributionToolUsed") === "true",
@@ -185,6 +191,7 @@ function parseShotFields(formData: FormData) {
     aroma: formData.get("aroma") ? parseInt(formData.get("aroma") as string) : null,
     tasteBalance: formData.get("tasteBalance") ? parseInt(formData.get("tasteBalance") as string) : null,
     shotRating: formData.get("shotRating") ? parseInt(formData.get("shotRating") as string) : null,
+    flowCharacteristics: ((formData.get("flowCharacteristics") as string) || null) as NewShot["flowCharacteristics"],
     notes: (formData.get("notes") as string) || null,
     pulledAt: (formData.get("pulledAt") as string) || new Date().toISOString(),
   };
@@ -214,12 +221,14 @@ export async function updateShot(
     shotTimeSeconds: f.shotTimeSeconds,
     lagG: f.lagG,
     preinfusionSeconds: f.preinfusionSeconds,
+    temperatureC: f.temperatureC,
     springWeightLbs: f.springWeightLbs,
     wdtUsed: f.wdtUsed,
     distributionToolUsed: f.distributionToolUsed,
     grinderRetentionG: f.grinderRetentionG,
     tasteBalance: f.tasteBalance,
     shotRating: f.shotRating,
+    flowCharacteristics: f.flowCharacteristics,
     notes: f.notes,
   }).where(eq(shots.id, id));
 

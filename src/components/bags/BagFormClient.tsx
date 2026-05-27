@@ -116,12 +116,12 @@ function Toggle({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className="relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0"
+        className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200"
         style={{ backgroundColor: checked ? "var(--accent)" : "var(--divider)" }}
       >
         <span
-          className="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform duration-200"
-          style={{ transform: checked ? "translateX(22px)" : "translateX(2px)" }}
+          className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transition-all duration-200 mt-[2px]"
+          style={{ marginLeft: checked ? 22 : 2 }}
         />
       </button>
     </>
@@ -182,7 +182,8 @@ export default function BagFormClient({
     setFormKey((k) => k + 1); // remount uncontrolled inputs
   };
   const [duplicateBag, setDuplicateBag] = useState<Bag | null>(null);
-  const [forceMode, setForceMode] = useState<"replace" | "addNew" | null>(null);
+  const forceInputRef = useRef<HTMLInputElement>(null);
+  const replaceIdInputRef = useRef<HTMLInputElement>(null);
 
   const action = mode === "edit" && updateAction ? updateAction : createAction;
 
@@ -192,13 +193,6 @@ export default function BagFormClient({
       formData.set("isBlend", isBlend ? "true" : "false");
       formData.set("isDecaf", isDecaf ? "true" : "false");
 
-      if (forceMode === "replace" && duplicateBag) {
-        formData.set("force", "true");
-        formData.set("replaceId", String(duplicateBag.id));
-      } else if (forceMode === "addNew") {
-        formData.set("force", "true");
-      }
-
       const result = await action(_prev, formData);
 
       if (result && "duplicate" in result) {
@@ -207,6 +201,8 @@ export default function BagFormClient({
       }
 
       if (result && "success" in result) {
+        if (forceInputRef.current) forceInputRef.current.value = "";
+        if (replaceIdInputRef.current) replaceIdInputRef.current.value = "";
         router.push(`/bags/${result.id}`);
       }
 
@@ -216,13 +212,14 @@ export default function BagFormClient({
   );
 
   const handleReplace = () => {
-    setForceMode("replace");
+    if (forceInputRef.current) forceInputRef.current.value = "true";
+    if (replaceIdInputRef.current && duplicateBag) replaceIdInputRef.current.value = String(duplicateBag.id);
     setDuplicateBag(null);
     formRef.current?.requestSubmit();
   };
 
   const handleAddNew = () => {
-    setForceMode("addNew");
+    if (forceInputRef.current) forceInputRef.current.value = "true";
     setDuplicateBag(null);
     formRef.current?.requestSubmit();
   };
@@ -257,6 +254,10 @@ export default function BagFormClient({
       )}
 
       <form ref={formRef} action={formAction} className="pb-48">
+        {/* Hidden force fields — set via DOM ref before requestSubmit() */}
+        <input type="hidden" name="force" ref={forceInputRef} defaultValue="" />
+        <input type="hidden" name="replaceId" ref={replaceIdInputRef} defaultValue="" />
+
         {/* Header */}
         <div
           className="flex items-center justify-between px-4 pt-4 pb-4 sticky top-0 z-10"

@@ -316,6 +316,34 @@ function FreshnessTimeline({
   );
 }
 
+function WeightBar({ weightG, totalDoseG }: { weightG: number; totalDoseG: number }) {
+  const remaining = Math.max(0, weightG - totalDoseG);
+  const pct = Math.min(100, (remaining / weightG) * 100);
+  const barColor = pct > 50 ? "var(--accent)" : pct > 25 ? "#FF9500" : "#FF3B30";
+
+  return (
+    <div className="px-6 py-4">
+      <div className="flex justify-between items-baseline mb-2">
+        <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Weight</span>
+        <span className="text-[17px]" style={{ color: "var(--text-secondary)" }}>
+          ~{Math.round(remaining)}g left
+        </span>
+      </div>
+      <div className="relative rounded-full overflow-hidden" style={{ height: 8, backgroundColor: "var(--card-secondary)" }}>
+        <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct.toFixed(1)}%`, backgroundColor: barColor }} />
+      </div>
+      <div className="flex justify-between mt-1.5">
+        <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+          {Math.round(pct)}% remaining
+        </span>
+        <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+          {weightG}g total
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function SectionHeader({ label }: { label: string }) {
   return (
     <p
@@ -347,7 +375,6 @@ export default async function BagDetailPage({
     { label: "Purchase Date", value: bag.purchaseDate ?? "" },
     { label: "Shop", value: bag.purchaseShop ?? "" },
     { label: "Price", value: bag.price ? `$${bag.price}` : "" },
-    { label: "Weight", value: bag.weightG ? `${bag.weightG}g` : "" },
   ].filter((r) => r.value && r.value !== "—");
 
   return (
@@ -458,6 +485,15 @@ export default async function BagDetailPage({
                   <InfoRow label={row.label} value={row.value} />
                 </div>
               ))}
+              {bag.weightG != null && bag.status === "active" && (
+                <>
+                  {infoRows.length > 0 && <Divider />}
+                  <WeightBar
+                    weightG={bag.weightG}
+                    totalDoseG={bag.totalDoseG ?? 0}
+                  />
+                </>
+              )}
             </div>
           </div>
         )}

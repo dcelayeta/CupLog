@@ -21,6 +21,12 @@ const db = drizzle(client, { schema });
 async function seed() {
   console.log("Seeding database...");
 
+  const existing = await db.select().from(extractionThresholds).limit(1);
+  if (existing.length > 0) {
+    console.log("Database already seeded — skipping.");
+    process.exit(0);
+  }
+
   // ── Extraction thresholds ──────────────────────────────────────────────────
 
   await db.insert(extractionThresholds).values([

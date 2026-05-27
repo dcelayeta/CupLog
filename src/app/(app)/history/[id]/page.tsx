@@ -5,7 +5,7 @@ import { getShotPositionInHistory } from "@/lib/analysis/queries";
 import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
 import { getAnalysisForShot } from "@/lib/analysis/queries";
 import ClassificationBadge from "@/components/shots/ClassificationBadge";
-import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
+import { getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 import TasteBalanceDisplay from "@/components/shots/TasteBalanceDisplay";
 import ShotAnalysisClient from "@/components/shots/ShotAnalysisClient";
 
@@ -67,6 +67,15 @@ function DrinkCompositionBar({ espressoMl, milkMl, foamMl, hotWaterMl, hasChocol
   );
 }
 
+const FLOW_LABELS: Record<string, string> = {
+  normal: "Normal",
+  one_spout_dominant: "One spout dominant",
+  both_spouts_uneven: "Both spouts uneven",
+  spraying: "Spraying",
+  dripping_restricted: "Dripping / Restricted",
+  very_fast: "Very fast",
+};
+
 function SectionHeader({ title }: { title: string }) {
   return (
     <div className="px-4 pt-5 pb-1">
@@ -91,7 +100,12 @@ export default async function ShotDetailPage({
   if (!shot) notFound();
   const { shotNumber } = await getShotPositionInHistory(Number(id), shot.pulledAt);
   const brewRatio = shot.yieldG != null ? shot.yieldG / shot.doseG : null;
-  const daysSinceRoast = getDaysSinceRoast(shot.bagRoastDate);
+  const flowRate = shot.yieldG != null && shot.shotTimeSeconds != null && shot.shotTimeSeconds > 0
+    ? (shot.yieldG / shot.shotTimeSeconds).toFixed(2)
+    : null;
+  const shotDate = new Date(shot.pulledAt.slice(0, 10) + "T00:00:00");
+  const roastDate = new Date(shot.bagRoastDate + "T00:00:00");
+  const daysSinceRoast = Math.floor((shotDate.getTime() - roastDate.getTime()) / (1000 * 60 * 60 * 24));
   const peakStart = shot.bagPeakStartDay ?? undefined;
   const peakEnd = shot.bagPeakEndDay ?? undefined;
   const freshnessColor = FRESHNESS_CSS[getFreshnessColor(daysSinceRoast, peakStart, peakEnd)];
@@ -162,6 +176,12 @@ export default async function ShotDetailPage({
         <DetailRow label="Yield" value={shot.yieldG != null ? `${shot.yieldG}g` : "—"} />
         <DetailRow label="Brew Ratio" value={brewRatio != null ? `1:${brewRatio.toFixed(2)}` : "—"} />
         <DetailRow label="Shot Time" value={shot.shotTimeSeconds != null ? `${shot.shotTimeSeconds}s` : "—"} />
+        {flowRate !== null && (
+          <DetailRow label="Flow Rate" value={`${flowRate} g/s`} />
+        )}
+        {shot.flowCharacteristics != null && (
+          <DetailRow label="Flow" value={FLOW_LABELS[shot.flowCharacteristics] ?? shot.flowCharacteristics} />
+        )}
         {shot.lagG !== null && shot.yieldG != null && (
           <DetailRow
             label="Stopped at"
@@ -173,6 +193,9 @@ export default async function ShotDetailPage({
         )}
         {shot.preinfusionSeconds !== null && (
           <DetailRow label="Pre-infusion" value={`${shot.preinfusionSeconds}s`} />
+        )}
+        {shot.temperatureC !== null && (
+          <DetailRow label="Temperature" value={`${shot.temperatureC}°C`} />
         )}
         {shot.springWeightLbs !== null && (
           <DetailRow label="Spring Weight" value={`${shot.springWeightLbs} lbs`} />

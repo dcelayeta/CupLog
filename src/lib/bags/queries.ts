@@ -8,12 +8,61 @@ export type GrindRange = { min: number; max: number };
 export type BagWithOrigins = Bag & {
   origins: BagOrigin[];
   shotCount?: number;
+  totalDoseG?: number;
+  bagIndex?: number;
+  bagTotal?: number;
   avgTasteBalance?: number | null;
   avgRetentionG?: number | null;
   bestGrindRange?: GrindRange | null;
   referenceGrindRange?: GrindRange | null;
   avgShotRating?: number | null;
 };
+
+async function fetchShotCountsAndCounters(bagIds: number[]) {
+  const idList = sql.join(bagIds.map((id) => sql`${id}`), sql`, `);
+
+  const [ratingRows, shotCountRows, bagCounterRows] = await Promise.all([
+    db.all(sql`
+      SELECT bag_id, ROUND(AVG(shot_rating), 1) as avg_shot_rating
+      FROM shots WHERE bag_id IN (${idList}) GROUP BY bag_id
+    `) as Promise<{ bag_id: number; avg_shot_rating: number | null }[]>,
+    db.all(sql`
+      SELECT bag_id, COUNT(*) as shot_count, COALESCE(SUM(dose_g), 0) as total_dose_g
+      FROM shots WHERE bag_id IN (${idList}) GROUP BY bag_id
+    `) as Promise<{ bag_id: number; shot_count: number; total_dose_g: number }[]>,
+    db.all(sql`
+      SELECT
+        id,
+        CAST(ROW_NUMBER() OVER (PARTITION BY lower(roaster), lower(name) ORDER BY roast_date, id) AS INTEGER) AS bag_index,
+        CAST(COUNT(*) OVER (PARTITION BY lower(roaster), lower(name)) AS INTEGER) AS bag_total
+      FROM bags WHERE status != 'removed'
+    `) as Promise<{ id: number; bag_index: number; bag_total: number }[]>,
+  ]);
+
+  const ratingMap = Object.fromEntries(ratingRows.map((r) => [r.bag_id, r.avg_shot_rating]));
+  const shotCountMap = Object.fromEntries(shotCountRows.map((r) => [r.bag_id, r.shot_count]));
+  const totalDoseMap = Object.fromEntries(shotCountRows.map((r) => [r.bag_id, r.total_dose_g]));
+  const bagCounterMap = Object.fromEntries(bagCounterRows.map((r) => [r.id, { bagIndex: r.bag_index, bagTotal: r.bag_total }]));
+
+  return { ratingMap, shotCountMap, totalDoseMap, bagCounterMap };
+}
+
+function attachStats<T extends { id: number }>(
+  bag: T,
+  ratingMap: Record<number, number | null>,
+  shotCountMap: Record<number, number>,
+  totalDoseMap: Record<number, number>,
+  bagCounterMap: Record<number, { bagIndex: number; bagTotal: number }>
+) {
+  return {
+    ...bag,
+    avgShotRating: ratingMap[bag.id] ?? null,
+    shotCount: shotCountMap[bag.id] ?? 0,
+    totalDoseG: totalDoseMap[bag.id] ?? 0,
+    bagIndex: bagCounterMap[bag.id]?.bagIndex ?? 1,
+    bagTotal: bagCounterMap[bag.id]?.bagTotal ?? 1,
+  };
+}
 
 export async function getBags(
   status: "active" | "finished" | "all" = "active"
@@ -36,29 +85,16 @@ export async function getBags(
 
   if (bagRows.length === 0) return [];
 
-  const originRows = await db
-    .select()
-    .from(bagOrigins)
-    .where(
-      sql`${bagOrigins.bagId} IN (${sql.join(
-        bagRows.map((b) => sql`${b.id}`),
-        sql`, `
-      )})`
-    );
-
-  const ratingRows = await db.all(sql`
-    SELECT bag_id, ROUND(AVG(shot_rating), 1) as avg_shot_rating
-    FROM shots
-    WHERE bag_id IN (${sql.join(bagRows.map((b) => sql`${b.id}`), sql`, `)})
-    GROUP BY bag_id
-  `) as { bag_id: number; avg_shot_rating: number | null }[];
-
-  const ratingMap = Object.fromEntries(ratingRows.map((r) => [r.bag_id, r.avg_shot_rating]));
+  const [originRows, { ratingMap, shotCountMap, totalDoseMap, bagCounterMap }] = await Promise.all([
+    db.select().from(bagOrigins).where(
+      sql`${bagOrigins.bagId} IN (${sql.join(bagRows.map((b) => sql`${b.id}`), sql`, `)})`
+    ),
+    fetchShotCountsAndCounters(bagRows.map((b) => b.id)),
+  ]);
 
   const result = bagRows.map((bag) => ({
-    ...bag,
+    ...attachStats(bag, ratingMap, shotCountMap, totalDoseMap, bagCounterMap),
     origins: originRows.filter((o) => o.bagId === bag.id),
-    avgShotRating: ratingMap[bag.id] ?? null,
   }));
 
   if (status === "all") {
@@ -153,7 +189,12 @@ export async function getBagById(id: number): Promise<BagWithOrigins | null> {
     }
   }
 
-  return { ...bag, origins, shotCount: Number(count), avgTasteBalance: avgTasteBalance ?? null, avgRetentionG: avgRetentionG != null ? Math.round(avgRetentionG * 100) / 100 : null, avgShotRating: avgShotRating != null ? Math.round(avgShotRating * 10) / 10 : null, bestGrindRange, referenceGrindRange };
+  const [{ totalDoseG }] = await db
+    .select({ totalDoseG: sql<number>`COALESCE(SUM(${shots.doseG}), 0)` })
+    .from(shots)
+    .where(eq(shots.bagId, id));
+
+  return { ...bag, origins, shotCount: Number(count), totalDoseG: totalDoseG ?? 0, avgTasteBalance: avgTasteBalance ?? null, avgRetentionG: avgRetentionG != null ? Math.round(avgRetentionG * 100) / 100 : null, avgShotRating: avgShotRating != null ? Math.round(avgShotRating * 10) / 10 : null, bestGrindRange, referenceGrindRange };
 }
 
 export async function findDuplicateBag(
@@ -187,7 +228,6 @@ export async function searchBags(
     ? sql`${bags.status} != ${"removed"}`
     : eq(bags.status, status);
 
-  // Match on bag fields OR any origin (country, variety)
   const bagRows = await db
     .select()
     .from(bags)
@@ -214,29 +254,16 @@ export async function searchBags(
 
   if (bagRows.length === 0) return [];
 
-  const originRows = await db
-    .select()
-    .from(bagOrigins)
-    .where(
-      sql`${bagOrigins.bagId} IN (${sql.join(
-        bagRows.map((b) => sql`${b.id}`),
-        sql`, `
-      )})`
-    );
-
-  const ratingRows = await db.all(sql`
-    SELECT bag_id, ROUND(AVG(shot_rating), 1) as avg_shot_rating
-    FROM shots
-    WHERE bag_id IN (${sql.join(bagRows.map((b) => sql`${b.id}`), sql`, `)})
-    GROUP BY bag_id
-  `) as { bag_id: number; avg_shot_rating: number | null }[];
-
-  const ratingMap = Object.fromEntries(ratingRows.map((r) => [r.bag_id, r.avg_shot_rating]));
+  const [originRows, { ratingMap, shotCountMap, totalDoseMap, bagCounterMap }] = await Promise.all([
+    db.select().from(bagOrigins).where(
+      sql`${bagOrigins.bagId} IN (${sql.join(bagRows.map((b) => sql`${b.id}`), sql`, `)})`
+    ),
+    fetchShotCountsAndCounters(bagRows.map((b) => b.id)),
+  ]);
 
   const result = bagRows.map((bag) => ({
-    ...bag,
+    ...attachStats(bag, ratingMap, shotCountMap, totalDoseMap, bagCounterMap),
     origins: originRows.filter((o) => o.bagId === bag.id),
-    avgShotRating: ratingMap[bag.id] ?? null,
   }));
 
   if (status === "all") {

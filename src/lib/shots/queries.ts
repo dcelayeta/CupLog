@@ -49,6 +49,7 @@ export type ShotDetail = {
   shotTimeSeconds: number | null;
   lagG: number | null;
   preinfusionSeconds: number | null;
+  temperatureC: number | null;
   springWeightLbs: number | null;
   wdtUsed: boolean;
   distributionToolUsed: boolean;
@@ -60,6 +61,7 @@ export type ShotDetail = {
   aroma: number | null;
   tasteBalance: number | null;
   shotRating: number | null;
+  flowCharacteristics: string | null;
   notes: string | null;
   bagId: number;
   bagName: string;
@@ -110,6 +112,7 @@ export type LastShotDefaults = {
   doseG: number;
   grindSetting: number | null;
   lagG: number | null;
+  temperatureC: number | null;
   springWeightLbs: number | null;
   wdtUsed: boolean;
 };
@@ -130,6 +133,7 @@ export async function getLastShotDefaults(): Promise<LastShotDefaults | null> {
       doseG: shots.doseG,
       grindSetting: shots.grindSetting,
       lagG: shots.lagG,
+      temperatureC: shots.temperatureC,
       springWeightLbs: shots.springWeightLbs,
       wdtUsed: shots.wdtUsed,
     })
@@ -234,6 +238,7 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       shotTimeSeconds: shots.shotTimeSeconds,
       lagG: shots.lagG,
       preinfusionSeconds: shots.preinfusionSeconds,
+      temperatureC: shots.temperatureC,
       springWeightLbs: shots.springWeightLbs,
       wdtUsed: shots.wdtUsed,
       distributionToolUsed: shots.distributionToolUsed,
@@ -245,6 +250,7 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       aroma: shots.aroma,
       tasteBalance: shots.tasteBalance,
       shotRating: shots.shotRating,
+      flowCharacteristics: shots.flowCharacteristics,
       notes: shots.notes,
       bagId: shots.bagId,
       bagName: bags.name,

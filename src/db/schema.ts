@@ -127,6 +127,7 @@ export const shots = sqliteTable("shots", {
   shotTimeSeconds: integer("shot_time_seconds"),
   lagG: real("lag_g"), // grams that drip through after pressing stop (no 3-way valve)
   preinfusionSeconds: integer("preinfusion_seconds"),
+  temperatureC: real("temperature_c"),
   springWeightLbs: integer("spring_weight_lbs"),
   wdtUsed: integer("wdt_used", { mode: "boolean" }).notNull().default(false),
   distributionToolUsed: integer("distribution_tool_used", { mode: "boolean" }).notNull().default(false),
@@ -138,6 +139,9 @@ export const shots = sqliteTable("shots", {
   aroma: integer("aroma"),
   tasteBalance: integer("taste_balance"), // 1=very sour … 4=balanced … 7=very bitter
   shotRating: integer("shot_rating"), // 1–5 stars
+  flowCharacteristics: text("flow_characteristics", {
+    enum: ["normal", "one_spout_dominant", "both_spouts_uneven", "spraying", "dripping_restricted", "very_fast"],
+  }),
   notes: text("notes"),
   createdAt: text("created_at")
     .notNull()

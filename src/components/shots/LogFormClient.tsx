@@ -26,6 +26,15 @@ type Props = {
 
 const MILK_TYPES = ["Whole", "Oat", "Almond", "Skim", "Soy", "Coconut", "Half & Half"];
 
+const FLOW_OPTIONS: { value: string; label: string }[] = [
+  { value: "normal", label: "Normal" },
+  { value: "one_spout_dominant", label: "One spout dominant" },
+  { value: "both_spouts_uneven", label: "Both spouts uneven" },
+  { value: "spraying", label: "Spraying" },
+  { value: "dripping_restricted", label: "Dripping / Restricted" },
+  { value: "very_fast", label: "Very fast" },
+];
+
 const MAX_DRINK_ML = 300;
 
 function LiveDrinkBar({ espressoMl, milkMl, foamMl, hotWaterMl, hasChocolate, hasIceCream, hasChai }: {
@@ -161,6 +170,9 @@ export default function LogFormClient({
     lastShot?.lagG != null ? lastShot.lagG.toString() : ""
   );
   const [preinfusionSeconds, setPreinfusionSeconds] = useState("");
+  const [temperatureC, setTemperatureC] = useState(
+    lastShot?.temperatureC != null ? lastShot.temperatureC.toString() : "93"
+  );
   const [springWeightLbs, setSpringWeightLbs] = useState(
     lastShot?.springWeightLbs != null
       ? lastShot.springWeightLbs.toString()
@@ -168,9 +180,8 @@ export default function LogFormClient({
   );
   const [wdtUsed, setWdtUsed] = useState(lastShot ? lastShot.wdtUsed : true);
   const [distributionToolUsed, setDistributionToolUsed] = useState(false);
-  const [grinderRetentionG, setGrinderRetentionG] = useState(
-    averageRetention?.toString() ?? ""
-  );
+  const [grinderRetentionG, setGrinderRetentionG] = useState("0");
+  const [flowCharacteristics, setFlowCharacteristics] = useState<string | null>(null);
 
   // Taste
   const [tasteBalance, setTasteBalance] = useState<number | null>(null);
@@ -237,6 +248,7 @@ export default function LogFormClient({
         <input type="hidden" name="bagRoastDate" value={selectedBag?.roastDate ?? ""} />
         <input type="hidden" name="wdtUsed" value={wdtUsed ? "true" : "false"} />
         <input type="hidden" name="distributionToolUsed" value={distributionToolUsed ? "true" : "false"} />
+        <input type="hidden" name="flowCharacteristics" value={flowCharacteristics ?? ""} />
         <input type="hidden" name="includeDrink" value={includeDrink ? "true" : "false"} />
         {equipmentProfile && (
           <input type="hidden" name="equipmentProfileId" value={equipmentProfile.id} />
@@ -318,11 +330,14 @@ export default function LogFormClient({
           <Row label="Pre-infusion (s)">
             <NumberInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} placeholder="—" step="1" min="0" />
           </Row>
+          <Row label="Temperature (°C)">
+            <NumberInput name="temperatureC" value={temperatureC} onChange={setTemperatureC} placeholder="93" step="1" min="0" max="105" />
+          </Row>
           <Row label="Spring Weight (lbs)">
             <NumberInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} placeholder="—" step="1" min="0" />
           </Row>
           <Row label="Retention (g)">
-            <NumberInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} placeholder={averageRetention ? `avg ${averageRetention}g` : "—"} step="0.1" min="0" />
+            <NumberInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} placeholder="—" step="0.1" min="0" />
           </Row>
           <div
             className="flex items-center px-6 min-h-[52px]"
@@ -353,6 +368,31 @@ export default function LogFormClient({
                 style={{ marginLeft: distributionToolUsed ? 22 : 2 }}
               />
             </button>
+          </div>
+          <div className="px-4 py-3">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Flow</span>
+              {flowCharacteristics !== null && (
+                <button type="button" onClick={() => setFlowCharacteristics(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
+              )}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {FLOW_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setFlowCharacteristics(flowCharacteristics === opt.value ? null : opt.value)}
+                  className="text-[13px] font-medium px-3 py-1.5 rounded-full"
+                  style={
+                    flowCharacteristics === opt.value
+                      ? { backgroundColor: "var(--accent)", color: "#fff" }
+                      : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                  }
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
