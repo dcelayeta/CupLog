@@ -12,9 +12,10 @@ export default async function BagsPage({
     params.status === "finished" ? "finished" : params.status === "all" ? "all" : "active";
   const query = params.q ?? "";
 
-  const bags = query
-    ? await searchBags(query, status)
-    : await getBags(status);
+  const [bags, reserveBags] = await Promise.all([
+    query ? searchBags(query, status) : getBags(status),
+    status === "active" && !query ? getBags("reserve") : Promise.resolve([]),
+  ]);
 
   return (
     <div className="pt-4">
@@ -35,7 +36,7 @@ export default async function BagsPage({
         </Link>
       </div>
 
-      <BagsListClient bags={bags} status={status} query={query} />
+      <BagsListClient bags={bags} reserveBags={reserveBags} status={status} query={query} />
     </div>
   );
 }

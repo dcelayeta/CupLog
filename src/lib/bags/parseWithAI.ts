@@ -1,6 +1,9 @@
 "use server";
 
 import Anthropic from "@anthropic-ai/sdk";
+import { db } from "@/db/client";
+import { shots, bags, equipmentProfiles } from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 export type ParsedBagData = {
   roaster?: string;
@@ -174,5 +177,122 @@ export async function parseBagWithAI(input: {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return { success: false, error: `Parse failed: ${message}` };
+  }
+}
+
+export async function getDialInRecommendation(
+  bagData: ParsedBagData
+): Promise<{ tip: string } | { error: string }> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return { error: "ANTHROPIC_API_KEY is not configured." };
+  }
+
+  const [equipment] = await db
+    .select()
+    .from(equipmentProfiles)
+    .where(eq(equipmentProfiles.isActive, true))
+    .limit(1);
+
+  // Recent shots from bags with the same roast level for grind reference
+  const similarShotsQuery = db
+    .select({
+      doseG: shots.doseG,
+      yieldG: shots.yieldG,
+      shotTimeSeconds: shots.shotTimeSeconds,
+      grindSetting: shots.grindSetting,
+      shotRating: shots.shotRating,
+      tasteBalance: shots.tasteBalance,
+      notes: shots.notes,
+      bagName: bags.name,
+      roaster: bags.roaster,
+      roastLevel: bags.roastLevel,
+      processingMethod: bags.processingMethod,
+    })
+    .from(shots)
+    .innerJoin(bags, eq(shots.bagId, bags.id))
+    .orderBy(desc(shots.pulledAt))
+    .limit(12);
+
+  const similarShots = await similarShotsQuery;
+
+  // Filter client-side for same roast level / process (avoids complex conditional drizzle where)
+  const relevant = similarShots.filter((s) => {
+    const sameRoast = bagData.roastLevel && bagData.roastLevel !== "unspecified"
+      ? s.roastLevel === bagData.roastLevel
+      : true;
+    const sameProcess = bagData.processingMethod && bagData.processingMethod !== "unspecified"
+      ? s.processingMethod === bagData.processingMethod
+      : true;
+    return sameRoast || sameProcess;
+  });
+
+  const shotsForContext = relevant.length >= 3 ? relevant : similarShots.slice(0, 8);
+
+  const equipmentStr = equipment
+    ? [
+        equipment.machine ? `Machine: ${equipment.machine}` : null,
+        equipment.grinder ? `Grinder: ${equipment.grinder}` : null,
+      ].filter(Boolean).join(", ")
+    : "Equipment: not specified";
+
+  const bagLines = [
+    [bagData.roaster, bagData.name].filter(Boolean).join(" — ") || "New bag",
+    bagData.roastLevel && bagData.roastLevel !== "unspecified"
+      ? `Roast: ${bagData.roastLevel.replace("_", " ")}`
+      : null,
+    bagData.processingMethod && bagData.processingMethod !== "unspecified"
+      ? `Process: ${bagData.processingMethod.replace(/_/g, " ")}`
+      : null,
+    bagData.origins?.length
+      ? `Origin: ${bagData.origins.map((o) => [o.country, o.region, o.variety].filter(Boolean).join(", ")).join(" / ")}`
+      : null,
+    bagData.notes ? `Flavor notes: ${bagData.notes}` : null,
+  ].filter(Boolean).join("\n");
+
+  const TASTE_LABELS = ["", "Very Sour", "Sour", "Slightly Sour", "Balanced", "Slightly Bitter", "Bitter", "Very Bitter"];
+  const shotLines = shotsForContext.map((s) => {
+    const ratio = s.yieldG && s.doseG ? (s.yieldG / s.doseG).toFixed(2) : "?";
+    const taste = s.tasteBalance != null ? (TASTE_LABELS[Math.round(s.tasteBalance)] ?? null) : null;
+    return [
+      `${s.roaster} ${s.bagName} (${s.roastLevel?.replace("_", " ") ?? "?"})`,
+      `${s.doseG}g→${s.yieldG ?? "?"}g (1:${ratio})`,
+      s.shotTimeSeconds ? `${s.shotTimeSeconds}s` : null,
+      s.grindSetting ? `grind ${s.grindSetting}` : null,
+      s.shotRating ? `${s.shotRating}/5★` : null,
+      taste,
+      s.notes ? `"${s.notes}"` : null,
+    ].filter(Boolean).join(" · ");
+  });
+
+  const context = `New bag:\n${bagLines}\n\n${equipmentStr}\n\nRecent shots for context:\n${shotLines.length ? shotLines.map((l) => `  ${l}`).join("\n") : "  (no similar shots yet)"}`;
+
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  try {
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 300,
+      system: `You are an expert espresso coach. Given a new bag of coffee and the user's recent shot history, give a concise starting point for dialing in this specific bean.
+
+Respond ONLY with valid JSON: {"tip": "2-3 sentence actionable recommendation"}
+
+Be specific: suggest a starting dose/ratio range, whether to go finer or coarser than usual based on the roast/process, and one key thing to watch for. Reference the user's actual equipment and historical grind settings when available. Do not repeat the bag name or ask questions.`,
+      messages: [{ role: "user", content: context }],
+    });
+
+    const raw = msg.content[0];
+    if (raw.type !== "text") return { error: "Unexpected response." };
+
+    const start = raw.text.indexOf("{");
+    const end = raw.text.lastIndexOf("}");
+    if (start === -1 || end === -1) return { error: "Could not parse response." };
+
+    const parsed = JSON.parse(raw.text.slice(start, end + 1));
+    if (!parsed.tip) return { error: "No tip in response." };
+
+    return { tip: parsed.tip as string };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return { error: `Failed: ${message}` };
   }
 }

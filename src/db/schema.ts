@@ -29,7 +29,8 @@ export const bags = sqliteTable("bags", {
   purchaseShop: text("purchase_shop"),
   price: real("price"),
   weightG: integer("weight_g"),
-  status: text("status", { enum: ["active", "finished", "removed"] })
+  weightCorrectionG: integer("weight_correction_g").default(0),
+  status: text("status", { enum: ["active", "reserve", "finished", "removed"] })
     .notNull()
     .default("active"),
   finishedDate: text("finished_date"),
@@ -215,6 +216,33 @@ export const shotAnalyses = sqliteTable("shot_analyses", {
     .default(sql`(datetime('now'))`),
 });
 
+// ─── bag_analyses ────────────────────────────────────────────────────────────
+
+export const bagAnalyses = sqliteTable("bag_analyses", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  bagId: integer("bag_id").notNull().references(() => bags.id),
+  summary: text("summary").notNull(),
+  recommendation: text("recommendation").notNull(), // "buy_again" | "try_with_adjustments" | "avoid"
+  recommendationReason: text("recommendation_reason").notNull(),
+  grindNotes: text("grind_notes"),
+  tasteNotes: text("taste_notes"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+// ─── coffee_faqs ─────────────────────────────────────────────────────────────
+
+export const coffeeFaqs = sqliteTable("coffee_faqs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  category: text("category").notNull().default("General"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type Bag = typeof bags.$inferSelect;
@@ -230,3 +258,5 @@ export type Drink = typeof drinks.$inferSelect;
 export type NewDrink = typeof drinks.$inferInsert;
 export type CoachingState = typeof coachingState.$inferSelect;
 export type ShotAnalysis = typeof shotAnalyses.$inferSelect;
+export type CoffeeFaq = typeof coffeeFaqs.$inferSelect;
+export type BagAnalysis = typeof bagAnalyses.$inferSelect;

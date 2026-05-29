@@ -73,12 +73,12 @@ export default async function MorePage() {
         More
       </h1>
 
-      <SectionHeader title="Insights" />
+      <SectionHeader title="Knowledge" />
       <div
         className="mx-4 rounded-2xl overflow-hidden"
         style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
       >
-        <NavRow href="/more/stats" label="Stats" description="Rating and taste distributions" />
+        <NavRow href="/more/faqs" label="My Coffee FAQs" description="Ask questions, get personalized answers" />
       </div>
 
       <SectionHeader title="Drinks" />

@@ -47,6 +47,17 @@ const tabs = [
     ),
   },
   {
+    href: "/more/stats",
+    label: "Stats",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="12" width="4" height="9" rx="1" />
+        <rect x="10" y="7" width="4" height="14" rx="1" />
+        <rect x="17" y="3" width="4" height="18" rx="1" />
+      </svg>
+    ),
+  },
+  {
     href: "/more",
     label: "More",
     icon: (active: boolean) => (
@@ -68,19 +79,21 @@ export default function BottomTabBar() {
       style={{ paddingBottom: "calc(10px + env(safe-area-inset-bottom))" }}
     >
       <nav
-        className="flex items-center gap-0.5 px-2 py-2 rounded-[28px] shadow-xl"
+        className="flex items-center gap-1 px-3 py-2 rounded-[28px] shadow-xl"
         style={{
           backgroundColor: "var(--tab-bar-bg)",
           boxShadow: "0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08)",
         }}
       >
         {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.href);
+          const active = tab.href === "/more"
+            ? pathname.startsWith("/more") && !pathname.startsWith("/more/stats")
+            : pathname.startsWith(tab.href);
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className="flex flex-col items-center justify-center gap-0.5 min-w-[60px] min-h-[52px] rounded-[20px] px-2.5 transition-colors"
+              className="flex flex-col items-center justify-center gap-0.5 min-w-[58px] min-h-[52px] rounded-[20px] px-2.5 transition-colors"
               style={{
                 backgroundColor: active ? "var(--tab-active-bg)" : "transparent",
                 color: active ? "var(--accent)" : "var(--text-secondary)",

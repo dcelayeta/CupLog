@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { getBags } from "@/lib/bags/queries";
 import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 import { getActiveEquipmentProfile } from "@/lib/equipment/queries";
+import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
 
 async function getStats() {
   const [row] = await db.all(sql`
@@ -32,7 +33,12 @@ async function getLastShot() {
       s.notes,
       b.roaster,
       b.name as bag_name,
-      d.detected_drink_name
+      d.detected_drink_name,
+      d.milk_quantity_ml,
+      d.foam_ml,
+      d.hot_water_ml,
+      d.milk_type,
+      d.is_iced
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
     LEFT JOIN drinks d ON d.shot_id = s.id
@@ -64,6 +70,36 @@ function MiniFreshnessBar({ days, peakStart, peakEnd }: {
         backgroundColor: "white", transform: "translateX(-50%)", borderRadius: 1,
         boxShadow: "0 0 3px rgba(0,0,0,0.5)",
       }} />
+    </div>
+  );
+}
+
+const MAX_DRINK_ML = 300;
+
+function DrinkCompositionBar({ espressoMl, milkMl, foamMl, hotWaterMl, hasChocolate, hasIceCream, hasChai }: {
+  espressoMl: number; milkMl: number; foamMl: number; hotWaterMl: number;
+  hasChocolate: boolean; hasIceCream: boolean; hasChai: boolean;
+}) {
+  const chaiMl = hasChai ? 30 : 0;
+  const chocolateMl = hasChocolate ? 10 : 0;
+  const iceCreamMl = hasIceCream ? 60 : 0;
+  const filled = espressoMl + chaiMl + chocolateMl + hotWaterMl + milkMl + iceCreamMl + foamMl;
+  const empty = Math.max(0, MAX_DRINK_ML - filled);
+  const segments = [
+    { ml: espressoMl,   color: "var(--drink-espresso)" },
+    { ml: chaiMl,       color: "var(--drink-chai)" },
+    { ml: chocolateMl,  color: "#79564d" },
+    { ml: hotWaterMl,   color: "#a0cee7" },
+    { ml: milkMl,       color: "#f3f2f6" },
+    { ml: iceCreamMl,   color: "#d2d3c4" },
+    { ml: foamMl,       color: "#fefce6" },
+    { ml: empty,        color: "#c9c9ce" },
+  ].filter(s => s.ml > 0);
+  return (
+    <div className="flex overflow-hidden rounded-full" style={{ height: 10 }}>
+      {segments.map((seg, i) => (
+        <div key={i} style={{ width: `${(seg.ml / MAX_DRINK_ML) * 100}%`, backgroundColor: seg.color, flexShrink: 0 }} />
+      ))}
     </div>
   );
 }
@@ -243,11 +279,24 @@ export default async function HomePage() {
                 <p className="text-[17px] font-semibold mb-0.5" style={{ color: "var(--text-primary)" }}>
                   {lastShot.roaster} — {lastShot.bag_name}
                 </p>
-                {lastShot.detected_drink_name && (
-                  <p className="text-[13px] mb-1" style={{ color: "var(--accent)" }}>
-                    {String(lastShot.detected_drink_name)}
-                  </p>
-                )}
+                {lastShot.detected_drink_name && (() => {
+                  const drinkName = String(lastShot.detected_drink_name);
+                  const defaults = DRINK_DEFAULTS[drinkName as keyof typeof DRINK_DEFAULTS];
+                  return (
+                    <div className="mb-2">
+                      <p className="text-[13px] mb-1.5" style={{ color: "var(--accent)" }}>{drinkName}</p>
+                      <DrinkCompositionBar
+                        espressoMl={Number(lastShot.yield_g) || 0}
+                        milkMl={Number(lastShot.milk_quantity_ml) || 0}
+                        foamMl={Number(lastShot.foam_ml) || 0}
+                        hotWaterMl={Number(lastShot.hot_water_ml) || 0}
+                        hasChocolate={defaults?.hasChocolate ?? false}
+                        hasIceCream={defaults?.hasIceCream ?? false}
+                        hasChai={defaults?.hasChai ?? false}
+                      />
+                    </div>
+                  );
+                })()}
                 <div className="flex items-center gap-3 flex-wrap mt-1">
                   <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
                     {lastShot.dose_g}g{lastShot.yield_g != null ? ` → ${lastShot.yield_g}g` : ""}
@@ -319,6 +368,28 @@ export default async function HomePage() {
                   {days >= 0 && (
                     <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{days}d</span>
                   )}
+                </div>
+                <div className="flex items-center gap-3 mt-1">
+                  {bag.avgShotRating != null && (
+                    <span className="text-[12px] font-medium" style={{ color: "#FF9500" }}>
+                      ★ {bag.avgShotRating.toFixed(1)}
+                    </span>
+                  )}
+                  <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                    {bag.shotCount ?? 0} {(bag.shotCount ?? 0) === 1 ? "shot" : "shots"}
+                  </span>
+                  <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                    Bag {bag.bagIndex ?? 1}
+                  </span>
+                  {bag.weightG != null && (() => {
+                    const remaining = Math.round(bag.weightG - (bag.totalDoseG ?? 0) + (bag.weightCorrectionG ?? 0));
+                    if (remaining <= 0) return null;
+                    return (
+                      <span className="text-[12px]" style={{ color: remaining < 100 ? "#FF9500" : "var(--text-secondary)" }}>
+                        ~{remaining}g left
+                      </span>
+                    );
+                  })()}
                 </div>
               </Link>
             );

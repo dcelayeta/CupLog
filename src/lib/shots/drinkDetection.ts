@@ -1,10 +1,6 @@
 export type EspressoBase = "Ristretto" | "Espresso" | "Doppio" | "Lungo" | null;
 
 export const ALL_DRINK_NAMES = [
-  "Ristretto",
-  "Espresso",
-  "Doppio",
-  "Lungo",
   "Americano",
   "Macchiato",
   "Cortado",
@@ -27,7 +23,7 @@ export type DrinkDefaults = {
   hasChai: boolean;
 };
 
-export const DRINK_DEFAULTS: Record<DrinkName, DrinkDefaults> = {
+export const DRINK_DEFAULTS: Record<string, DrinkDefaults> = {
   Ristretto:   { milkMl: 0,   foamMl: 0,  hotWaterMl: 0,   hasChocolate: false, hasIceCream: false, hasChai: false },
   Espresso:    { milkMl: 0,   foamMl: 0,  hotWaterMl: 0,   hasChocolate: false, hasIceCream: false, hasChai: false },
   Doppio:      { milkMl: 0,   foamMl: 0,  hotWaterMl: 0,   hasChocolate: false, hasIceCream: false, hasChai: false },
@@ -106,11 +102,6 @@ export function detectDrink(params: {
   // Latte: milkMl 150–300, foamMl 0–35
   if (milkMl >= 150 && milkMl <= 300 && foamMl >= 0 && foamMl <= 35 && hotWaterMl === 0 && !hasChocolate && !hasChai) {
     matches.push("Latte");
-  }
-
-  // Base espresso: no milk, foam, water, or extras
-  if (base !== null && milkMl === 0 && foamMl === 0 && hotWaterMl === 0 && !hasChocolate && !hasIceCream && !hasChai) {
-    matches.push(base);
   }
 
   if (matches.length === 1) return matches[0];

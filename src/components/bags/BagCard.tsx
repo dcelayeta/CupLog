@@ -80,8 +80,8 @@ export default function BagCard({ bag }: { bag: BagWithOrigins }) {
   const bagIndex = bag.bagIndex ?? 1;
   const bagTotal = bag.bagTotal ?? 1;
   const bagLabel = bagTotal > 1 ? `Bag ${bagIndex}/${bagTotal}` : `Bag ${bagIndex}`;
-  const remainingG = bag.weightG != null && bag.status === "active"
-    ? Math.round(bag.weightG - (bag.totalDoseG ?? 0))
+  const remainingG = bag.weightG != null && (bag.status === "active" || bag.status === "reserve")
+    ? Math.round(bag.weightG - (bag.totalDoseG ?? 0) + (bag.weightCorrectionG ?? 0))
     : null;
 
   return (
@@ -104,8 +104,8 @@ export default function BagCard({ bag }: { bag: BagWithOrigins }) {
           {bag.name}
         </span>
 
-        {/* Line 3: Freshness label + bar (active) or finished status */}
-        {bag.status === "active" ? (() => {
+        {/* Line 3: Freshness label + bar (active/reserve) or finished status */}
+        {bag.status === "active" || bag.status === "reserve" ? (() => {
           const days = getDaysSinceRoast(bag.roastDate);
           const start = bag.peakStartDay ?? 7;
           const end = bag.peakEndDay ?? 35;

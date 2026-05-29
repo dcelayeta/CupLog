@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { parseBagWithAI } from "@/lib/bags/parseWithAI";
+import { parseBagWithAI, getDialInRecommendation } from "@/lib/bags/parseWithAI";
 import type { ParsedBagData } from "@/lib/bags/parseWithAI";
 
 export default function AIEntryPanel({
@@ -14,7 +14,21 @@ export default function AIEntryPanel({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [parsedData, setParsedData] = useState<ParsedBagData | null>(null);
+  const [isTipping, setIsTipping] = useState(false);
+  const [tip, setTip] = useState<string | null>(null);
+  const [tipError, setTipError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleClose = () => {
+    setIsOpen(false);
+    setError(null);
+    setParsedData(null);
+    setTip(null);
+    setTipError(null);
+    setText("");
+    setImageFile(null);
+  };
 
   const handleParse = async () => {
     setError(null);
@@ -42,12 +56,27 @@ export default function AIEntryPanel({
       }
 
       onParsed(result.data);
-      // Reset panel
-      setText("");
-      setImageFile(null);
-      setIsOpen(false);
+      setParsedData(result.data);
+      setTip(null);
+      setTipError(null);
     } finally {
       setIsParsing(false);
+    }
+  };
+
+  const handleGetTip = async () => {
+    if (!parsedData) return;
+    setIsTipping(true);
+    setTipError(null);
+    try {
+      const result = await getDialInRecommendation(parsedData);
+      if ("error" in result) {
+        setTipError(result.error);
+      } else {
+        setTip(result.tip);
+      }
+    } finally {
+      setIsTipping(false);
     }
   };
 
@@ -86,6 +115,99 @@ export default function AIEntryPanel({
     );
   }
 
+  // ── Parsed state ──────────────────────────────────────────────────────────
+  if (parsedData) {
+    const bagLabel = [parsedData.roaster, parsedData.name].filter(Boolean).join(" — ") || "Bag";
+    return (
+      <div className="px-4 mb-2">
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+        >
+          {/* Header */}
+          <div className="row-divider flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="10" r="9" stroke="#34C759" strokeWidth="1.8" />
+                <path d="M6 10l3 3 5-5" stroke="#34C759" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                Parsed
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="text-[15px] font-medium"
+              style={{ color: "var(--accent)" }}
+            >
+              Done
+            </button>
+          </div>
+
+          {/* Bag summary */}
+          <div className="px-4 py-3 row-divider">
+            <p className="text-[15px] font-medium" style={{ color: "var(--text-primary)" }}>
+              {bagLabel}
+            </p>
+            {(parsedData.roastLevel && parsedData.roastLevel !== "unspecified" || parsedData.processingMethod && parsedData.processingMethod !== "unspecified") && (
+              <p className="text-[13px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                {[
+                  parsedData.roastLevel !== "unspecified" ? parsedData.roastLevel?.replace("_", " ") : null,
+                  parsedData.processingMethod !== "unspecified" ? parsedData.processingMethod?.replace(/_/g, " ") : null,
+                ].filter(Boolean).join(" · ")}
+              </p>
+            )}
+            {parsedData.origins?.length ? (
+              <p className="text-[13px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                {parsedData.origins.map((o) => [o.country, o.region].filter(Boolean).join(", ")).join(" / ")}
+              </p>
+            ) : null}
+          </div>
+
+          {/* Dial-in tip section */}
+          <div className="px-4 py-3">
+            {!tip && !isTipping && (
+              <button
+                type="button"
+                onClick={handleGetTip}
+                className="w-full py-2.5 rounded-full text-[15px] font-medium flex items-center justify-center gap-1.5 transition-opacity"
+                style={{ backgroundColor: "#AF52DE22", color: "#AF52DE" }}
+              >
+                <span style={{ fontSize: 16 }}>✦</span>
+                Get dial-in tip
+              </button>
+            )}
+            {isTipping && (
+              <p className="text-[14px] text-center py-1" style={{ color: "var(--text-secondary)" }}>
+                Generating tip…
+              </p>
+            )}
+            {tipError && (
+              <p className="text-[14px]" style={{ color: "var(--destructive)" }}>
+                {tipError}
+              </p>
+            )}
+            {tip && (
+              <div
+                className="rounded-xl px-4 py-3"
+                style={{ backgroundColor: "#AF52DE11", border: "1px solid #AF52DE33" }}
+              >
+                <p className="text-[13px] font-semibold mb-1" style={{ color: "#AF52DE" }}>
+                  Dial-in tip ✦
+                </p>
+                <p className="text-[15px] leading-relaxed" style={{ color: "var(--text-primary)" }}>
+                  {tip}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Input state ───────────────────────────────────────────────────────────
   return (
     <div className="px-4 mb-2">
       <div
@@ -107,10 +229,7 @@ export default function AIEntryPanel({
           </span>
           <button
             type="button"
-            onClick={() => {
-              setIsOpen(false);
-              setError(null);
-            }}
+            onClick={handleClose}
             className="text-[15px]"
             style={{ color: "var(--text-secondary)" }}
           >

@@ -74,7 +74,8 @@ export async function logShot(
     flowCharacteristics: ((formData.get("flowCharacteristics") as string) || null) as NewShot["flowCharacteristics"],
   };
 
-  const pulledAt = (formData.get("pulledAt") as string) || new Date().toISOString();
+  const pulledAtRaw = (formData.get("pulledAt") as string) || "";
+  const pulledAt = pulledAtRaw ? new Date(pulledAtRaw).toISOString() : new Date().toISOString();
 
   const [shot] = await db
     .insert(shots)
@@ -193,7 +194,10 @@ function parseShotFields(formData: FormData) {
     shotRating: formData.get("shotRating") ? parseInt(formData.get("shotRating") as string) : null,
     flowCharacteristics: ((formData.get("flowCharacteristics") as string) || null) as NewShot["flowCharacteristics"],
     notes: (formData.get("notes") as string) || null,
-    pulledAt: (formData.get("pulledAt") as string) || new Date().toISOString(),
+    pulledAt: (() => {
+      const raw = (formData.get("pulledAt") as string) || "";
+      return raw ? new Date(raw).toISOString() : new Date().toISOString();
+    })(),
   };
 }
 

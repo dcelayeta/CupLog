@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import DuplicateModal from "./DuplicateModal";
 import AIEntryPanel from "./AIEntryPanel";
@@ -182,8 +182,7 @@ export default function BagFormClient({
     setFormKey((k) => k + 1); // remount uncontrolled inputs
   };
   const [duplicateBag, setDuplicateBag] = useState<Bag | null>(null);
-  const forceInputRef = useRef<HTMLInputElement>(null);
-  const replaceIdInputRef = useRef<HTMLInputElement>(null);
+  const [isModalPending, startModalTransition] = useTransition();
 
   const action = mode === "edit" && updateAction ? updateAction : createAction;
 
@@ -201,8 +200,6 @@ export default function BagFormClient({
       }
 
       if (result && "success" in result) {
-        if (forceInputRef.current) forceInputRef.current.value = "";
-        if (replaceIdInputRef.current) replaceIdInputRef.current.value = "";
         router.push(`/bags/${result.id}`);
       }
 
@@ -211,17 +208,32 @@ export default function BagFormClient({
     null
   );
 
+  const buildFormData = (overrides: Record<string, string> = {}) => {
+    const formData = formRef.current ? new FormData(formRef.current) : new FormData();
+    formData.set("origins", JSON.stringify(origins));
+    formData.set("isBlend", isBlend ? "true" : "false");
+    formData.set("isDecaf", isDecaf ? "true" : "false");
+    for (const [k, v] of Object.entries(overrides)) formData.set(k, v);
+    return formData;
+  };
+
   const handleReplace = () => {
-    if (forceInputRef.current) forceInputRef.current.value = "true";
-    if (replaceIdInputRef.current && duplicateBag) replaceIdInputRef.current.value = String(duplicateBag.id);
+    if (!duplicateBag) return;
+    const formData = buildFormData({ force: "true", replaceId: String(duplicateBag.id) });
     setDuplicateBag(null);
-    formRef.current?.requestSubmit();
+    startModalTransition(async () => {
+      const result = await createAction(null, formData);
+      if (result && "success" in result) router.push(`/bags/${result.id}`);
+    });
   };
 
   const handleAddNew = () => {
-    if (forceInputRef.current) forceInputRef.current.value = "true";
+    const formData = buildFormData({ force: "true" });
     setDuplicateBag(null);
-    formRef.current?.requestSubmit();
+    startModalTransition(async () => {
+      const result = await createAction(null, formData);
+      if (result && "success" in result) router.push(`/bags/${result.id}`);
+    });
   };
 
   const updateOrigin = (
@@ -254,9 +266,6 @@ export default function BagFormClient({
       )}
 
       <form ref={formRef} action={formAction} className="pb-48">
-        {/* Hidden force fields — set via DOM ref before requestSubmit() */}
-        <input type="hidden" name="force" ref={forceInputRef} defaultValue="" />
-        <input type="hidden" name="replaceId" ref={replaceIdInputRef} defaultValue="" />
 
         {/* Header */}
         <div
@@ -437,6 +446,22 @@ export default function BagFormClient({
                   style={{ color: "var(--text-primary)" }}
                 />
               </FieldRow>
+              {mode === "edit" && (
+                <>
+                  <Divider />
+                  <FieldRow label="Weight Correction (g)">
+                    <input
+                      name="weightCorrectionG"
+                      type="number"
+                      inputMode="numeric"
+                      defaultValue={initialData?.weightCorrectionG ?? 0}
+                      placeholder="0"
+                      className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
+                      style={{ color: "var(--text-primary)" }}
+                    />
+                  </FieldRow>
+                </>
+              )}
             </GroupedCard>
           </div>
 
@@ -663,7 +688,7 @@ export default function BagFormClient({
 
         {/* Sticky Save — sits above the floating tab bar (~80px) */}
         <div
-          className="fixed left-0 right-0 px-4 pb-4"
+          className="fixed left-0 right-0 px-4 pb-4 flex flex-col gap-2"
           style={{
             bottom: "calc(80px + env(safe-area-inset-bottom))",
             backgroundColor: "var(--bg)",
@@ -671,7 +696,7 @@ export default function BagFormClient({
         >
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || isModalPending}
             className="w-full py-4 rounded-full text-[17px] font-medium transition-opacity disabled:opacity-50"
             style={{
               backgroundColor: "var(--card)",
@@ -679,8 +704,20 @@ export default function BagFormClient({
               boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
             }}
           >
-            {isPending ? "Saving…" : "Save Bag"}
+            {isPending || isModalPending ? "Saving…" : "Save Bag"}
           </button>
+          {mode === "add" && (
+            <button
+              type="submit"
+              name="status"
+              value="reserve"
+              disabled={isPending || isModalPending}
+              className="w-full py-3 rounded-full text-[15px] font-medium transition-opacity disabled:opacity-50"
+              style={{ backgroundColor: "transparent", color: "var(--text-secondary)" }}
+            >
+              Save as Reserve
+            </button>
+          )}
         </div>
       </form>
     </>

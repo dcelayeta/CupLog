@@ -117,6 +117,83 @@ async function getFlowRateDistribution(): Promise<Record<string, number>> {
   return dist;
 }
 
+async function getRoastTypeDistribution(): Promise<{ roastLevel: string; count: number }[]> {
+  const rows = await db.all(sql`
+    SELECT b.roast_level as roastLevel, COUNT(s.id) as count
+    FROM bags b
+    LEFT JOIN shots s ON s.bag_id = b.id
+    WHERE b.status != 'removed'
+    GROUP BY b.roast_level
+    ORDER BY count DESC
+  `) as { roastLevel: string; count: number }[];
+  return rows.map(r => ({ roastLevel: String(r.roastLevel), count: Number(r.count) }));
+}
+
+async function getShotsPerCoffee(): Promise<{ roaster: string; name: string; count: number }[]> {
+  const rows = await db.all(sql`
+    SELECT b.roaster, b.name, COUNT(s.id) as count
+    FROM bags b
+    LEFT JOIN shots s ON s.bag_id = b.id
+    WHERE b.status != 'removed'
+    GROUP BY lower(b.roaster), lower(b.name)
+    ORDER BY count DESC
+  `) as { roaster: string; name: string; count: number }[];
+  return rows.map(r => ({ roaster: String(r.roaster), name: String(r.name), count: Number(r.count) }));
+}
+
+async function getDrinkTypeDistribution(): Promise<{ name: string; count: number }[]> {
+  const rows = await db.all(sql`
+    SELECT name, SUM(count) as count FROM (
+      SELECT detected_drink_name as name, COUNT(*) as count
+      FROM drinks
+      WHERE detected_drink_name IS NOT NULL
+      GROUP BY detected_drink_name
+
+      UNION ALL
+
+      SELECT
+        CASE
+          WHEN yield_g * 1.0 / dose_g >= 1.0 AND yield_g * 1.0 / dose_g < 1.5 THEN 'Ristretto'
+          WHEN yield_g * 1.0 / dose_g >= 1.5 AND yield_g * 1.0 / dose_g < 3.0 AND dose_g <= 10 THEN 'Espresso'
+          WHEN yield_g * 1.0 / dose_g >= 1.5 AND yield_g * 1.0 / dose_g < 3.0 AND dose_g > 10 THEN 'Doppio'
+          WHEN yield_g * 1.0 / dose_g >= 3.0 AND yield_g * 1.0 / dose_g < 4.0 THEN 'Lungo'
+          ELSE NULL
+        END as name,
+        COUNT(*) as count
+      FROM shots
+      WHERE id NOT IN (SELECT shot_id FROM drinks WHERE shot_id IS NOT NULL)
+        AND yield_g IS NOT NULL
+      GROUP BY name
+      HAVING name IS NOT NULL
+    )
+    GROUP BY name
+    ORDER BY count DESC
+  `) as { name: string; count: number }[];
+  return rows.map(r => ({ name: String(r.name), count: Number(r.count) }));
+}
+
+async function getDrinkRatingTrend(): Promise<{ rating: number; drinkName: string | null }[]> {
+  const rows = await db.all(sql`
+    SELECT d.overall_rating as rating, d.detected_drink_name as drinkName
+    FROM drinks d
+    JOIN shots s ON d.shot_id = s.id
+    WHERE d.overall_rating IS NOT NULL
+    ORDER BY s.pulled_at ASC
+  `) as { rating: number; drinkName: string | null }[];
+  return rows.map(r => ({ rating: Number(r.rating), drinkName: r.drinkName ? String(r.drinkName) : null }));
+}
+
+async function getShotVsDrinkRatings(): Promise<{ shotRating: number; drinkRating: number; count: number }[]> {
+  const rows = await db.all(sql`
+    SELECT s.shot_rating as shotRating, d.overall_rating as drinkRating, COUNT(*) as count
+    FROM shots s
+    JOIN drinks d ON d.shot_id = s.id
+    WHERE s.shot_rating IS NOT NULL AND d.overall_rating IS NOT NULL
+    GROUP BY s.shot_rating, d.overall_rating
+  `) as { shotRating: number; drinkRating: number; count: number }[];
+  return rows.map(r => ({ shotRating: Number(r.shotRating), drinkRating: Number(r.drinkRating), count: Number(r.count) }));
+}
+
 async function getRetentionTrend(): Promise<number[]> {
   const rows = await db.all(sql`
     SELECT grinder_retention_g
@@ -136,6 +213,17 @@ const RATING_COLORS: Record<number, string> = {
 const TASTE_ZONE_COLORS = [
   "#FF3B30", "#FF6B35", "#FFB347", "#34C759", "#FF9500", "#8B5CF6", "#6D28D9",
 ];
+
+function tasteLabel(tb: number | null): string {
+  if (tb === null) return "—";
+  if (tb <= 1.4) return "Very Sour";
+  if (tb <= 2.4) return "Sour";
+  if (tb <= 3.4) return "Slightly Sour";
+  if (tb <= 4.4) return "Balanced";
+  if (tb <= 5.4) return "Slightly Bitter";
+  if (tb <= 6.4) return "Bitter";
+  return "Very Bitter";
+}
 
 function tasteBalanceColor(tb: number | null): string {
   if (tb === null) return "#8E8E93";
@@ -165,8 +253,9 @@ function catmullRomPath(pts: [number, number][]): string {
 
 interface BarSpec { label: string; count: number; color: string; }
 
-function BarChart({ bars, title, subtitle, labelFontSize = 9 }: {
+function BarChart({ bars, title, subtitle, labelFontSize = 9, stat, statColor }: {
   bars: BarSpec[]; title: string; subtitle: string; labelFontSize?: number;
+  stat?: string; statColor?: string;
 }) {
   const n = bars.length;
   const W = 280, H = 110, padL = 8, padR = 8, padTop = 22, padBottom = 22;
@@ -187,6 +276,9 @@ function BarChart({ bars, title, subtitle, labelFontSize = 9 }: {
         <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
         <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
       </div>
+      {stat && (
+        <p className="px-4 pb-2 text-[13px]" style={{ color: statColor ?? "var(--text-primary)" }}>{stat}</p>
+      )}
       <div className="px-2 pb-3">
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
           {computed.map(b => b.barH > 0 && (
@@ -239,7 +331,7 @@ function ScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, xFormat }: {
               <rect x={padL} y={bandY1} width={plotW} height={bandY2 - bandY1} fill="#30D158" opacity={0.08} />
               {[1, 2, 3, 4, 5, 6, 7].map(tb => (
                 <line key={tb} x1={padL} y1={yPos(tb)} x2={padL + plotW} y2={yPos(tb)}
-                  stroke="var(--divider)" strokeWidth={tb === 4 ? 1 : 0.5} />
+                  style={{ stroke: "var(--divider)" }} strokeWidth={tb === 4 ? 1 : 0.5} />
               ))}
               {[{ tb: 1, label: "Sour" }, { tb: 4, label: "Bal." }, { tb: 7, label: "Bitter" }].map(({ tb, label }) => (
                 <text key={tb} x={padL - 4} y={yPos(tb) + 3.5} textAnchor="end" fontSize={8}
@@ -250,7 +342,7 @@ function ScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, xFormat }: {
               {xTicks.map(v => (
                 <g key={v}>
                   <line x1={xPos(v)} y1={padT + plotH} x2={xPos(v)} y2={padT + plotH + 4}
-                    stroke="var(--divider)" strokeWidth={1} />
+                    style={{ stroke: "var(--divider)" }} strokeWidth={1} />
                   <text x={xPos(v)} y={H - 5} textAnchor="middle" fontSize={8}
                     fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
                     {xFormat(v)}
@@ -283,7 +375,7 @@ function ScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, xFormat }: {
   );
 }
 
-function TrendChart({ points, title, subtitle, yMin, yMax, yTicks, yFormat, connectLine = false, rollingWindow = 0, legend }: {
+function TrendChart({ points, title, subtitle, yMin, yMax, yTicks, yFormat, connectLine = false, rollingWindow = 0, legend, stat, statColor }: {
   points: Array<{ y: number; color: string }>;
   title: string; subtitle: string;
   yMin: number; yMax: number;
@@ -291,6 +383,7 @@ function TrendChart({ points, title, subtitle, yMin, yMax, yTicks, yFormat, conn
   connectLine?: boolean;
   rollingWindow?: number;
   legend?: React.ReactNode;
+  stat?: string; statColor?: string;
 }) {
   const W = 300, H = 170, padL = 34, padR = 10, padT = 12, padB = 28;
   const plotW = W - padL - padR, plotH = H - padT - padB;
@@ -323,6 +416,9 @@ function TrendChart({ points, title, subtitle, yMin, yMax, yTicks, yFormat, conn
         <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
         <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
       </div>
+      {stat && (
+        <p className="px-4 pb-2 text-[13px]" style={{ color: statColor ?? "var(--text-primary)" }}>{stat}</p>
+      )}
       {n < 3 ? (
         <div className="px-4 py-8 text-center">
           <p className="text-[15px]" style={{ color: "var(--text-secondary)" }}>Not enough data yet</p>
@@ -333,7 +429,7 @@ function TrendChart({ points, title, subtitle, yMin, yMax, yTicks, yFormat, conn
             <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
               {yTicks.map(v => (
                 <line key={v} x1={padL} y1={yPos(v)} x2={padL + plotW} y2={yPos(v)}
-                  stroke="var(--divider)" strokeWidth={0.5} />
+                  style={{ stroke: "var(--divider)" }} strokeWidth={0.5} />
               ))}
               {yTicks.map(v => (
                 <text key={`lbl-${v}`} x={padL - 4} y={yPos(v) + 3.5} textAnchor="end" fontSize={8}
@@ -348,10 +444,10 @@ function TrendChart({ points, title, subtitle, yMin, yMax, yTicks, yFormat, conn
                 </text>
               ))}
               {linePath && (
-                <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth={1} opacity={0.2} />
+                <path d={linePath} fill="none" style={{ stroke: "var(--accent)" }} strokeWidth={1} opacity={0.2} />
               )}
               {rollingPts.length > 1 && (
-                <path d={catmullRomPath(rollingPts)} fill="none" stroke="var(--accent)"
+                <path d={catmullRomPath(rollingPts)} fill="none" style={{ stroke: "var(--accent)" }}
                   strokeWidth={1.5} opacity={0.55} strokeLinecap="round" strokeLinejoin="round" />
               )}
               {points.map((pt, i) => (
@@ -366,6 +462,127 @@ function TrendChart({ points, title, subtitle, yMin, yMax, yTicks, yFormat, conn
   );
 }
 
+function RatingBubbleChart({ data, title, subtitle }: {
+  data: { shotRating: number; drinkRating: number; count: number }[];
+  title: string;
+  subtitle: string;
+}) {
+  const W = 280, H = 200;
+  const padL = 38, padR = 12, padT = 12, padB = 32;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const ratings = [1, 2, 3, 4, 5];
+  const xPos = (r: number) => padL + ((r - 1) / 4) * plotW;
+  const yPos = (r: number) => padT + ((5 - r) / 4) * plotH;
+  const maxCount = Math.max(...data.map(d => d.count), 1);
+
+  return (
+    <div className="rounded-2xl overflow-hidden mb-4"
+      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+      <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
+        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
+      </div>
+      {data.length === 0 ? (
+        <div className="px-4 py-8 text-center">
+          <p className="text-[15px]" style={{ color: "var(--text-secondary)" }}>No data yet</p>
+        </div>
+      ) : (
+        <div className="px-2 pb-3">
+          <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+            {/* Diagonal reference line */}
+            <line x1={xPos(1)} y1={yPos(1)} x2={xPos(5)} y2={yPos(5)}
+              style={{ stroke: "var(--divider)" }} strokeWidth={1} strokeDasharray="3 3" />
+            {/* Grid */}
+            {ratings.map(r => (
+              <g key={r}>
+                <line x1={xPos(r)} y1={padT} x2={xPos(r)} y2={padT + plotH}
+                  style={{ stroke: "var(--divider)" }} strokeWidth={0.5} />
+                <line x1={padL} y1={yPos(r)} x2={padL + plotW} y2={yPos(r)}
+                  style={{ stroke: "var(--divider)" }} strokeWidth={0.5} />
+                <text x={xPos(r)} y={H - 8} textAnchor="middle" fontSize={9}
+                  fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+                  {r}★
+                </text>
+                <text x={padL - 5} y={yPos(r) + 3.5} textAnchor="end" fontSize={9}
+                  fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+                  {r}★
+                </text>
+              </g>
+            ))}
+            {/* Axis labels */}
+            <text x={padL + plotW / 2} y={H - 1} textAnchor="middle" fontSize={8}
+              fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+              Shot
+            </text>
+            <text x={8} y={padT + plotH / 2} textAnchor="middle" fontSize={8}
+              fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif"
+              transform={`rotate(-90, 8, ${padT + plotH / 2})`}>
+              Drink
+            </text>
+            {/* Bubbles */}
+            {data.map(({ shotRating, drinkRating, count }) => (
+              <g key={`${shotRating}-${drinkRating}`}>
+                <circle
+                  cx={xPos(shotRating)} cy={yPos(drinkRating)}
+                  r={3 + (count / maxCount) * 10}
+                  fill={RATING_COLORS[shotRating] ?? "#8E8E93"} opacity={0.72}
+                />
+                {count > 1 && (
+                  <text x={xPos(shotRating)} y={yPos(drinkRating) + 3.5} textAnchor="middle" fontSize={8}
+                    fill="white" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif" fontWeight="600">
+                    {count}
+                  </text>
+                )}
+              </g>
+            ))}
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectionLabel({ title }: { title: string }) {
+  return (
+    <p className="text-[20px] font-semibold mb-3 mt-2" style={{ color: "var(--text-primary)" }}>
+      {title}
+    </p>
+  );
+}
+
+function HorizontalBarChart({ rows, title, subtitle }: {
+  rows: { label: string; count: number }[];
+  title: string;
+  subtitle: string;
+}) {
+  const max = Math.max(...rows.map(r => r.count), 1);
+  return (
+    <div className="rounded-2xl overflow-hidden mb-4"
+      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
+        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
+      </div>
+      <div className="px-4 pb-3 flex flex-col gap-2.5">
+        {rows.map((row, i) => (
+          <div key={i}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[13px]" style={{ color: "var(--text-primary)" }}>{row.label}</span>
+              <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{row.count} shot{row.count !== 1 ? "s" : ""}</span>
+            </div>
+            <div className="relative rounded-full overflow-hidden" style={{ height: 6, backgroundColor: "var(--card-secondary)" }}>
+              <div className="absolute inset-y-0 left-0 rounded-full" style={{
+                width: `${(row.count / max * 100).toFixed(1)}%`,
+                backgroundColor: "var(--accent)",
+              }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function StatsPage() {
@@ -373,6 +590,8 @@ export default async function StatsPage() {
     ratingDist, tasteDist,
     [ratioPoints, timePoints],
     ratingTrend, freshnessPoints, retentionValues, flowRateDist,
+    roastTypeDist, shotsPerCoffee,
+    drinkTypeDist, drinkRatingTrend, shotVsDrinkRatings,
   ] = await Promise.all([
     getRatingDistribution(),
     getTasteDistribution(),
@@ -381,6 +600,11 @@ export default async function StatsPage() {
     getFreshnessVsTaste(),
     getRetentionTrend(),
     getFlowRateDistribution(),
+    getRoastTypeDistribution(),
+    getShotsPerCoffee(),
+    getDrinkTypeDistribution(),
+    getDrinkRatingTrend(),
+    getShotVsDrinkRatings(),
   ]);
 
   const ratingBars: BarSpec[] = [
@@ -419,6 +643,24 @@ export default async function StatsPage() {
   }));
   const totalFlowRated = flowBars.reduce((a, b) => a + b.count, 0);
 
+  // Averages for stat lines
+  const avgRating = totalRated > 0
+    ? ratingBars.reduce((a, b, i) => a + (i + 1) * b.count, 0) / totalRated
+    : null;
+
+  const TASTE_MIDPOINTS: Record<number, number> = { 1: 0.7, 2: 1.9, 3: 2.9, 4: 3.9, 5: 4.9, 6: 5.9, 7: 6.7 };
+  const avgTasteRaw = totalTaste > 0
+    ? Object.entries(tasteDist).reduce((a, [k, v]) => a + (TASTE_MIDPOINTS[Number(k)] ?? Number(k)) * v, 0) / totalTaste
+    : null;
+
+  const avgFlowRate = totalFlowRated > 0
+    ? FLOW_BUCKETS.reduce((a, b) => a + b * (flowRateDist[b.toFixed(1)] ?? 0), 0) / totalFlowRated
+    : null;
+
+  const avgRetention = retentionValues.length > 0
+    ? retentionValues.reduce((a, b) => a + b, 0) / retentionValues.length
+    : null;
+
   // Rating trend — dots colored by taste balance, rolling avg overlay
   const ratingWindow = Math.max(5, Math.round(ratingTrend.length / 8));
   const ratingTrendPoints = ratingTrend.map(p => ({
@@ -447,6 +689,49 @@ export default async function StatsPage() {
       retTicks.push(Math.round(t * 100) / 100);
   }
 
+  // Bean section data
+  const ROAST_LEVEL_LABELS: Record<string, string> = {
+    light: "Light",
+    medium_light: "Med-Light",
+    medium: "Medium",
+    medium_dark: "Med-Dark",
+    dark: "Dark",
+    unspecified: "Unspecified",
+  };
+  const ROAST_LEVEL_COLORS: Record<string, string> = {
+    light: "#FFD60A",
+    medium_light: "#FF9500",
+    medium: "#C84B31",
+    medium_dark: "#8B3A2A",
+    dark: "#4A2315",
+    unspecified: "#8E8E93",
+  };
+  const roastBars: BarSpec[] = roastTypeDist
+    .filter(r => r.count > 0)
+    .map(r => ({
+      label: ROAST_LEVEL_LABELS[r.roastLevel] ?? r.roastLevel,
+      count: r.count,
+      color: ROAST_LEVEL_COLORS[r.roastLevel] ?? "#8E8E93",
+    }));
+
+  const coffeeRows = shotsPerCoffee.map(r => ({
+    label: `${r.roaster} ${r.name}`,
+    count: r.count,
+  }));
+
+  // Drinks section data
+  const drinkTypeRows = drinkTypeDist.map(r => ({ label: r.name, count: r.count }));
+  const totalDrinks = drinkTypeDist.reduce((a, r) => a + r.count, 0);
+
+  const drinkRatingWindow = Math.max(3, Math.round(drinkRatingTrend.length / 8));
+  const avgDrinkRating = drinkRatingTrend.length > 0
+    ? drinkRatingTrend.reduce((a, r) => a + r.rating, 0) / drinkRatingTrend.length
+    : null;
+  const drinkTrendPoints = drinkRatingTrend.map(r => ({
+    y: r.rating,
+    color: RATING_COLORS[r.rating] ?? "#8E8E93",
+  }));
+
   const tasteLegend = (
     <div className="flex items-center gap-2 flex-wrap">
       {["V.Sour", "Sour", "Sl.Sour", "Balanced", "Sl.Bitter", "Bitter", "V.Bitter"].map((label, i) => (
@@ -460,21 +745,35 @@ export default async function StatsPage() {
 
   return (
     <div className="pt-4 pb-24">
-      <div className="px-4 mb-2">
-        <Link href="/more" className="text-[17px] flex items-center gap-1" style={{ color: "var(--accent)" }}>
-          <svg width="10" height="17" viewBox="0 0 10 17" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 1L1 8.5L9 16" />
-          </svg>
-          More
-        </Link>
-      </div>
-      <h1 className="text-[34px] font-display px-4 mb-4" style={{ color: "var(--text-primary)" }}>
+      <h1 className="text-[34px] font-display px-4 pt-2 mb-4" style={{ color: "var(--text-primary)" }}>
         Stats
       </h1>
       <div className="px-4">
-        <BarChart bars={ratingBars} title="Shot ratings" subtitle={`${totalRated} rated`} />
-        <BarChart bars={tasteBars} title="Taste balance" subtitle={`${totalTaste} logged`} labelFontSize={8} />
-        <BarChart bars={flowBars} title="Flow rate distribution" subtitle={`${totalFlowRated} shots · g/s`} labelFontSize={7} />
+        <SectionLabel title="Shots" />
+        <BarChart bars={ratingBars} title="Shot ratings" subtitle={`${totalRated} rated`}
+          stat={avgRating != null ? `★ ${avgRating.toFixed(1)}` : undefined}
+          statColor="#FF9500"
+        />
+        <BarChart bars={tasteBars} title="Taste balance" subtitle={`${totalTaste} logged`} labelFontSize={8}
+          stat={avgTasteRaw != null ? tasteLabel(avgTasteRaw) : undefined}
+          statColor={avgTasteRaw != null ? tasteBalanceColor(avgTasteRaw) : undefined}
+        />
+        <BarChart bars={flowBars} title="Flow rate distribution" subtitle={`${totalFlowRated} shots · g/s`} labelFontSize={7}
+          stat={avgFlowRate != null ? `${avgFlowRate.toFixed(2)} g/s` : undefined}
+        />
+        <TrendChart
+          points={ratingTrendPoints}
+          title="Rating over time"
+          subtitle={`${ratingTrend.length} rated`}
+          yMin={0.5} yMax={5.5}
+          yTicks={[1, 2, 3, 4, 5]}
+          yFormat={v => `${v}★`}
+          rollingWindow={ratingWindow}
+          legend={tasteLegend}
+          stat={avgRating != null ? `★ ${avgRating.toFixed(1)}` : undefined}
+          statColor="#FF9500"
+        />
+        <SectionLabel title="Technique" />
         <ScatterPlot
           points={ratioPoints}
           title="Ratio vs taste"
@@ -492,15 +791,22 @@ export default async function StatsPage() {
           xFormat={v => `${v}s`}
         />
         <TrendChart
-          points={ratingTrendPoints}
-          title="Rating over time"
-          subtitle={`${ratingTrend.length} rated`}
-          yMin={0.5} yMax={5.5}
-          yTicks={[1, 2, 3, 4, 5]}
-          yFormat={v => `${v}★`}
-          rollingWindow={ratingWindow}
-          legend={tasteLegend}
+          points={retentionPoints}
+          title="Grinder retention"
+          subtitle={`${retentionValues.length} logged`}
+          yMin={retYMin} yMax={retYMax}
+          yTicks={retTicks}
+          yFormat={v => `${v}g`}
+          connectLine
+          stat={avgRetention != null ? `${avgRetention.toFixed(2)}g avg` : undefined}
         />
+        <SectionLabel title="Beans" />
+        {roastBars.length > 0 && (
+          <BarChart bars={roastBars} title="Roast level" subtitle={`${roastBars.reduce((a, b) => a + b.count, 0)} shots`} />
+        )}
+        {coffeeRows.length > 0 && (
+          <HorizontalBarChart rows={coffeeRows} title="Shots per coffee" subtitle={`${coffeeRows.length} coffees`} />
+        )}
         <ScatterPlot
           points={freshnessPoints}
           title="Roast age vs taste"
@@ -509,15 +815,36 @@ export default async function StatsPage() {
           xTicks={freshnessTicks}
           xFormat={v => `${v}d`}
         />
-        <TrendChart
-          points={retentionPoints}
-          title="Grinder retention"
-          subtitle={`${retentionValues.length} logged`}
-          yMin={retYMin} yMax={retYMax}
-          yTicks={retTicks}
-          yFormat={v => `${v}g`}
-          connectLine
-        />
+        {(drinkTypeRows.length > 0 || drinkRatingTrend.length > 0 || shotVsDrinkRatings.length > 0) && (
+          <SectionLabel title="Drinks" />
+        )}
+        {drinkTypeRows.length > 0 && (
+          <HorizontalBarChart
+            rows={drinkTypeRows}
+            title="Drink types"
+            subtitle={`${totalDrinks} logged`}
+          />
+        )}
+        {drinkRatingTrend.length > 0 && (
+          <TrendChart
+            points={drinkTrendPoints}
+            title="Drink rating over time"
+            subtitle={`${drinkRatingTrend.length} rated`}
+            yMin={0.5} yMax={5.5}
+            yTicks={[1, 2, 3, 4, 5]}
+            yFormat={v => `${v}★`}
+            rollingWindow={drinkRatingWindow}
+            stat={avgDrinkRating != null ? `★ ${avgDrinkRating.toFixed(1)}` : undefined}
+            statColor="#FF9500"
+          />
+        )}
+        {shotVsDrinkRatings.length > 0 && (
+          <RatingBubbleChart
+            data={shotVsDrinkRatings}
+            title="Shot vs drink rating"
+            subtitle={`${shotVsDrinkRatings.reduce((a, r) => a + r.count, 0)} logged`}
+          />
+        )}
       </div>
     </div>
   );

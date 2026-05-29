@@ -390,6 +390,17 @@ export default function HistoryListClient({
                         {shot.drink.detectedDrinkName}
                       </span>
                     )}
+                    {shot.hasAnalysis && (
+                      <span
+                        className="text-[12px] font-medium px-2 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: "#AF52DE22",
+                          color: "#AF52DE",
+                        }}
+                      >
+                        AI
+                      </span>
+                    )}
                     <span
                       className="text-[12px] font-medium px-2 py-0.5 rounded-full"
                       style={{

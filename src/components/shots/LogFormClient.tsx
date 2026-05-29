@@ -155,7 +155,7 @@ export default function LogFormClient({
 
   // Resolve defaults: last shot takes priority over equipment profile fallbacks
   const initialBagId = (
-    lastShot ? bags.find((b) => b.id === lastShot.bagId)?.id : bags[0]?.id
+    (lastShot ? bags.find((b) => b.id === lastShot.bagId)?.id : null) ?? bags[0]?.id
   )?.toString() ?? "";
 
   // Shot fields
@@ -187,6 +187,13 @@ export default function LogFormClient({
   const [tasteBalance, setTasteBalance] = useState<number | null>(null);
   const [shotRating, setShotRating] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
+
+  // Date / time
+  const [pulledAt, setPulledAt] = useState(() => {
+    const d = new Date();
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
 
   // Drink
   const [includeDrink, setIncludeDrink] = useState(false);
@@ -270,11 +277,17 @@ export default function LogFormClient({
               className="text-right outline-none bg-transparent text-[17px] max-w-[200px] truncate"
               style={{ color: "var(--accent)" }}
             >
-              {bags.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.roaster} · {b.name}
-                </option>
-              ))}
+              {(() => {
+                const dupes = new Set(
+                  bags.map(b => `${b.roaster}|${b.name}`)
+                    .filter((k, _, a) => a.filter(x => x === k).length > 1)
+                );
+                return bags.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.roaster} · {b.name}{dupes.has(`${b.roaster}|${b.name}`) ? ` (${b.roastDate.slice(5)})` : ""}
+                  </option>
+                ));
+              })()}
             </select>
           </div>
         </div>
@@ -394,6 +407,16 @@ export default function LogFormClient({
               ))}
             </div>
           </div>
+          <Row label="Date & Time">
+            <input
+              type="datetime-local"
+              name="pulledAt"
+              value={pulledAt}
+              onChange={(e) => setPulledAt(e.target.value)}
+              className="text-right outline-none bg-transparent text-[17px]"
+              style={{ color: "var(--accent)" }}
+            />
+          </Row>
         </div>
 
         {/* ── Taste ── */}

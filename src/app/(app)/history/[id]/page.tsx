@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getShotById, getLatestShotId } from "@/lib/shots/queries";
 import { getShotPositionInHistory } from "@/lib/analysis/queries";
-import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
+import { DRINK_DEFAULTS, detectEspressoBase } from "@/lib/shots/drinkDetection";
 import { getAnalysisForShot } from "@/lib/analysis/queries";
 import ClassificationBadge from "@/components/shots/ClassificationBadge";
 import { getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
@@ -100,6 +100,7 @@ export default async function ShotDetailPage({
   if (!shot) notFound();
   const { shotNumber } = await getShotPositionInHistory(Number(id), shot.pulledAt);
   const brewRatio = shot.yieldG != null ? shot.yieldG / shot.doseG : null;
+  const espressoBase = shot.yieldG != null ? detectEspressoBase(shot.doseG, shot.yieldG) : null;
   const flowRate = shot.yieldG != null && shot.shotTimeSeconds != null && shot.shotTimeSeconds > 0
     ? (shot.yieldG / shot.shotTimeSeconds).toFixed(2)
     : null;
@@ -145,6 +146,25 @@ export default async function ShotDetailPage({
 
       {/* Classifications + freshness */}
       <div className="px-4 mb-3 flex gap-2 flex-wrap">
+        {espressoBase && (
+          <span
+            style={{
+              display: "inline-block",
+              backgroundColor: "var(--card-secondary)",
+              color: "var(--text-secondary)",
+              fontSize: 13,
+              fontWeight: 600,
+              borderRadius: 20,
+              paddingLeft: 10,
+              paddingRight: 10,
+              paddingTop: 3,
+              paddingBottom: 3,
+              lineHeight: 1.3,
+            }}
+          >
+            {espressoBase}
+          </span>
+        )}
         <ClassificationBadge classification={shot.timeClassification} />
         <ClassificationBadge classification={shot.ratioClassification} />
         <span

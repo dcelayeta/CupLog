@@ -65,7 +65,7 @@ function attachStats<T extends { id: number }>(
 }
 
 export async function getBags(
-  status: "active" | "finished" | "all" = "active"
+  status: "active" | "reserve" | "finished" | "all" = "active"
 ): Promise<BagWithOrigins[]> {
   const whereClause = status === "all"
     ? sql`${bags.status} != ${"removed"}`
@@ -205,7 +205,7 @@ export async function findDuplicateBag(
   const conditions = [
     sql`lower(${bags.roaster}) = lower(${roaster})`,
     sql`lower(${bags.name}) = lower(${name})`,
-    or(eq(bags.status, "active"), eq(bags.status, "finished")),
+    eq(bags.status, "active"),
   ];
   if (excludeId) conditions.push(ne(bags.id, excludeId));
 

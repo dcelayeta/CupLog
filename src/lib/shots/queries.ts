@@ -5,6 +5,7 @@ import {
   drinks,
   equipmentProfiles,
   extractionThresholds,
+  shotAnalyses,
 } from "@/db/schema";
 import { eq, and, sql, desc, isNotNull } from "drizzle-orm";
 import { classifyTime, classifyRatio, type Classification } from "./classification";
@@ -38,6 +39,7 @@ export type ShotRow = {
     overallRating: number | null;
     detectedDrinkName: string | null;
   } | null;
+  hasAnalysis: boolean;
 };
 
 export type ShotDetail = {
@@ -187,22 +189,26 @@ export async function getShotsForHistory(bagId?: number): Promise<ShotRow[]> {
 
   if (shotRows.length === 0) return [];
 
-  const drinkRows = await db
-    .select({
-      shotId: drinks.shotId,
-      id: drinks.id,
-      overallRating: drinks.overallRating,
-      detectedDrinkName: drinks.detectedDrinkName,
-    })
-    .from(drinks)
-    .where(
-      sql`${drinks.shotId} IN (${sql.join(
-        shotRows.map((s) => sql`${s.id}`),
-        sql`, `
-      )})`
-    );
+  const shotIdList = sql.join(shotRows.map((s) => sql`${s.id}`), sql`, `);
+
+  const [drinkRows, analysisRows] = await Promise.all([
+    db
+      .select({
+        shotId: drinks.shotId,
+        id: drinks.id,
+        overallRating: drinks.overallRating,
+        detectedDrinkName: drinks.detectedDrinkName,
+      })
+      .from(drinks)
+      .where(sql`${drinks.shotId} IN (${shotIdList})`),
+    db
+      .select({ shotId: shotAnalyses.shotId })
+      .from(shotAnalyses)
+      .where(sql`${shotAnalyses.shotId} IN (${shotIdList})`),
+  ]);
 
   const drinkMap = new Map(drinkRows.map((d) => [d.shotId, d]));
+  const analysisSet = new Set(analysisRows.map((a) => a.shotId));
 
   const noData: Classification = { label: "—", color: "#8E8E93" };
   return shotRows.map((s) => {
@@ -221,6 +227,7 @@ export async function getShotsForHistory(bagId?: number): Promise<ShotRow[]> {
             detectedDrinkName: d.detectedDrinkName ?? null,
           }
         : null,
+      hasAnalysis: analysisSet.has(s.id),
     };
   });
 }

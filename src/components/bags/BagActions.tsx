@@ -7,7 +7,7 @@ export default function BagActions({
   status,
 }: {
   bagId: number;
-  status: "active" | "finished" | "removed";
+  status: "active" | "reserve" | "finished" | "removed";
 }) {
   const handleFinish = async () => {
     if (!confirm("Mark this bag as finished?")) return;
@@ -26,6 +26,24 @@ export default function BagActions({
 
   return (
     <div className="px-4 pb-8 flex flex-col items-center gap-4">
+      {status === "reserve" && (
+        <>
+          <button
+            onClick={handleReactivate}
+            className="text-[15px] font-medium"
+            style={{ color: "var(--accent)" }}
+          >
+            Activate — start using this bag
+          </button>
+          <button
+            onClick={handleRemove}
+            className="text-[15px] font-medium"
+            style={{ color: "var(--destructive)" }}
+          >
+            Delete Bag
+          </button>
+        </>
+      )}
       {status === "active" && (
         <>
           <button

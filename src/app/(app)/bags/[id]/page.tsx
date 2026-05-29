@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBagById } from "@/lib/bags/queries";
+import { getBagAnalysis } from "@/lib/bags/bagAnalysis";
 import FreshnessIndicator from "@/components/bags/FreshnessIndicator";
 import BagActions from "@/components/bags/BagActions";
+import BagAnalysisClient from "@/components/bags/BagAnalysisClient";
 import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 
 const ROAST_LABELS: Record<string, string> = {
@@ -316,8 +318,8 @@ function FreshnessTimeline({
   );
 }
 
-function WeightBar({ weightG, totalDoseG }: { weightG: number; totalDoseG: number }) {
-  const remaining = Math.max(0, weightG - totalDoseG);
+function WeightBar({ weightG, totalDoseG, weightCorrectionG = 0 }: { weightG: number; totalDoseG: number; weightCorrectionG?: number }) {
+  const remaining = Math.max(0, weightG - totalDoseG + weightCorrectionG);
   const pct = Math.min(100, (remaining / weightG) * 100);
   const barColor = pct > 50 ? "var(--accent)" : pct > 25 ? "#FF9500" : "#FF3B30";
 
@@ -329,7 +331,7 @@ function WeightBar({ weightG, totalDoseG }: { weightG: number; totalDoseG: numbe
           ~{Math.round(remaining)}g left
         </span>
       </div>
-      <div className="relative rounded-full overflow-hidden" style={{ height: 8, backgroundColor: "var(--card-secondary)" }}>
+      <div className="relative rounded-full overflow-hidden" style={{ height: 8, backgroundColor: "var(--divider)" }}>
         <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct.toFixed(1)}%`, backgroundColor: barColor }} />
       </div>
       <div className="flex justify-between mt-1.5">
@@ -337,7 +339,7 @@ function WeightBar({ weightG, totalDoseG }: { weightG: number; totalDoseG: numbe
           {Math.round(pct)}% remaining
         </span>
         <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
-          {weightG}g total
+          {weightG}g total{weightCorrectionG !== 0 ? ` · ${weightCorrectionG > 0 ? "+" : ""}${weightCorrectionG}g adjusted` : ""}
         </span>
       </div>
     </div>
@@ -361,7 +363,10 @@ export default async function BagDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const bag = await getBagById(Number(id));
+  const [bag, existingAnalysis] = await Promise.all([
+    getBagById(Number(id)),
+    getBagAnalysis(Number(id)),
+  ]);
   if (!bag) notFound();
 
   const infoRows = [
@@ -491,6 +496,7 @@ export default async function BagDetailPage({
                   <WeightBar
                     weightG={bag.weightG}
                     totalDoseG={bag.totalDoseG ?? 0}
+                    weightCorrectionG={bag.weightCorrectionG ?? 0}
                   />
                 </>
               )}
@@ -686,6 +692,14 @@ export default async function BagDetailPage({
                 {bag.notes}
               </p>
             </div>
+          </div>
+        )}
+
+        {/* AI Bag Review — finished bags only */}
+        {bag.status === "finished" && (
+          <div>
+            <SectionHeader label="AI Review" />
+            <BagAnalysisClient bagId={bag.id} existingAnalysis={existingAnalysis} />
           </div>
         )}
 

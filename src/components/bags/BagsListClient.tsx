@@ -7,10 +7,12 @@ import type { BagWithOrigins } from "@/lib/bags/queries";
 
 export default function BagsListClient({
   bags,
+  reserveBags = [],
   status,
   query,
 }: {
   bags: BagWithOrigins[];
+  reserveBags?: BagWithOrigins[];
   status: "active" | "finished" | "all";
   query: string;
 }) {
@@ -90,7 +92,7 @@ export default function BagsListClient({
         </div>
       </div>
 
-      {/* List */}
+      {/* Active / main list */}
       {bags.length === 0 ? (
         <div className="px-4 py-12 text-center">
           <p
@@ -115,15 +117,34 @@ export default function BagsListClient({
               {i > 0 && (
                 <div
                   className="ml-4"
-                  style={{
-                    height: "1px",
-                    backgroundColor: "var(--divider)",
-                  }}
+                  style={{ height: "1px", backgroundColor: "var(--divider)" }}
                 />
               )}
               <BagCard bag={bag} />
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Reserve bags section */}
+      {reserveBags.length > 0 && (
+        <div className="mt-6">
+          <p className="px-4 mb-2 text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+            Reserve
+          </p>
+          <div
+            className="mx-4 rounded-2xl overflow-hidden"
+            style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+          >
+            {reserveBags.map((bag, i) => (
+              <div key={bag.id}>
+                {i > 0 && (
+                  <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
+                )}
+                <BagCard bag={bag} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

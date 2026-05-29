@@ -186,6 +186,13 @@ export default function ShotEditFormClient({
   const [overallRating, setOverallRating] = useState<number | null>(shot.drink?.overallRating ?? null);
   const [drinkNotes, setDrinkNotes] = useState(shot.drink?.notes ?? "");
 
+  // Date / time
+  const [pulledAt, setPulledAt] = useState(() => {
+    const d = new Date(shot.pulledAt);
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
+
   // Live preview
   const dose = parseNum(doseG);
   const yield_ = parseNum(yieldG);
@@ -228,8 +235,6 @@ export default function ShotEditFormClient({
         <input type="hidden" name="distributionToolUsed" value={distributionToolUsed ? "true" : "false"} />
         <input type="hidden" name="flowCharacteristics" value={flowCharacteristics ?? ""} />
         <input type="hidden" name="includeDrink" value={includeDrink ? "true" : "false"} />
-        <input type="hidden" name="pulledAt" value={shot.pulledAt} />
-
         {/* Bag */}
         <SectionHeader title="Bean" />
         <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
@@ -244,6 +249,16 @@ export default function ShotEditFormClient({
         {/* Shot */}
         <SectionHeader title="Shot" />
         <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+          <Row label="Date & Time">
+            <input
+              type="datetime-local"
+              name="pulledAt"
+              value={pulledAt}
+              onChange={(e) => setPulledAt(e.target.value)}
+              className="text-right outline-none bg-transparent text-[17px]"
+              style={{ color: "var(--accent)" }}
+            />
+          </Row>
           <Row label="Dose (g)"><NumberInput name="doseG" value={doseG} onChange={setDoseG} placeholder="18" step="0.1" min="5" max="30" /></Row>
           <Row label="Yield (g)"><NumberInput name="yieldG" value={yieldG} onChange={setYieldG} placeholder="36" step="0.1" min="10" max="100" /></Row>
           <Row label="Shot Time (s)"><NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder="28" step="1" min="5" max="120" /></Row>

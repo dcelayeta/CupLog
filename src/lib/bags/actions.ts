@@ -66,6 +66,8 @@ export async function createBag(
     ? Number(formData.get("peakEndDay"))
     : estimated.peakEndDay;
 
+  const status = (formData.get("status") as "active" | "reserve") === "reserve" ? "reserve" : "active";
+
   const bagData: NewBag = {
     roaster,
     name,
@@ -78,9 +80,11 @@ export async function createBag(
     purchaseShop: (formData.get("purchaseShop") as string) || null,
     price: formData.get("price") ? Number(formData.get("price")) : null,
     weightG: formData.get("weightG") ? Number(formData.get("weightG")) : null,
+    weightCorrectionG: formData.get("weightCorrectionG") ? Number(formData.get("weightCorrectionG")) : 0,
     notes: (formData.get("notes") as string) || null,
     peakStartDay,
     peakEndDay,
+    status,
   };
 
   const [bag] = await db.insert(bags).values(bagData).returning();
@@ -139,6 +143,7 @@ export async function updateBag(
       purchaseShop: (formData.get("purchaseShop") as string) || null,
       price: formData.get("price") ? Number(formData.get("price")) : null,
       weightG: formData.get("weightG") ? Number(formData.get("weightG")) : null,
+      weightCorrectionG: formData.get("weightCorrectionG") ? Number(formData.get("weightCorrectionG")) : 0,
       notes: (formData.get("notes") as string) || null,
       peakStartDay,
       peakEndDay,
