@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/db/client";
 import { sql } from "drizzle-orm";
 import { getBags } from "@/lib/bags/queries";
+import ClientDateTime from "@/components/ClientDateTime";
 import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 import { getActiveEquipmentProfile } from "@/lib/equipment/queries";
 import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
@@ -272,7 +273,7 @@ export default async function HomePage() {
                   Last shot
                 </p>
                 <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                  {formatDate(String(lastShot.pulled_at))}
+                  <ClientDateTime iso={String(lastShot.pulled_at)} dateOnly />
                 </p>
               </div>
               <div className="px-4 pb-3">
