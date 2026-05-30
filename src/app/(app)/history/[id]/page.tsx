@@ -5,6 +5,7 @@ import { getShotPositionInHistory } from "@/lib/analysis/queries";
 import { DRINK_DEFAULTS, detectEspressoBase } from "@/lib/shots/drinkDetection";
 import { getAnalysisForShot } from "@/lib/analysis/queries";
 import ClassificationBadge from "@/components/shots/ClassificationBadge";
+import ClientDateTime from "@/components/ClientDateTime";
 import { getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 import TasteBalanceDisplay from "@/components/shots/TasteBalanceDisplay";
 import ShotAnalysisClient from "@/components/shots/ShotAnalysisClient";
@@ -137,7 +138,7 @@ export default async function ShotDetailPage({
           {shot.roasterName} · {shot.bagName}
         </h1>
         <p className="text-[15px] mt-1" style={{ color: "var(--text-secondary)" }}>
-          {formatDateTime(shot.pulledAt)}{" "}
+          <ClientDateTime iso={shot.pulledAt} />{" "}
           <span style={{ color: shot.id === latestShotId ? "#007AFF" : "var(--text-secondary)" }}>
             (Shot {shotNumber}{shot.id === latestShotId ? " — Latest shot" : ""})
           </span>
