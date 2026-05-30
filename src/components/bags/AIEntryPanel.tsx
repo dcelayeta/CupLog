@@ -7,9 +7,11 @@ import type { ParsedBagData } from "@/lib/bags/parseWithAI";
 export default function AIEntryPanel({
   onParsed,
   onTip,
+  onTipLoading,
 }: {
   onParsed: (data: ParsedBagData) => void;
   onTip?: (tip: string) => void;
+  onTipLoading?: (loading: boolean) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [text, setText] = useState("");
@@ -61,25 +63,22 @@ export default function AIEntryPanel({
       setParsedData(result.data);
       setTip(null);
       setTipError(null);
+
+      // Auto-fetch dial-in tip right after parsing
+      setIsTipping(true);
+      onTipLoading?.(true);
+      getDialInRecommendation(result.data).then((tipResult) => {
+        setIsTipping(false);
+        onTipLoading?.(false);
+        if ("error" in tipResult) {
+          setTipError(tipResult.error);
+        } else {
+          setTip(tipResult.tip);
+          onTip?.(tipResult.tip);
+        }
+      });
     } finally {
       setIsParsing(false);
-    }
-  };
-
-  const handleGetTip = async () => {
-    if (!parsedData) return;
-    setIsTipping(true);
-    setTipError(null);
-    try {
-      const result = await getDialInRecommendation(parsedData);
-      if ("error" in result) {
-        setTipError(result.error);
-      } else {
-        setTip(result.tip);
-        onTip?.(result.tip);
-      }
-    } finally {
-      setIsTipping(false);
     }
   };
 
@@ -169,42 +168,33 @@ export default function AIEntryPanel({
           </div>
 
           {/* Dial-in tip section */}
-          <div className="px-4 py-3">
-            {!tip && !isTipping && (
-              <button
-                type="button"
-                onClick={handleGetTip}
-                className="w-full py-2.5 rounded-full text-[15px] font-medium flex items-center justify-center gap-1.5 transition-opacity"
-                style={{ backgroundColor: "#AF52DE22", color: "#AF52DE" }}
-              >
-                <span style={{ fontSize: 16 }}>✦</span>
-                Get dial-in tip
-              </button>
-            )}
-            {isTipping && (
-              <p className="text-[14px] text-center py-1" style={{ color: "var(--text-secondary)" }}>
-                Generating tip…
-              </p>
-            )}
-            {tipError && (
-              <p className="text-[14px]" style={{ color: "var(--destructive)" }}>
-                {tipError}
-              </p>
-            )}
-            {tip && (
-              <div
-                className="rounded-xl px-4 py-3"
-                style={{ backgroundColor: "#AF52DE11", border: "1px solid #AF52DE33" }}
-              >
-                <p className="text-[13px] font-semibold mb-1" style={{ color: "#AF52DE" }}>
-                  Dial-in tip ✦
+          {(isTipping || tip || tipError) && (
+            <div className="px-4 py-3">
+              {isTipping && (
+                <p className="text-[14px] text-center py-1" style={{ color: "var(--text-secondary)" }}>
+                  Generating dial-in tip…
                 </p>
-                <p className="text-[15px] leading-relaxed" style={{ color: "var(--text-primary)" }}>
-                  {tip}
+              )}
+              {tipError && (
+                <p className="text-[14px]" style={{ color: "var(--destructive)" }}>
+                  {tipError}
                 </p>
-              </div>
-            )}
-          </div>
+              )}
+              {tip && (
+                <div
+                  className="rounded-xl px-4 py-3"
+                  style={{ backgroundColor: "#AF52DE11", border: "1px solid #AF52DE33" }}
+                >
+                  <p className="text-[13px] font-semibold mb-1" style={{ color: "#AF52DE" }}>
+                    Dial-in tip ✦
+                  </p>
+                  <p className="text-[15px] leading-relaxed" style={{ color: "var(--text-primary)" }}>
+                    {tip}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

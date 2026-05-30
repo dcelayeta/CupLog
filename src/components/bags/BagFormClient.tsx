@@ -147,6 +147,7 @@ export default function BagFormClient({
   const [aiData, setAiData] = useState<ParsedBagData | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [dialInTip, setDialInTip] = useState<string | null>(null);
+  const [isTipLoading, setIsTipLoading] = useState(false);
 
   // Active data source: AI result takes priority over initialData
   const activeData = aiData ?? initialData;
@@ -296,7 +297,11 @@ export default function BagFormClient({
         {/* AI Entry — add mode only */}
         {mode === "add" && (
           <>
-            <AIEntryPanel onParsed={handleAIParsed} onTip={setDialInTip} />
+            <AIEntryPanel
+              onParsed={handleAIParsed}
+              onTip={setDialInTip}
+              onTipLoading={setIsTipLoading}
+            />
             {dialInTip && <input type="hidden" name="dialInTip" value={dialInTip} />}
           </>
         )}
@@ -700,7 +705,7 @@ export default function BagFormClient({
         >
           <button
             type="submit"
-            disabled={isPending || isModalPending}
+            disabled={isPending || isModalPending || isTipLoading}
             className="w-full py-4 rounded-full text-[17px] font-medium transition-opacity disabled:opacity-50"
             style={{
               backgroundColor: "var(--card)",
@@ -708,7 +713,7 @@ export default function BagFormClient({
               boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
             }}
           >
-            {isPending || isModalPending ? "Saving…" : "Save Bag"}
+            {isPending || isModalPending ? "Saving…" : isTipLoading ? "Getting dial-in tip…" : "Save Bag"}
           </button>
           {mode === "add" && (
             <button
