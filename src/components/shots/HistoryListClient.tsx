@@ -317,8 +317,10 @@ export default function HistoryListClient({
         <div className="px-4 flex flex-col gap-2">
           {filtered.map((shot) => {
             const brewRatio = shot.yieldG != null ? shot.yieldG / shot.doseG : null;
-            const shotDate = new Date(shot.pulledAt.slice(0, 10) + "T00:00:00");
-            const roastDate = new Date(shot.bagRoastDate + "T00:00:00");
+            const _s = new Date(shot.pulledAt);
+            const shotDate = new Date(_s.getFullYear(), _s.getMonth(), _s.getDate());
+            const [ry, rm, rd] = shot.bagRoastDate.split("-").map(Number);
+            const roastDate = new Date(ry, rm - 1, rd);
             const days = Math.floor((shotDate.getTime() - roastDate.getTime()) / (1000 * 60 * 60 * 24));
             const freshnessColor = FRESHNESS_CSS[getFreshnessColor(days)];
             const freshnessLabel = getFreshnessLabel(days);

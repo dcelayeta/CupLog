@@ -94,7 +94,8 @@ export default async function ShotDetailPage({
   const flowRate = shot.yieldG != null && shot.shotTimeSeconds != null && shot.shotTimeSeconds > 0
     ? (shot.yieldG / shot.shotTimeSeconds).toFixed(2)
     : null;
-  const shotDate = new Date(shot.pulledAt.slice(0, 10) + "T00:00:00");
+  const shotLocalDate = new Date(shot.pulledAt).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const shotDate = new Date(shotLocalDate + "T00:00:00");
   const roastDate = new Date(shot.bagRoastDate + "T00:00:00");
   const daysSinceRoast = Math.floor((shotDate.getTime() - roastDate.getTime()) / (1000 * 60 * 60 * 24));
   const peakStart = shot.bagPeakStartDay ?? undefined;

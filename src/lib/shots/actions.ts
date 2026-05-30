@@ -299,6 +299,7 @@ export async function deleteShot(id: number): Promise<void> {
     await db.delete(drinks).where(eq(drinks.id, drink.id));
   }
   await db.delete(shots).where(eq(shots.id, id));
+  revalidatePath("/home");
   revalidatePath("/history");
   redirect("/history");
 }
