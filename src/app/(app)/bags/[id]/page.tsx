@@ -695,6 +695,28 @@ export default async function BagDetailPage({
           </div>
         )}
 
+        {/* Dial-in tip — shown until first shot is pulled */}
+        {bag.dialInTip && (bag.shotCount ?? 0) === 0 && (
+          <div>
+            <SectionHeader label="Dial-in Tip" />
+            <div
+              className="mx-4 rounded-2xl px-4 py-3"
+              style={{
+                backgroundColor: "#AF52DE11",
+                border: "1px solid #AF52DE33",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+              }}
+            >
+              <p className="text-[13px] font-semibold mb-1" style={{ color: "#AF52DE" }}>
+                ✦ AI recommendation
+              </p>
+              <p className="text-[15px] leading-relaxed" style={{ color: "var(--text-primary)" }}>
+                {bag.dialInTip}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* AI Bag Review — finished bags only */}
         {bag.status === "finished" && (
           <div>

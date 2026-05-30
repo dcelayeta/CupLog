@@ -6,8 +6,10 @@ import type { ParsedBagData } from "@/lib/bags/parseWithAI";
 
 export default function AIEntryPanel({
   onParsed,
+  onTip,
 }: {
   onParsed: (data: ParsedBagData) => void;
+  onTip?: (tip: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [text, setText] = useState("");
@@ -74,6 +76,7 @@ export default function AIEntryPanel({
         setTipError(result.error);
       } else {
         setTip(result.tip);
+        onTip?.(result.tip);
       }
     } finally {
       setIsTipping(false);

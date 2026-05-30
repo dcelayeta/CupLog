@@ -244,7 +244,7 @@ export default async function HomePage() {
                   }}
                 >
                   <span
-                    className="text-[18px] font-semibold"
+                    className="text-[18px] font-semibold text-center"
                     style={{ color: color ?? "var(--text-primary)" }}
                   >
                     {value}

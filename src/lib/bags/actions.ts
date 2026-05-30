@@ -81,6 +81,7 @@ export async function createBag(
     price: formData.get("price") ? Number(formData.get("price")) : null,
     weightG: formData.get("weightG") ? Number(formData.get("weightG")) : null,
     weightCorrectionG: formData.get("weightCorrectionG") ? Number(formData.get("weightCorrectionG")) : 0,
+    dialInTip: (formData.get("dialInTip") as string) || null,
     notes: (formData.get("notes") as string) || null,
     peakStartDay,
     peakEndDay,

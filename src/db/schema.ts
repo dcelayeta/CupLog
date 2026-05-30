@@ -30,6 +30,7 @@ export const bags = sqliteTable("bags", {
   price: real("price"),
   weightG: integer("weight_g"),
   weightCorrectionG: integer("weight_correction_g").default(0),
+  dialInTip: text("dial_in_tip"),
   status: text("status", { enum: ["active", "reserve", "finished", "removed"] })
     .notNull()
     .default("active"),

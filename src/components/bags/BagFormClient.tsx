@@ -146,6 +146,7 @@ export default function BagFormClient({
   // uncontrolled inputs so their defaultValues pick up the new data
   const [aiData, setAiData] = useState<ParsedBagData | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [dialInTip, setDialInTip] = useState<string | null>(null);
 
   // Active data source: AI result takes priority over initialData
   const activeData = aiData ?? initialData;
@@ -294,7 +295,10 @@ export default function BagFormClient({
 
         {/* AI Entry — add mode only */}
         {mode === "add" && (
-          <AIEntryPanel onParsed={handleAIParsed} />
+          <>
+            <AIEntryPanel onParsed={handleAIParsed} onTip={setDialInTip} />
+            {dialInTip && <input type="hidden" name="dialInTip" value={dialInTip} />}
+          </>
         )}
 
         <div key={formKey} className="flex flex-col gap-6">
