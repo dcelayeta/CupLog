@@ -141,11 +141,6 @@ function formatTime(secs: number | null): string {
   return `${secs}s`;
 }
 
-function formatDate(pulledAt: string | null): string {
-  if (!pulledAt) return "";
-  const d = new Date(pulledAt);
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-}
 
 export default async function HomePage() {
   const [stats, lastShot, activeBags, equipment] = await Promise.all([

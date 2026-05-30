@@ -10,17 +10,6 @@ import { getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/
 import TasteBalanceDisplay from "@/components/shots/TasteBalanceDisplay";
 import ShotAnalysisClient from "@/components/shots/ShotAnalysisClient";
 
-function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 function DetailRow({ label, value, noDivider }: { label: string; value: React.ReactNode; noDivider?: boolean }) {
   if (value === null || value === undefined || value === "") return null;
