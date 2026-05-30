@@ -148,6 +148,7 @@ export async function logShot(
       .values(drinkValues);
   }
 
+  revalidatePath("/home");
   revalidatePath("/history");
   revalidatePath("/log");
 

@@ -410,12 +410,13 @@ export default function LogFormClient({
           <Row label="Date & Time">
             <input
               type="datetime-local"
-              name="pulledAt"
               value={pulledAt}
               onChange={(e) => setPulledAt(e.target.value)}
               className="text-right outline-none bg-transparent text-[17px]"
               style={{ color: "var(--accent)" }}
             />
+            {/* Convert local time to UTC before submitting — server (Vercel) runs in UTC */}
+            <input type="hidden" name="pulledAt" value={pulledAt ? new Date(pulledAt).toISOString() : ""} />
           </Row>
         </div>
 

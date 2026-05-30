@@ -252,12 +252,12 @@ export default function ShotEditFormClient({
           <Row label="Date & Time">
             <input
               type="datetime-local"
-              name="pulledAt"
               value={pulledAt}
               onChange={(e) => setPulledAt(e.target.value)}
               className="text-right outline-none bg-transparent text-[17px]"
               style={{ color: "var(--accent)" }}
             />
+            <input type="hidden" name="pulledAt" value={pulledAt ? new Date(pulledAt).toISOString() : ""} />
           </Row>
           <Row label="Dose (g)"><NumberInput name="doseG" value={doseG} onChange={setDoseG} placeholder="18" step="0.1" min="5" max="30" /></Row>
           <Row label="Yield (g)"><NumberInput name="yieldG" value={yieldG} onChange={setYieldG} placeholder="36" step="0.1" min="10" max="100" /></Row>
