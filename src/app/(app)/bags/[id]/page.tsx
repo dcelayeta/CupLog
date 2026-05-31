@@ -5,6 +5,7 @@ import { getBagAnalysis } from "@/lib/bags/bagAnalysis";
 import FreshnessIndicator from "@/components/bags/FreshnessIndicator";
 import BagActions from "@/components/bags/BagActions";
 import BagAnalysisClient from "@/components/bags/BagAnalysisClient";
+import BagDialInClient from "@/components/bags/BagDialInClient";
 import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 
 const ROAST_LABELS: Record<string, string> = {
@@ -695,25 +696,15 @@ export default async function BagDetailPage({
           </div>
         )}
 
-        {/* Dial-in tip — shown until first shot is pulled */}
-        {bag.dialInTip && (bag.shotCount ?? 0) === 0 && (
+        {/* Dial-in tip — active bags only */}
+        {bag.status === "active" && (
           <div>
-            <SectionHeader label="Dial-in Tip" />
-            <div
-              className="mx-4 rounded-2xl px-4 py-3"
-              style={{
-                backgroundColor: "#AF52DE11",
-                border: "1px solid #AF52DE33",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
-              }}
-            >
-              <p className="text-[13px] font-semibold mb-1" style={{ color: "#AF52DE" }}>
-                ✦ AI recommendation
-              </p>
-              <p className="text-[15px] leading-relaxed" style={{ color: "var(--text-primary)" }}>
-                {bag.dialInTip}
-              </p>
-            </div>
+            <SectionHeader label="Dial-in" />
+            <BagDialInClient
+              bagId={bag.id}
+              shotCount={bag.shotCount ?? 0}
+              existingTip={bag.dialInTip ?? null}
+            />
           </div>
         )}
 

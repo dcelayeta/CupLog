@@ -32,6 +32,8 @@ export type ShotRow = {
   bagStatus: string;
   shotRating: number | null;
   notes: string | null;
+  isFailed: boolean;
+  failReason: string | null;
   timeClassification: Classification;
   ratioClassification: Classification;
   drink: {
@@ -64,6 +66,8 @@ export type ShotDetail = {
   tasteBalance: number | null;
   shotRating: number | null;
   flowCharacteristics: string | null;
+  isFailed: boolean;
+  failReason: string | null;
   notes: string | null;
   bagId: number;
   bagName: string;
@@ -181,6 +185,8 @@ export async function getShotsForHistory(bagId?: number): Promise<ShotRow[]> {
       bagStatus: bags.status,
       shotRating: shots.shotRating,
       notes: shots.notes,
+      isFailed: shots.isFailed,
+      failReason: shots.failReason,
     })
     .from(shots)
     .innerJoin(bags, eq(shots.bagId, bags.id))
@@ -258,6 +264,8 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       tasteBalance: shots.tasteBalance,
       shotRating: shots.shotRating,
       flowCharacteristics: shots.flowCharacteristics,
+      isFailed: shots.isFailed,
+      failReason: shots.failReason,
       notes: shots.notes,
       bagId: shots.bagId,
       bagName: bags.name,

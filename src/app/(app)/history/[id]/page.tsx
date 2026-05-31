@@ -135,6 +135,24 @@ export default async function ShotDetailPage({
         </p>
       </div>
 
+      {/* Failed shot banner */}
+      {shot.isFailed && (
+        <div className="mx-4 mb-3 px-4 py-2.5 rounded-2xl flex items-center gap-2" style={{ backgroundColor: "#FF3B3022", border: "1px solid #FF3B3044" }}>
+          <span className="text-[15px] font-semibold" style={{ color: "#FF3B30" }}>Failed Shot</span>
+          {shot.failReason && (
+            <span className="text-[14px]" style={{ color: "#FF3B30AA" }}>
+              · {{
+                channeling: "Channeling",
+                puck_collapse: "Puck Collapse",
+                grind_error: "Grind Error",
+                equipment_issue: "Equipment Issue",
+                other: "Other",
+              }[shot.failReason] ?? shot.failReason}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Classifications + freshness */}
       <div className="px-4 mb-3 flex gap-2 flex-wrap">
         {espressoBase && (

@@ -183,6 +183,10 @@ export default function LogFormClient({
   const [grinderRetentionG, setGrinderRetentionG] = useState("0");
   const [flowCharacteristics, setFlowCharacteristics] = useState<string | null>(null);
 
+  // Failed shot
+  const [isFailed, setIsFailed] = useState(false);
+  const [failReason, setFailReason] = useState<string>("");
+
   // Taste
   const [tasteBalance, setTasteBalance] = useState<number | null>(null);
   const [shotRating, setShotRating] = useState<number | null>(null);
@@ -257,6 +261,8 @@ export default function LogFormClient({
         <input type="hidden" name="distributionToolUsed" value={distributionToolUsed ? "true" : "false"} />
         <input type="hidden" name="flowCharacteristics" value={flowCharacteristics ?? ""} />
         <input type="hidden" name="includeDrink" value={includeDrink ? "true" : "false"} />
+        <input type="hidden" name="isFailed" value={isFailed ? "true" : "false"} />
+        {isFailed && failReason && <input type="hidden" name="failReason" value={failReason} />}
         {equipmentProfile && (
           <input type="hidden" name="equipmentProfileId" value={equipmentProfile.id} />
         )}
@@ -298,14 +304,58 @@ export default function LogFormClient({
           className="mx-4 rounded-2xl overflow-hidden"
           style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
         >
+          {/* Failed shot toggle */}
+          <div className="flex items-center px-6 min-h-[52px]">
+            <span className="text-[17px] flex-1" style={{ color: isFailed ? "#FF3B30" : "var(--text-primary)" }}>
+              Failed Shot
+            </span>
+            <button
+              type="button"
+              onClick={() => { setIsFailed(!isFailed); setFailReason(""); }}
+              className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200"
+              style={{ backgroundColor: isFailed ? "#FF3B30" : "#E5E5EA" }}
+            >
+              <span
+                className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transform transition-transform duration-200 mt-[2px]"
+                style={{ marginLeft: isFailed ? 22 : 2 }}
+              />
+            </button>
+          </div>
+          {isFailed && (
+            <div className="row-divider px-4 py-2">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: "channeling", label: "Channeling" },
+                  { value: "puck_collapse", label: "Puck Collapse" },
+                  { value: "grind_error", label: "Grind Error" },
+                  { value: "equipment_issue", label: "Equipment" },
+                  { value: "other", label: "Other" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFailReason(failReason === opt.value ? "" : opt.value)}
+                    className="text-[13px] font-medium px-3 py-1.5 rounded-full"
+                    style={
+                      failReason === opt.value
+                        ? { backgroundColor: "#FF3B30", color: "#fff" }
+                        : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <Row label="Dose (g)">
             <NumberInput name="doseG" value={doseG} onChange={setDoseG} placeholder="18" step="0.1" min="5" max="30" />
           </Row>
-          <Row label="Yield (g)">
-            <NumberInput name="yieldG" value={yieldG} onChange={setYieldG} placeholder="36" step="0.1" min="10" max="100" />
+          <Row label={isFailed ? "Yield (g)" : "Yield (g)"}>
+            <NumberInput name="yieldG" value={yieldG} onChange={setYieldG} placeholder={isFailed ? "—" : "36"} step="0.1" min="0" max="100" />
           </Row>
           <Row label="Shot Time (s)">
-            <NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder="28" step="1" min="5" max="120" />
+            <NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder={isFailed ? "—" : "28"} step="1" min="0" max="120" />
           </Row>
           <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass || adjustedDoseG)}>
             <NumberInput name="lagG" value={lagG} onChange={setLagG} placeholder="—" step="0.5" min="0" />
@@ -421,30 +471,34 @@ export default function LogFormClient({
         </div>
 
         {/* ── Taste ── */}
-        <SectionHeader title="Taste" />
-        <div
-          className="mx-4 rounded-2xl overflow-hidden"
-          style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
-        >
-          <div className="px-6 py-3 row-divider">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Balance</span>
-              {tasteBalance !== null && (
-                <button type="button" onClick={() => setTasteBalance(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
-              )}
+        {!isFailed && (
+          <>
+            <SectionHeader title="Taste" />
+            <div
+              className="mx-4 rounded-2xl overflow-hidden"
+              style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+            >
+              <div className="px-6 py-3 row-divider">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Balance</span>
+                  {tasteBalance !== null && (
+                    <button type="button" onClick={() => setTasteBalance(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
+                  )}
+                </div>
+                <TasteBalanceControl value={tasteBalance} onChange={setTasteBalance} name="tasteBalance" />
+              </div>
+              <div className="px-6 py-3">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Shot Rating</span>
+                  {shotRating !== null && (
+                    <button type="button" onClick={() => setShotRating(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
+                  )}
+                </div>
+                <ShotStarRating value={shotRating} onChange={setShotRating} name="shotRating" />
+              </div>
             </div>
-            <TasteBalanceControl value={tasteBalance} onChange={setTasteBalance} name="tasteBalance" />
-          </div>
-          <div className="px-6 py-3">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Shot Rating</span>
-              {shotRating !== null && (
-                <button type="button" onClick={() => setShotRating(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
-              )}
-            </div>
-            <ShotStarRating value={shotRating} onChange={setShotRating} name="shotRating" />
-          </div>
-        </div>
+          </>
+        )}
 
         {/* ── Notes ── */}
         <div
@@ -465,6 +519,8 @@ export default function LogFormClient({
         </div>
 
         {/* ── Include Drink Toggle ── */}
+        {!isFailed && (
+        <>
         <SectionHeader title="Drink" />
         <div
           className="mx-4 rounded-2xl overflow-hidden"
@@ -708,6 +764,8 @@ export default function LogFormClient({
             </>
           )}
         </div>
+        </>
+        )}
 
         {/* Error */}
         {state && "error" in state && (

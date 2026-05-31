@@ -30,19 +30,27 @@ export async function logShot(
 ): Promise<LogShotResult> {
   const bagId = Number(formData.get("bagId"));
   const doseG = parseFloat(formData.get("doseG") as string);
-  const yieldG = parseFloat(formData.get("yieldG") as string);
-  const shotTimeSeconds = parseInt(formData.get("shotTimeSeconds") as string, 10);
   const bagRoastDate = formData.get("bagRoastDate") as string;
+  const isFailed = formData.get("isFailed") === "true";
+  const failReason = (formData.get("failReason") as string) || null;
 
   // Basic validation
   if (!bagId) return { error: "Please select a bag." };
   if (isNaN(doseG) || doseG < 5 || doseG > 30)
     return { error: "Dose must be between 5g and 30g." };
-  if (isNaN(yieldG) || yieldG < 10 || yieldG > 100)
-    return { error: "Yield must be between 10g and 100g." };
-  if (yieldG <= doseG) return { error: "Yield must be greater than dose." };
-  if (isNaN(shotTimeSeconds) || shotTimeSeconds < 5 || shotTimeSeconds > 120)
-    return { error: "Shot time must be between 5 and 120 seconds." };
+
+  const yieldRaw = formData.get("yieldG") as string;
+  const yieldG = yieldRaw ? parseFloat(yieldRaw) : NaN;
+  const shotTimeRaw = formData.get("shotTimeSeconds") as string;
+  const shotTimeSeconds = shotTimeRaw ? parseInt(shotTimeRaw, 10) : NaN;
+
+  if (!isFailed) {
+    if (isNaN(yieldG) || yieldG < 10 || yieldG > 100)
+      return { error: "Yield must be between 10g and 100g." };
+    if (yieldG <= doseG) return { error: "Yield must be greater than dose." };
+    if (isNaN(shotTimeSeconds) || shotTimeSeconds < 5 || shotTimeSeconds > 120)
+      return { error: "Shot time must be between 5 and 120 seconds." };
+  }
 
   const grindSetting = formData.get("grindSetting")
     ? parseFloat(formData.get("grindSetting") as string)
@@ -85,8 +93,8 @@ export async function logShot(
       pulledAt,
       grindSetting,
       doseG,
-      yieldG,
-      shotTimeSeconds,
+      yieldG: isFailed ? (isNaN(yieldG) ? null : yieldG) : yieldG,
+      shotTimeSeconds: isFailed ? (isNaN(shotTimeSeconds) ? null : shotTimeSeconds) : shotTimeSeconds,
       lagG,
       preinfusionSeconds,
       temperatureC,
@@ -94,14 +102,16 @@ export async function logShot(
       wdtUsed,
       distributionToolUsed,
       grinderRetentionG,
-      ...tasteFields,
+      ...(isFailed ? {} : tasteFields),
+      isFailed,
+      failReason: isFailed ? (failReason as NewShot["failReason"]) : null,
       notes: (formData.get("notes") as string) || null,
     }])
     .returning();
 
-  // Optional drink
+  // Optional drink — skipped for failed shots
   let detectedDrinkName: string | null = null;
-  const includeDrink = formData.get("includeDrink") === "true";
+  const includeDrink = !isFailed && formData.get("includeDrink") === "true";
 
   if (includeDrink) {
     const milkQuantityMl = formData.get("milkQuantityMl")
@@ -194,6 +204,8 @@ function parseShotFields(formData: FormData) {
     tasteBalance: formData.get("tasteBalance") ? parseInt(formData.get("tasteBalance") as string) : null,
     shotRating: formData.get("shotRating") ? parseInt(formData.get("shotRating") as string) : null,
     flowCharacteristics: ((formData.get("flowCharacteristics") as string) || null) as NewShot["flowCharacteristics"],
+    isFailed: formData.get("isFailed") === "true",
+    failReason: ((formData.get("failReason") as string) || null) as NewShot["failReason"],
     notes: (formData.get("notes") as string) || null,
     pulledAt: (() => {
       const raw = (formData.get("pulledAt") as string) || "";
@@ -213,17 +225,19 @@ export async function updateShot(
 
   if (!f.bagId) return { error: "Please select a bag." };
   if (isNaN(f.doseG) || f.doseG < 5 || f.doseG > 30) return { error: "Dose must be between 5g and 30g." };
-  if (isNaN(f.yieldG) || f.yieldG < 10 || f.yieldG > 100) return { error: "Yield must be between 10g and 100g." };
-  if (f.yieldG <= f.doseG) return { error: "Yield must be greater than dose." };
-  if (isNaN(f.shotTimeSeconds) || f.shotTimeSeconds < 5 || f.shotTimeSeconds > 120) return { error: "Shot time must be between 5 and 120 seconds." };
+  if (!f.isFailed) {
+    if (isNaN(f.yieldG) || f.yieldG < 10 || f.yieldG > 100) return { error: "Yield must be between 10g and 100g." };
+    if (f.yieldG <= f.doseG) return { error: "Yield must be greater than dose." };
+    if (isNaN(f.shotTimeSeconds) || f.shotTimeSeconds < 5 || f.shotTimeSeconds > 120) return { error: "Shot time must be between 5 and 120 seconds." };
+  }
 
   await db.update(shots).set({
     bagId: f.bagId,
     pulledAt: f.pulledAt,
     grindSetting: f.grindSetting,
     doseG: f.doseG,
-    yieldG: f.yieldG,
-    shotTimeSeconds: f.shotTimeSeconds,
+    yieldG: f.isFailed ? (isNaN(f.yieldG) ? null : f.yieldG) : f.yieldG,
+    shotTimeSeconds: f.isFailed ? (isNaN(f.shotTimeSeconds) ? null : f.shotTimeSeconds) : f.shotTimeSeconds,
     lagG: f.lagG,
     preinfusionSeconds: f.preinfusionSeconds,
     temperatureC: f.temperatureC,
@@ -231,13 +245,15 @@ export async function updateShot(
     wdtUsed: f.wdtUsed,
     distributionToolUsed: f.distributionToolUsed,
     grinderRetentionG: f.grinderRetentionG,
-    tasteBalance: f.tasteBalance,
-    shotRating: f.shotRating,
+    tasteBalance: f.isFailed ? null : f.tasteBalance,
+    shotRating: f.isFailed ? null : f.shotRating,
     flowCharacteristics: f.flowCharacteristics,
+    isFailed: f.isFailed,
+    failReason: f.isFailed ? f.failReason : null,
     notes: f.notes,
   }).where(eq(shots.id, id));
 
-  const includeDrink = formData.get("includeDrink") === "true";
+  const includeDrink = !f.isFailed && formData.get("includeDrink") === "true";
 
   // Get existing drink if any
   const [existingDrink] = await db.select({ id: drinks.id }).from(drinks).where(eq(drinks.shotId, id)).limit(1);

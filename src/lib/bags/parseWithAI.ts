@@ -3,7 +3,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db/client";
 import { shots, bags, equipmentProfiles } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 export type ParsedBagData = {
   roaster?: string;
@@ -291,6 +292,149 @@ Be specific: suggest a starting dose/ratio range, whether to go finer or coarser
     if (!parsed.tip) return { error: "No tip in response." };
 
     return { tip: parsed.tip as string };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return { error: `Failed: ${message}` };
+  }
+}
+
+export async function getBagRecommendation(
+  bagId: number
+): Promise<{ tip: string } | { error: string }> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return { error: "ANTHROPIC_API_KEY is not configured." };
+  }
+
+  const [bag, equipment] = await Promise.all([
+    db.select().from(bags).where(eq(bags.id, bagId)).limit(1).then((r) => r[0] ?? null),
+    db.select().from(equipmentProfiles).where(eq(equipmentProfiles.isActive, true)).limit(1).then((r) => r[0] ?? null),
+  ]);
+
+  if (!bag) return { error: "Bag not found." };
+
+  // Shots from this bag, most recent first
+  const bagShots = await db
+    .select({
+      doseG: shots.doseG,
+      yieldG: shots.yieldG,
+      shotTimeSeconds: shots.shotTimeSeconds,
+      grindSetting: shots.grindSetting,
+      shotRating: shots.shotRating,
+      tasteBalance: shots.tasteBalance,
+      notes: shots.notes,
+      pulledAt: shots.pulledAt,
+    })
+    .from(shots)
+    .where(eq(shots.bagId, bagId))
+    .orderBy(desc(shots.pulledAt))
+    .limit(10);
+
+  // Reference shots from other bags of similar type
+  const refShots = await db
+    .select({
+      doseG: shots.doseG,
+      yieldG: shots.yieldG,
+      shotTimeSeconds: shots.shotTimeSeconds,
+      grindSetting: shots.grindSetting,
+      shotRating: shots.shotRating,
+      tasteBalance: shots.tasteBalance,
+      bagName: bags.name,
+      roaster: bags.roaster,
+      roastLevel: bags.roastLevel,
+      processingMethod: bags.processingMethod,
+    })
+    .from(shots)
+    .innerJoin(bags, eq(shots.bagId, bags.id))
+    .where(eq(bags.roastLevel, bag.roastLevel))
+    .orderBy(desc(shots.pulledAt))
+    .limit(8);
+
+  const TASTE_LABELS = ["", "Very Sour", "Sour", "Slightly Sour", "Balanced", "Slightly Bitter", "Bitter", "Very Bitter"];
+
+  const bagLines = [
+    [bag.roaster, bag.name].filter(Boolean).join(" — "),
+    bag.roastLevel && bag.roastLevel !== "unspecified" ? `Roast: ${bag.roastLevel.replace("_", " ")}` : null,
+    bag.processingMethod && bag.processingMethod !== "unspecified" ? `Process: ${bag.processingMethod.replace(/_/g, " ")}` : null,
+    bag.notes ? `Flavor notes: ${bag.notes}` : null,
+  ].filter(Boolean).join("\n");
+
+  const equipmentStr = equipment
+    ? [
+        equipment.machine ? `Machine: ${equipment.machine}` : null,
+        equipment.grinder ? `Grinder: ${equipment.grinder}` : null,
+      ].filter(Boolean).join(", ")
+    : "Equipment: not specified";
+
+  const hasShotHistory = bagShots.length > 0;
+
+  const bagShotLines = bagShots.map((s, i) => {
+    const ratio = s.yieldG && s.doseG ? (s.yieldG / s.doseG).toFixed(2) : "?";
+    const taste = s.tasteBalance != null ? (TASTE_LABELS[Math.round(s.tasteBalance)] ?? null) : null;
+    return [
+      `Shot ${bagShots.length - i}`,
+      `${s.doseG}g→${s.yieldG ?? "?"}g (1:${ratio})`,
+      s.shotTimeSeconds ? `${s.shotTimeSeconds}s` : null,
+      s.grindSetting ? `grind ${s.grindSetting}` : null,
+      s.shotRating ? `${s.shotRating}/5★` : null,
+      taste,
+      s.notes ? `"${s.notes}"` : null,
+    ].filter(Boolean).join(" · ");
+  });
+
+  const refShotLines = refShots
+    .filter((s) => s.bagName !== bag.name)
+    .slice(0, 5)
+    .map((s) => {
+      const ratio = s.yieldG && s.doseG ? (s.yieldG / s.doseG).toFixed(2) : "?";
+      return [
+        `${s.roaster} ${s.bagName}`,
+        `${s.doseG}g→${s.yieldG ?? "?"}g (1:${ratio})`,
+        s.grindSetting ? `grind ${s.grindSetting}` : null,
+        s.shotRating ? `${s.shotRating}/5★` : null,
+      ].filter(Boolean).join(" · ");
+    });
+
+  const context = hasShotHistory
+    ? `Bag:\n${bagLines}\n\n${equipmentStr}\n\nShots pulled from this bag (newest first):\n${bagShotLines.map((l) => `  ${l}`).join("\n")}${refShotLines.length ? `\n\nSimilar bags for grind reference:\n${refShotLines.map((l) => `  ${l}`).join("\n")}` : ""}`
+    : `Bag:\n${bagLines}\n\n${equipmentStr}${refShotLines.length ? `\n\nRecent shots from similar bags:\n${refShotLines.map((l) => `  ${l}`).join("\n")}` : ""}`;
+
+  const system = hasShotHistory
+    ? `You are an expert espresso coach. The user has been dialing in this bag and wants specific improvement advice based on their shot history.
+
+Respond ONLY with valid JSON: {"tip": "2-4 sentence actionable advice"}
+
+Analyze the shot history: identify patterns (taste drift, grind direction, ratio trends), explain what the data suggests, and give a concrete next adjustment. Reference actual numbers from the history. Do not repeat the bag name or ask questions.`
+    : `You are an expert espresso coach. Give a concise starting point for dialing in this specific bean.
+
+Respond ONLY with valid JSON: {"tip": "2-3 sentence actionable recommendation"}
+
+Suggest a starting dose/ratio, whether to go finer or coarser based on roast/process, and one key thing to watch for. Reference the user's equipment and any available grind benchmarks. Do not repeat the bag name or ask questions.`;
+
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  try {
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      system,
+      messages: [{ role: "user", content: context }],
+    });
+
+    const raw = msg.content[0];
+    if (raw.type !== "text") return { error: "Unexpected response." };
+
+    const start = raw.text.indexOf("{");
+    const end = raw.text.lastIndexOf("}");
+    if (start === -1 || end === -1) return { error: "Could not parse response." };
+
+    const parsed = JSON.parse(raw.text.slice(start, end + 1));
+    if (!parsed.tip) return { error: "No tip in response." };
+
+    const tip = parsed.tip as string;
+    await db.update(bags).set({ dialInTip: tip, updatedAt: sql`(datetime('now'))` }).where(eq(bags.id, bagId));
+    revalidatePath(`/bags/${bagId}`);
+
+    return { tip };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return { error: `Failed: ${message}` };

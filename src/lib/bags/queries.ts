@@ -126,27 +126,28 @@ export async function getBagById(id: number): Promise<BagWithOrigins | null> {
   const [{ avgTasteBalance }] = await db
     .select({ avgTasteBalance: sql<number | null>`avg(${shots.tasteBalance})` })
     .from(shots)
-    .where(eq(shots.bagId, id));
+    .where(and(eq(shots.bagId, id), eq(shots.isFailed, false)));
 
   const [{ avgRetentionG }] = await db
     .select({ avgRetentionG: sql<number | null>`avg(${shots.grinderRetentionG})` })
     .from(shots)
-    .where(eq(shots.bagId, id));
+    .where(and(eq(shots.bagId, id), eq(shots.isFailed, false)));
 
   const [{ avgShotRating }] = await db
     .select({ avgShotRating: sql<number | null>`avg(${shots.shotRating})` })
     .from(shots)
-    .where(eq(shots.bagId, id));
+    .where(and(eq(shots.bagId, id), eq(shots.isFailed, false)));
 
-  // Best grind range: from shots rated 4+ on this bag; fallback to highest-rated shots
+  // Best grind range: from non-failed shots rated 4+ on this bag; fallback to highest-rated shots
   const [grindRow] = await db.all(sql`
     SELECT MIN(grind_setting) as min_grind, MAX(grind_setting) as max_grind
     FROM shots
     WHERE bag_id = ${id}
+      AND is_failed = 0
       AND grind_setting IS NOT NULL
       AND shot_rating >= COALESCE(
-        NULLIF((SELECT MAX(shot_rating) FROM shots WHERE bag_id = ${id} AND shot_rating >= 4), 0),
-        (SELECT MAX(shot_rating) FROM shots WHERE bag_id = ${id})
+        NULLIF((SELECT MAX(shot_rating) FROM shots WHERE bag_id = ${id} AND is_failed = 0 AND shot_rating >= 4), 0),
+        (SELECT MAX(shot_rating) FROM shots WHERE bag_id = ${id} AND is_failed = 0)
       )
   `) as { min_grind: number | null; max_grind: number | null }[];
 

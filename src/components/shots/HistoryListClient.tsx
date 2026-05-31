@@ -338,14 +338,21 @@ export default function HistoryListClient({
                   {/* Top row */}
                   <div className="flex items-start justify-between mb-1">
                     <div>
-                      <p className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                        {shot.bagStatus === "removed" ? "[Archived] " : ""}{shot.roasterName} · {shot.bagName}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[15px] font-semibold" style={{ color: shot.isFailed ? "#FF3B30" : "var(--text-primary)" }}>
+                          {shot.bagStatus === "removed" ? "[Archived] " : ""}{shot.roasterName} · {shot.bagName}
+                        </p>
+                        {shot.isFailed && (
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#FF3B3022", color: "#FF3B30" }}>
+                            Failed
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[13px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
                         {formatDate(shot.pulledAt)} at {formatTime(shot.pulledAt)}
                       </p>
                     </div>
-                    {shot.shotRating != null && (
+                    {!shot.isFailed && shot.shotRating != null && (
                       <StarRating value={shot.shotRating} />
                     )}
                   </div>
