@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getBagById } from "@/lib/bags/queries";
+import { getBagById, getBagShotChartData } from "@/lib/bags/queries";
 import { getBagAnalysis } from "@/lib/bags/bagAnalysis";
 import FreshnessIndicator from "@/components/bags/FreshnessIndicator";
 import BagActions from "@/components/bags/BagActions";
 import BagAnalysisClient from "@/components/bags/BagAnalysisClient";
 import BagDialInClient from "@/components/bags/BagDialInClient";
 import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
+import BagShotCharts from "@/components/bags/BagShotCharts";
 
 const ROAST_LABELS: Record<string, string> = {
   light: "Light",
@@ -364,9 +365,10 @@ export default async function BagDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [bag, existingAnalysis] = await Promise.all([
+  const [bag, existingAnalysis, shotChartData] = await Promise.all([
     getBagById(Number(id)),
     getBagAnalysis(Number(id)),
+    getBagShotChartData(Number(id)),
   ]);
   if (!bag) notFound();
 
@@ -576,6 +578,27 @@ export default async function BagDetailPage({
           </div>
         )}
 
+        {/* Notes */}
+        {bag.notes && (
+          <div>
+            <SectionHeader label="Notes" />
+            <div
+              className="mx-4 rounded-2xl px-4 py-3"
+              style={{
+                backgroundColor: "var(--card)",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+              }}
+            >
+              <p
+                className="text-[17px] leading-relaxed whitespace-pre-wrap"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {bag.notes}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Shot count */}
         <div>
           <SectionHeader label="History" />
@@ -680,24 +703,11 @@ export default async function BagDetailPage({
           </div>
         </div>
 
-        {/* Notes */}
-        {bag.notes && (
+        {/* Shot Analysis charts */}
+        {(bag.shotCount ?? 0) > 0 && (
           <div>
-            <SectionHeader label="Notes" />
-            <div
-              className="mx-4 rounded-2xl px-4 py-3"
-              style={{
-                backgroundColor: "var(--card)",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
-              }}
-            >
-              <p
-                className="text-[17px] leading-relaxed whitespace-pre-wrap"
-                style={{ color: "var(--text-primary)" }}
-              >
-                {bag.notes}
-              </p>
-            </div>
+            <SectionHeader label="Shot Analysis" />
+            <BagShotCharts shots={shotChartData} />
           </div>
         )}
 

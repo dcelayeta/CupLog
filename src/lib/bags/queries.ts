@@ -208,6 +208,34 @@ export async function getBagById(id: number): Promise<BagWithOrigins | null> {
   return { ...bag, origins, shotCount: Number(count), failedShotCount: Number(failedCount ?? 0), totalDoseG: totalDoseG ?? 0, avgTasteBalance: avgTasteBalance ?? null, avgRetentionG: avgRetentionG != null ? Math.round(avgRetentionG * 100) / 100 : null, avgShotRating: avgShotRating != null ? Math.round(avgShotRating * 10) / 10 : null, bestGrindRange, referenceGrindRange };
 }
 
+export type BagChartShot = {
+  id: number;
+  pulledAt: string;
+  grindSetting: number | null;
+  doseG: number;
+  yieldG: number | null;
+  tasteBalance: number | null;
+  shotRating: number | null;
+  isFailed: boolean;
+};
+
+export async function getBagShotChartData(bagId: number): Promise<BagChartShot[]> {
+  return db
+    .select({
+      id: shots.id,
+      pulledAt: shots.pulledAt,
+      grindSetting: shots.grindSetting,
+      doseG: shots.doseG,
+      yieldG: shots.yieldG,
+      tasteBalance: shots.tasteBalance,
+      shotRating: shots.shotRating,
+      isFailed: shots.isFailed,
+    })
+    .from(shots)
+    .where(eq(shots.bagId, bagId))
+    .orderBy(asc(shots.pulledAt));
+}
+
 export async function findDuplicateBag(
   roaster: string,
   name: string,
