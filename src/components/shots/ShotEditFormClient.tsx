@@ -168,7 +168,6 @@ export default function ShotEditFormClient({
   const [grindSetting, setGrindSetting] = useState(shot.grindSetting?.toString() ?? "");
   const [lagG, setLagG] = useState(shot.lagG?.toString() ?? "");
   const [preinfusionSeconds, setPreinfusionSeconds] = useState(shot.preinfusionSeconds?.toString() ?? "");
-  const [temperatureC, setTemperatureC] = useState(shot.temperatureC?.toString() ?? "93");
   const [springWeightLbs, setSpringWeightLbs] = useState(shot.springWeightLbs?.toString() ?? "");
   const [wdtUsed, setWdtUsed] = useState(shot.wdtUsed);
   const [distributionToolUsed, setDistributionToolUsed] = useState(shot.distributionToolUsed);
@@ -325,7 +324,6 @@ export default function ShotEditFormClient({
 
           <Row label="Grind Setting"><NumberInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} placeholder="—" step="0.5" min="0" /></Row>
           <Row label="Pre-infusion (s)"><NumberInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} placeholder="—" step="1" min="0" /></Row>
-          <Row label="Temperature (°C)"><NumberInput name="temperatureC" value={temperatureC} onChange={setTemperatureC} placeholder="93" step="1" min="0" max="105" /></Row>
           <Row label="Spring Weight (lbs)"><NumberInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} placeholder="—" step="1" min="0" /></Row>
           <Row label="Retention (g)"><NumberInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} placeholder="—" step="0.1" min="0" /></Row>
           <div className="flex items-center px-6 min-h-[52px]">

@@ -224,9 +224,6 @@ export default async function ShotDetailPage({
         {shot.preinfusionSeconds !== null && (
           <DetailRow label="Pre-infusion" value={`${shot.preinfusionSeconds}s`} />
         )}
-        {shot.temperatureC !== null && (
-          <DetailRow label="Temperature" value={`${shot.temperatureC}°C`} />
-        )}
         {shot.springWeightLbs !== null && (
           <DetailRow label="Spring Weight" value={`${shot.springWeightLbs} lbs`} />
         )}

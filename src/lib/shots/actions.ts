@@ -61,9 +61,6 @@ export async function logShot(
   const preinfusionSeconds = formData.get("preinfusionSeconds")
     ? parseInt(formData.get("preinfusionSeconds") as string, 10)
     : null;
-  const temperatureC = formData.get("temperatureC")
-    ? parseFloat(formData.get("temperatureC") as string)
-    : null;
   const springWeightLbs = formData.get("springWeightLbs")
     ? parseInt(formData.get("springWeightLbs") as string, 10)
     : null;
@@ -97,7 +94,6 @@ export async function logShot(
       shotTimeSeconds: isFailed ? (isNaN(shotTimeSeconds) ? null : shotTimeSeconds) : shotTimeSeconds,
       lagG,
       preinfusionSeconds,
-      temperatureC,
       springWeightLbs,
       wdtUsed,
       distributionToolUsed,
@@ -191,7 +187,6 @@ function parseShotFields(formData: FormData) {
     grindSetting: formData.get("grindSetting") ? parseFloat(formData.get("grindSetting") as string) : null,
     lagG: formData.get("lagG") ? parseFloat(formData.get("lagG") as string) : null,
     preinfusionSeconds: formData.get("preinfusionSeconds") ? parseInt(formData.get("preinfusionSeconds") as string, 10) : null,
-    temperatureC: formData.get("temperatureC") ? parseFloat(formData.get("temperatureC") as string) : null,
     springWeightLbs: formData.get("springWeightLbs") ? parseInt(formData.get("springWeightLbs") as string, 10) : null,
     wdtUsed: formData.get("wdtUsed") === "true",
     distributionToolUsed: formData.get("distributionToolUsed") === "true",
@@ -240,7 +235,6 @@ export async function updateShot(
     shotTimeSeconds: f.isFailed ? (isNaN(f.shotTimeSeconds) ? null : f.shotTimeSeconds) : f.shotTimeSeconds,
     lagG: f.lagG,
     preinfusionSeconds: f.preinfusionSeconds,
-    temperatureC: f.temperatureC,
     springWeightLbs: f.springWeightLbs,
     wdtUsed: f.wdtUsed,
     distributionToolUsed: f.distributionToolUsed,

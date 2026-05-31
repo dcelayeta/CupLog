@@ -322,8 +322,10 @@ export default function HistoryListClient({
             const [ry, rm, rd] = shot.bagRoastDate.split("-").map(Number);
             const roastDate = new Date(ry, rm - 1, rd);
             const days = Math.floor((shotDate.getTime() - roastDate.getTime()) / (1000 * 60 * 60 * 24));
-            const freshnessColor = FRESHNESS_CSS[getFreshnessColor(days)];
-            const freshnessLabel = getFreshnessLabel(days);
+            const peakStart = shot.bagPeakStartDay ?? 7;
+            const peakEnd = shot.bagPeakEndDay ?? 35;
+            const freshnessColor = FRESHNESS_CSS[getFreshnessColor(days, peakStart, peakEnd)];
+            const freshnessLabel = getFreshnessLabel(days, peakStart, peakEnd);
             return (
               <Link
                 key={shot.id}

@@ -29,6 +29,8 @@ export type ShotRow = {
   bagName: string;
   roasterName: string;
   bagRoastDate: string;
+  bagPeakStartDay: number | null;
+  bagPeakEndDay: number | null;
   bagStatus: string;
   shotRating: number | null;
   notes: string | null;
@@ -182,6 +184,8 @@ export async function getShotsForHistory(bagId?: number): Promise<ShotRow[]> {
       bagName: bags.name,
       roasterName: bags.roaster,
       bagRoastDate: bags.roastDate,
+      bagPeakStartDay: bags.peakStartDay,
+      bagPeakEndDay: bags.peakEndDay,
       bagStatus: bags.status,
       shotRating: shots.shotRating,
       notes: shots.notes,

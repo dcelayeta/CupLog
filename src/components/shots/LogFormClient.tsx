@@ -170,9 +170,6 @@ export default function LogFormClient({
     lastShot?.lagG != null ? lastShot.lagG.toString() : ""
   );
   const [preinfusionSeconds, setPreinfusionSeconds] = useState("");
-  const [temperatureC, setTemperatureC] = useState(
-    lastShot?.temperatureC != null ? lastShot.temperatureC.toString() : "93"
-  );
   const [springWeightLbs, setSpringWeightLbs] = useState(
     lastShot?.springWeightLbs != null
       ? lastShot.springWeightLbs.toString()
@@ -393,9 +390,6 @@ export default function LogFormClient({
           </Row>
           <Row label="Pre-infusion (s)">
             <NumberInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} placeholder="—" step="1" min="0" />
-          </Row>
-          <Row label="Temperature (°C)">
-            <NumberInput name="temperatureC" value={temperatureC} onChange={setTemperatureC} placeholder="93" step="1" min="0" max="105" />
           </Row>
           <Row label="Spring Weight (lbs)">
             <NumberInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} placeholder="—" step="1" min="0" />

@@ -129,7 +129,8 @@ export const shots = sqliteTable("shots", {
   shotTimeSeconds: integer("shot_time_seconds"),
   lagG: real("lag_g"), // grams that drip through after pressing stop (no 3-way valve)
   preinfusionSeconds: integer("preinfusion_seconds"),
-  temperatureC: real("temperature_c"),
+  temperatureC: real("temperature_c").default(93),
+  pressureBar: real("pressure_bar").default(9),
   springWeightLbs: integer("spring_weight_lbs"),
   wdtUsed: integer("wdt_used", { mode: "boolean" }).notNull().default(false),
   distributionToolUsed: integer("distribution_tool_used", { mode: "boolean" }).notNull().default(false),
