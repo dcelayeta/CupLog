@@ -11,11 +11,12 @@ async function getStats() {
   const [row] = await db.all(sql`
     SELECT
       COUNT(*) as total_shots,
-      ROUND(AVG(shot_rating), 1) as avg_rating,
-      ROUND(AVG(taste_balance), 1) as avg_balance,
-      ROUND(AVG(dose_g), 1) as avg_dose,
-      ROUND(AVG(yield_g), 1) as avg_yield,
-      ROUND(AVG(shot_time_seconds), 0) as avg_time
+      SUM(CASE WHEN is_failed = 1 THEN 1 ELSE 0 END) as failed_shots,
+      ROUND(AVG(CASE WHEN is_failed = 0 THEN shot_rating END), 1) as avg_rating,
+      ROUND(AVG(CASE WHEN is_failed = 0 THEN taste_balance END), 1) as avg_balance,
+      ROUND(AVG(CASE WHEN is_failed = 0 THEN dose_g END), 1) as avg_dose,
+      ROUND(AVG(CASE WHEN is_failed = 0 THEN yield_g END), 1) as avg_yield,
+      ROUND(AVG(CASE WHEN is_failed = 0 THEN shot_time_seconds END), 0) as avg_time
     FROM shots
   `) as Record<string, number | null>[];
   return row ?? null;
@@ -43,6 +44,7 @@ async function getLastShot() {
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
     LEFT JOIN drinks d ON d.shot_id = s.id
+    WHERE s.is_failed = 0
     ORDER BY s.pulled_at DESC
     LIMIT 1
   `) as Record<string, string | number | null>[];
@@ -148,6 +150,7 @@ export default async function HomePage() {
   ]);
 
   const totalShots = Number(stats?.total_shots ?? 0);
+  const failedShots = Number(stats?.failed_shots ?? 0);
 
   return (
     <div className="pt-6 pb-24 px-4">
@@ -157,6 +160,8 @@ export default async function HomePage() {
       <p className="text-[15px] mb-6" style={{ color: "var(--text-secondary)" }}>
         {totalShots === 0
           ? "No shots logged yet."
+          : failedShots > 0
+          ? `${totalShots} shots · ${failedShots} failed`
           : `${totalShots} shot${totalShots !== 1 ? "s" : ""} pulled`}
       </p>
 

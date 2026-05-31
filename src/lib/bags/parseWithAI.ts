@@ -3,7 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db/client";
 import { shots, bags, equipmentProfiles } from "@/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export type ParsedBagData = {
@@ -232,7 +232,7 @@ export async function getDialInRecommendation(
   const equipmentStr = equipment
     ? [
         equipment.machine ? `Machine: ${equipment.machine}` : null,
-        equipment.grinder ? `Grinder: ${equipment.grinder}` : null,
+        equipment.grinder ? `Grinder: ${equipment.grinder} (lower number = finer, higher number = coarser)` : null,
       ].filter(Boolean).join(", ")
     : "Equipment: not specified";
 
@@ -277,7 +277,13 @@ export async function getDialInRecommendation(
 
 Respond ONLY with valid JSON: {"tip": "2-3 sentence actionable recommendation"}
 
-Be specific: suggest a starting dose/ratio range, whether to go finer or coarser than usual based on the roast/process, and one key thing to watch for. Reference the user's actual equipment and historical grind settings when available. Do not repeat the bag name or ask questions.`,
+Critical rules:
+- GRIND DIRECTION: lower number = finer grind, higher number = coarser grind. To go finer, decrease the number. To go coarser, increase the number. Never flip this.
+- GRINDER KNOWLEDGE: If the grinder model is specified, use your knowledge of its scale and typical espresso range to suggest a realistic starting range (give a range, not a single number).
+- REFERENCE SHOTS: If reference shots are provided, anchor your suggestion to those actual logged grind numbers.
+- NO DATA: When the grinder model is unknown and no reference shots exist, do NOT give a specific number. Suggest starting on the coarser end of the espresso range and stepping 3-5 settings finer per try until the shot flows in 25-35 seconds.
+- Suggest a starting dose/ratio and a systematic adjustment approach (3-5 settings per step while dialing in).
+- Do not repeat the bag name or ask questions.`,
       messages: [{ role: "user", content: context }],
     });
 
@@ -298,6 +304,15 @@ Be specific: suggest a starting dose/ratio range, whether to go finer or coarser
   }
 }
 
+const FAIL_REASON_DESCRIPTIONS: Record<string, string> = {
+  channeling: "channeling (water bypassed the puck)",
+  choking: "choking — shot too restricted, grind is already too fine",
+  puck_collapse: "puck collapse",
+  grind_error: "grind error",
+  equipment_issue: "equipment issue",
+  other: "other",
+};
+
 export async function getBagRecommendation(
   bagId: number
 ): Promise<{ tip: string } | { error: string }> {
@@ -312,7 +327,7 @@ export async function getBagRecommendation(
 
   if (!bag) return { error: "Bag not found." };
 
-  // Shots from this bag, most recent first
+  // All shots from this bag (including failed) — needed to understand direction
   const bagShots = await db
     .select({
       doseG: shots.doseG,
@@ -323,31 +338,55 @@ export async function getBagRecommendation(
       tasteBalance: shots.tasteBalance,
       notes: shots.notes,
       pulledAt: shots.pulledAt,
+      isFailed: shots.isFailed,
+      failReason: shots.failReason,
     })
     .from(shots)
     .where(eq(shots.bagId, bagId))
     .orderBy(desc(shots.pulledAt))
-    .limit(10);
+    .limit(15);
 
-  // Reference shots from other bags of similar type
-  const refShots = await db
+  // Previous bags of the SAME coffee — highest-quality grind reference
+  const prevSameCoffeeShots = await db
     .select({
       doseG: shots.doseG,
       yieldG: shots.yieldG,
-      shotTimeSeconds: shots.shotTimeSeconds,
       grindSetting: shots.grindSetting,
       shotRating: shots.shotRating,
-      tasteBalance: shots.tasteBalance,
       bagName: bags.name,
       roaster: bags.roaster,
-      roastLevel: bags.roastLevel,
-      processingMethod: bags.processingMethod,
     })
     .from(shots)
     .innerJoin(bags, eq(shots.bagId, bags.id))
-    .where(eq(bags.roastLevel, bag.roastLevel))
+    .where(and(
+      sql`lower(${bags.roaster}) = lower(${bag.roaster})`,
+      sql`lower(${bags.name}) = lower(${bag.name})`,
+      ne(bags.id, bagId),
+      eq(shots.isFailed, false),
+    ))
     .orderBy(desc(shots.pulledAt))
-    .limit(8);
+    .limit(6);
+
+  // Other bags of same roast level — broader context
+  const roastLevelShots = await db
+    .select({
+      doseG: shots.doseG,
+      yieldG: shots.yieldG,
+      grindSetting: shots.grindSetting,
+      shotRating: shots.shotRating,
+      bagName: bags.name,
+      roaster: bags.roaster,
+    })
+    .from(shots)
+    .innerJoin(bags, eq(shots.bagId, bags.id))
+    .where(and(
+      eq(bags.roastLevel, bag.roastLevel),
+      ne(bags.id, bagId),
+      sql`NOT (lower(${bags.roaster}) = lower(${bag.roaster}) AND lower(${bags.name}) = lower(${bag.name}))`,
+      eq(shots.isFailed, false),
+    ))
+    .orderBy(desc(shots.pulledAt))
+    .limit(4);
 
   const TASTE_LABELS = ["", "Very Sour", "Sour", "Slightly Sour", "Balanced", "Slightly Bitter", "Bitter", "Very Bitter"];
 
@@ -361,13 +400,21 @@ export async function getBagRecommendation(
   const equipmentStr = equipment
     ? [
         equipment.machine ? `Machine: ${equipment.machine}` : null,
-        equipment.grinder ? `Grinder: ${equipment.grinder}` : null,
+        equipment.grinder ? `Grinder: ${equipment.grinder} (lower number = finer, higher number = coarser)` : null,
       ].filter(Boolean).join(", ")
     : "Equipment: not specified";
 
   const hasShotHistory = bagShots.length > 0;
 
   const bagShotLines = bagShots.map((s, i) => {
+    if (s.isFailed) {
+      return [
+        `Shot ${bagShots.length - i} [FAILED: ${FAIL_REASON_DESCRIPTIONS[s.failReason ?? ""] ?? (s.failReason ?? "unknown reason")}]`,
+        `${s.doseG}g`,
+        s.grindSetting ? `grind ${s.grindSetting}` : null,
+        s.notes ? `"${s.notes}"` : null,
+      ].filter(Boolean).join(" · ");
+    }
     const ratio = s.yieldG && s.doseG ? (s.yieldG / s.doseG).toFixed(2) : "?";
     const taste = s.tasteBalance != null ? (TASTE_LABELS[Math.round(s.tasteBalance)] ?? null) : null;
     return [
@@ -381,34 +428,63 @@ export async function getBagRecommendation(
     ].filter(Boolean).join(" · ");
   });
 
-  const refShotLines = refShots
-    .filter((s) => s.bagName !== bag.name)
-    .slice(0, 5)
-    .map((s) => {
-      const ratio = s.yieldG && s.doseG ? (s.yieldG / s.doseG).toFixed(2) : "?";
-      return [
-        `${s.roaster} ${s.bagName}`,
-        `${s.doseG}g→${s.yieldG ?? "?"}g (1:${ratio})`,
-        s.grindSetting ? `grind ${s.grindSetting}` : null,
-        s.shotRating ? `${s.shotRating}/5★` : null,
-      ].filter(Boolean).join(" · ");
-    });
+  const fmtRefShot = (s: { doseG: number; yieldG: number | null; grindSetting: number | null; shotRating: number | null; roaster: string; bagName: string }) => {
+    const ratio = s.yieldG && s.doseG ? (s.yieldG / s.doseG).toFixed(2) : "?";
+    return [
+      `${s.roaster} ${s.bagName}`,
+      `${s.doseG}g→${s.yieldG ?? "?"}g (1:${ratio})`,
+      s.grindSetting ? `grind ${s.grindSetting}` : null,
+      s.shotRating ? `${s.shotRating}/5★` : null,
+    ].filter(Boolean).join(" · ");
+  };
+
+  const prevCoffeeSection = prevSameCoffeeShots.length > 0
+    ? `\n\nPrevious bags of same coffee — USE THESE GRIND NUMBERS AS PRIMARY REFERENCE:\n${prevSameCoffeeShots.map((s) => `  ${fmtRefShot(s)}`).join("\n")}`
+    : "";
+
+  const roastSection = roastLevelShots.length > 0
+    ? `\n\nOther ${bag.roastLevel?.replace("_", " ")} roast bags for context:\n${roastLevelShots.map((s) => `  ${fmtRefShot(s)}`).join("\n")}`
+    : "";
+
+  const hasOnlyFailedShots = hasShotHistory && bagShots.every((s) => s.isFailed);
+  const hasAnyChokingFailure = bagShots.some((s) => s.isFailed && s.failReason === "choking");
+  const chokingNote = hasOnlyFailedShots && hasAnyChokingFailure
+    ? "\n\n⚠️ ALL shots on this bag have failed due to choking — grind is significantly too fine. A large jump coarser (8-15 settings) is likely needed, not a minor tweak."
+    : hasAnyChokingFailure
+    ? "\n\n⚠�� Some shots have failed due to choking — avoid suggesting finer (lower) adjustments."
+    : "";
 
   const context = hasShotHistory
-    ? `Bag:\n${bagLines}\n\n${equipmentStr}\n\nShots pulled from this bag (newest first):\n${bagShotLines.map((l) => `  ${l}`).join("\n")}${refShotLines.length ? `\n\nSimilar bags for grind reference:\n${refShotLines.map((l) => `  ${l}`).join("\n")}` : ""}`
-    : `Bag:\n${bagLines}\n\n${equipmentStr}${refShotLines.length ? `\n\nRecent shots from similar bags:\n${refShotLines.map((l) => `  ${l}`).join("\n")}` : ""}`;
+    ? `Bag:\n${bagLines}\n\n${equipmentStr}\n\nShots from this bag (newest first):\n${bagShotLines.map((l) => `  ${l}`).join("\n")}${prevCoffeeSection}${roastSection}${chokingNote}`
+    : `Bag:\n${bagLines}\n\n${equipmentStr}${prevCoffeeSection}${roastSection}`;
 
   const system = hasShotHistory
     ? `You are an expert espresso coach. The user has been dialing in this bag and wants specific improvement advice based on their shot history.
 
 Respond ONLY with valid JSON: {"tip": "2-4 sentence actionable advice"}
 
-Analyze the shot history: identify patterns (taste drift, grind direction, ratio trends), explain what the data suggests, and give a concrete next adjustment. Reference actual numbers from the history. Do not repeat the bag name or ask questions.`
+Critical rules:
+- GRIND DIRECTION: lower number = finer grind, higher number = coarser grind. To go finer, decrease the number. To go coarser, increase the number. Never flip this.
+- ADJUSTMENT MAGNITUDE — match the size of the problem:
+  * All shots so far are FAILED (especially choking): grind is drastically off. Recommend jumping 8-15 settings coarser (higher number), not 2-3.
+  * Severely fast / sour or channeling with no flow: jump 5-10 settings.
+  * Moderate issue (slightly sour, slightly fast): adjust 3-5 settings.
+  * Fine-tuning near the sweet spot: 1-2 settings.
+- "Choking" = shot barely flows or stops completely — grind is ALREADY TOO FINE. Do NOT suggest going finer (lower). Recommend a significant jump coarser (higher).
+- GRINDER KNOWLEDGE: Use your knowledge of the grinder model (if specified) to validate that suggested numbers fall within a realistic espresso range for that grinder. State the range explicitly when helpful.
+- NEVER invent a grind number that isn't in the history or derivable from known grinder ranges. If you are estimating from grinder knowledge, say so.
+- Do not repeat the bag name or ask questions.`
     : `You are an expert espresso coach. Give a concise starting point for dialing in this specific bean.
 
 Respond ONLY with valid JSON: {"tip": "2-3 sentence actionable recommendation"}
 
-Suggest a starting dose/ratio, whether to go finer or coarser based on roast/process, and one key thing to watch for. Reference the user's equipment and any available grind benchmarks. Do not repeat the bag name or ask questions.`;
+Critical rules:
+- GRIND DIRECTION: lower number = finer grind, higher number = coarser grind. To go finer, decrease the number. To go coarser, increase the number. Never flip this.
+- GRINDER KNOWLEDGE: If the grinder model is specified, use your knowledge of its scale and typical espresso range to give a realistic starting range (e.g., Niche Zero espresso is typically 18-32). State the range, not a single number.
+- REFERENCE SHOTS: If reference shots are provided, anchor your suggestion to those actual grind numbers.
+- NO DATA: When no grind reference exists and the grinder model is unknown, do NOT give a specific number. Instead give a direction and a step size: e.g., "start on the coarser end of your espresso range, then move 3-5 settings finer at a time until the shot flows in 25-35 seconds."
+- Suggest a starting dose/ratio and how to step through the adjustment systematically (3-5 settings per try is a good increment while dialing in).
+- Do not repeat the bag name or ask questions.`;
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 

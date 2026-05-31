@@ -143,6 +143,7 @@ export default async function ShotDetailPage({
             <span className="text-[14px]" style={{ color: "#FF3B30AA" }}>
               · {{
                 channeling: "Channeling",
+                choking: "Choking",
                 puck_collapse: "Puck Collapse",
                 grind_error: "Grind Error",
                 equipment_issue: "Equipment Issue",

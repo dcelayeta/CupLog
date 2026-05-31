@@ -326,6 +326,7 @@ export default function LogFormClient({
               <div className="flex flex-wrap gap-2">
                 {[
                   { value: "channeling", label: "Channeling" },
+                  { value: "choking", label: "Choking" },
                   { value: "puck_collapse", label: "Puck Collapse" },
                   { value: "grind_error", label: "Grind Error" },
                   { value: "equipment_issue", label: "Equipment" },

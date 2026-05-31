@@ -146,7 +146,7 @@ export const shots = sqliteTable("shots", {
   }),
   isFailed: integer("is_failed", { mode: "boolean" }).notNull().default(false),
   failReason: text("fail_reason", {
-    enum: ["channeling", "puck_collapse", "grind_error", "equipment_issue", "other"],
+    enum: ["channeling", "choking", "puck_collapse", "grind_error", "equipment_issue", "other"],
   }),
   notes: text("notes"),
   createdAt: text("created_at")

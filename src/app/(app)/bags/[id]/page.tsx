@@ -601,6 +601,11 @@ export default async function BagDetailPage({
                 style={{ color: "var(--text-secondary)" }}
               >
                 {bag.shotCount ?? 0}
+                {(bag.failedShotCount ?? 0) > 0 && (
+                  <span className="text-[13px]" style={{ color: "#FF3B30" }}>
+                    · {bag.failedShotCount} failed
+                  </span>
+                )}
                 <svg
                   width="8"
                   height="13"

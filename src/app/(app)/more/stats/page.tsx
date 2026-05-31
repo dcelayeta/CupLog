@@ -8,7 +8,7 @@ async function getRatingDistribution(): Promise<Record<number, number>> {
   const rows = await db.all(sql`
     SELECT shot_rating, COUNT(*) as count
     FROM shots
-    WHERE shot_rating IS NOT NULL
+    WHERE shot_rating IS NOT NULL AND is_failed = 0
     GROUP BY shot_rating
   `) as { shot_rating: number; count: number }[];
   const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -30,7 +30,7 @@ async function getTasteDistribution(): Promise<Record<number, number>> {
       END as bucket,
       COUNT(*) as count
     FROM shots
-    WHERE taste_balance IS NOT NULL
+    WHERE taste_balance IS NOT NULL AND is_failed = 0
     GROUP BY bucket
   `) as { bucket: number; count: number }[];
   const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
@@ -44,7 +44,7 @@ async function getScatterData(): Promise<ScatterPoint[][]> {
   const rows = await db.all(sql`
     SELECT dose_g, yield_g, shot_time_seconds, taste_balance, shot_rating
     FROM shots
-    WHERE taste_balance IS NOT NULL
+    WHERE taste_balance IS NOT NULL AND is_failed = 0
   `) as {
     dose_g: number | null; yield_g: number | null;
     shot_time_seconds: number | null; taste_balance: number; shot_rating: number | null;
@@ -68,7 +68,7 @@ async function getRatingTrend(): Promise<RatingTrendPoint[]> {
   const rows = await db.all(sql`
     SELECT shot_rating, taste_balance
     FROM shots
-    WHERE shot_rating IS NOT NULL
+    WHERE shot_rating IS NOT NULL AND is_failed = 0
     ORDER BY pulled_at ASC
   `) as { shot_rating: number; taste_balance: number | null }[];
   return rows.map(r => ({
@@ -82,7 +82,7 @@ async function getFreshnessVsTaste(): Promise<ScatterPoint[]> {
     SELECT s.taste_balance, s.shot_rating, s.pulled_at, b.roast_date
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
-    WHERE s.taste_balance IS NOT NULL AND b.roast_date IS NOT NULL
+    WHERE s.taste_balance IS NOT NULL AND b.roast_date IS NOT NULL AND s.is_failed = 0
   `) as { taste_balance: number; shot_rating: number | null; pulled_at: string; roast_date: string }[];
   return rows.flatMap(r => {
     const days = Math.floor(
@@ -102,6 +102,7 @@ async function getFlowRateDistribution(): Promise<Record<string, number>> {
     WHERE yield_g IS NOT NULL
       AND shot_time_seconds IS NOT NULL
       AND shot_time_seconds > 0
+      AND is_failed = 0
     GROUP BY bucket
     ORDER BY bucket
   `) as { bucket: number; count: number }[];
@@ -120,9 +121,8 @@ async function getFlowRateDistribution(): Promise<Record<string, number>> {
 async function getRoastTypeDistribution(): Promise<{ roastLevel: string; count: number }[]> {
   const rows = await db.all(sql`
     SELECT b.roast_level as roastLevel, COUNT(s.id) as count
-    FROM bags b
-    LEFT JOIN shots s ON s.bag_id = b.id
-    WHERE b.status != 'removed'
+    FROM shots s
+    JOIN bags b ON s.bag_id = b.id
     GROUP BY b.roast_level
     ORDER BY count DESC
   `) as { roastLevel: string; count: number }[];
@@ -132,13 +132,35 @@ async function getRoastTypeDistribution(): Promise<{ roastLevel: string; count: 
 async function getShotsPerCoffee(): Promise<{ roaster: string; name: string; count: number }[]> {
   const rows = await db.all(sql`
     SELECT b.roaster, b.name, COUNT(s.id) as count
-    FROM bags b
-    LEFT JOIN shots s ON s.bag_id = b.id
-    WHERE b.status != 'removed'
+    FROM shots s
+    JOIN bags b ON s.bag_id = b.id
     GROUP BY lower(b.roaster), lower(b.name)
     ORDER BY count DESC
   `) as { roaster: string; name: string; count: number }[];
   return rows.map(r => ({ roaster: String(r.roaster), name: String(r.name), count: Number(r.count) }));
+}
+
+async function getFailedShotStats(): Promise<{ total: number; totalShots: number; byReason: { reason: string; count: number }[] }> {
+  const [row] = await db.all(sql`
+    SELECT
+      COUNT(*) as total_shots,
+      SUM(CASE WHEN is_failed = 1 THEN 1 ELSE 0 END) as failed_shots
+    FROM shots
+  `) as { total_shots: number; failed_shots: number }[];
+
+  const byReason = await db.all(sql`
+    SELECT COALESCE(fail_reason, 'other') as reason, COUNT(*) as count
+    FROM shots
+    WHERE is_failed = 1
+    GROUP BY reason
+    ORDER BY count DESC
+  `) as { reason: string; count: number }[];
+
+  return {
+    total: Number(row?.failed_shots ?? 0),
+    totalShots: Number(row?.total_shots ?? 0),
+    byReason: byReason.map(r => ({ reason: String(r.reason), count: Number(r.count) })),
+  };
 }
 
 async function getDrinkTypeDistribution(): Promise<{ name: string; count: number }[]> {
@@ -592,6 +614,7 @@ export default async function StatsPage() {
     ratingTrend, freshnessPoints, retentionValues, flowRateDist,
     roastTypeDist, shotsPerCoffee,
     drinkTypeDist, drinkRatingTrend, shotVsDrinkRatings,
+    failedStats,
   ] = await Promise.all([
     getRatingDistribution(),
     getTasteDistribution(),
@@ -605,6 +628,7 @@ export default async function StatsPage() {
     getDrinkTypeDistribution(),
     getDrinkRatingTrend(),
     getShotVsDrinkRatings(),
+    getFailedShotStats(),
   ]);
 
   const ratingBars: BarSpec[] = [
@@ -773,6 +797,26 @@ export default async function StatsPage() {
           stat={avgRating != null ? `★ ${avgRating.toFixed(1)}` : undefined}
           statColor="#FF9500"
         />
+        {failedStats.total > 0 && (
+          <>
+            <SectionLabel title="Failed Shots" />
+            <HorizontalBarChart
+              rows={failedStats.byReason.map(r => ({
+                label: ({
+                  channeling: "Channeling",
+                  choking: "Choking",
+                  puck_collapse: "Puck Collapse",
+                  grind_error: "Grind Error",
+                  equipment_issue: "Equipment Issue",
+                  other: "Other",
+                } as Record<string, string>)[r.reason] ?? r.reason,
+                count: r.count,
+              }))}
+              title="Failure reasons"
+              subtitle={`${failedStats.total} failed · ${((failedStats.total / failedStats.totalShots) * 100).toFixed(0)}% of shots`}
+            />
+          </>
+        )}
         <SectionLabel title="Technique" />
         <ScatterPlot
           points={ratioPoints}
