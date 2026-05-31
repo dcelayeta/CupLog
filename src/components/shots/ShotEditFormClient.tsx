@@ -12,6 +12,15 @@ import PillRating from "./PillRating";
 
 const MILK_TYPES = ["Whole", "Oat", "Almond", "Skim", "Soy", "Coconut", "Half & Half"];
 
+const FAIL_REASONS: { value: string; label: string }[] = [
+  { value: "channeling", label: "Channeling" },
+  { value: "choking", label: "Choking" },
+  { value: "puck_collapse", label: "Puck Collapse" },
+  { value: "grind_error", label: "Grind Error" },
+  { value: "equipment_issue", label: "Equipment" },
+  { value: "other", label: "Other" },
+];
+
 const FLOW_OPTIONS: { value: string; label: string }[] = [
   { value: "normal", label: "Normal" },
   { value: "one_spout_dominant", label: "One spout dominant" },
@@ -186,6 +195,10 @@ export default function ShotEditFormClient({
   const [overallRating, setOverallRating] = useState<number | null>(shot.drink?.overallRating ?? null);
   const [drinkNotes, setDrinkNotes] = useState(shot.drink?.notes ?? "");
 
+  // Failed shot
+  const [isFailed, setIsFailed] = useState(shot.isFailed);
+  const [failReason, setFailReason] = useState(shot.failReason ?? "");
+
   // Date / time
   const [pulledAt, setPulledAt] = useState(() => {
     const d = new Date(shot.pulledAt);
@@ -234,7 +247,9 @@ export default function ShotEditFormClient({
         <input type="hidden" name="wdtUsed" value={wdtUsed ? "true" : "false"} />
         <input type="hidden" name="distributionToolUsed" value={distributionToolUsed ? "true" : "false"} />
         <input type="hidden" name="flowCharacteristics" value={flowCharacteristics ?? ""} />
-        <input type="hidden" name="includeDrink" value={includeDrink ? "true" : "false"} />
+        <input type="hidden" name="includeDrink" value={(!isFailed && includeDrink) ? "true" : "false"} />
+        <input type="hidden" name="isFailed" value={isFailed ? "true" : "false"} />
+        {isFailed && failReason && <input type="hidden" name="failReason" value={failReason} />}
         {/* Bag */}
         <SectionHeader title="Bean" />
         <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
@@ -249,6 +264,39 @@ export default function ShotEditFormClient({
         {/* Shot */}
         <SectionHeader title="Shot" />
         <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+          {/* Failed Shot toggle */}
+          <div className="flex items-center px-6 min-h-[52px]">
+            <span className="text-[17px] flex-1" style={{ color: isFailed ? "#FF3B30" : "var(--text-primary)" }}>Failed Shot</span>
+            <button
+              type="button"
+              onClick={() => { setIsFailed(!isFailed); if (!isFailed) setFailReason(""); }}
+              className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200"
+              style={{ backgroundColor: isFailed ? "#FF3B30" : "#E5E5EA" }}
+            >
+              <span className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transition-transform duration-200 mt-[2px]" style={{ marginLeft: isFailed ? 22 : 2 }} />
+            </button>
+          </div>
+          {isFailed && (
+            <div className="row-divider-t px-4 py-2">
+              <div className="flex flex-wrap gap-2">
+                {FAIL_REASONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFailReason(failReason === opt.value ? "" : opt.value)}
+                    className="text-[13px] font-medium px-3 py-1.5 rounded-full"
+                    style={
+                      failReason === opt.value
+                        ? { backgroundColor: "#FF3B30", color: "#fff" }
+                        : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <Row label="Date & Time">
             <input
               type="datetime-local"
@@ -260,8 +308,8 @@ export default function ShotEditFormClient({
             <input type="hidden" name="pulledAt" value={pulledAt ? new Date(pulledAt).toISOString() : ""} />
           </Row>
           <Row label="Dose (g)"><NumberInput name="doseG" value={doseG} onChange={setDoseG} placeholder="18" step="0.1" min="5" max="30" /></Row>
-          <Row label="Yield (g)"><NumberInput name="yieldG" value={yieldG} onChange={setYieldG} placeholder="36" step="0.1" min="10" max="100" /></Row>
-          <Row label="Shot Time (s)"><NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder="28" step="1" min="5" max="120" /></Row>
+          <Row label="Yield (g)"><NumberInput name="yieldG" value={yieldG} onChange={setYieldG} placeholder={isFailed ? "—" : "36"} step="0.1" min={isFailed ? "0" : "10"} max="100" /></Row>
+          <Row label="Shot Time (s)"><NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder={isFailed ? "—" : "28"} step="1" min={isFailed ? "0" : "5"} max="120" /></Row>
           <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass)}><NumberInput name="lagG" value={lagG} onChange={setLagG} placeholder="—" step="0.5" min="0" /></Row>
 
           {(liveRatio || timeClass || ratioClass) && (
@@ -320,6 +368,7 @@ export default function ShotEditFormClient({
         </div>
 
         {/* Taste */}
+        {!isFailed && (<>
         <SectionHeader title="Taste" />
         <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
           <div className="px-6 py-3 row-divider">
@@ -338,6 +387,8 @@ export default function ShotEditFormClient({
           </div>
         </div>
 
+        </>)}
+
         {/* Notes */}
         <div className="mx-4 mt-3 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
           <div className="px-4 py-3">
@@ -346,6 +397,7 @@ export default function ShotEditFormClient({
         </div>
 
         {/* Drink */}
+        {!isFailed && (<>
         <SectionHeader title="Drink" />
         <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
           <div className="flex items-center px-6 min-h-[52px]">
@@ -524,6 +576,7 @@ export default function ShotEditFormClient({
             </>
           )}
         </div>
+        </>)}
 
         {state && "error" in state && state !== null && (
           <div className="mx-4 mt-3 px-4 py-3 rounded-2xl" style={{ backgroundColor: "var(--destructive)" + "22" }}>
