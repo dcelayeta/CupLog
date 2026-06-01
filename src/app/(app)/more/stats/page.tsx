@@ -142,16 +142,32 @@ async function getProcessMethodDistribution(): Promise<{ method: string; count: 
   return rows.map(r => ({ method: String(r.method), count: Number(r.count) }));
 }
 
-async function getOriginDistribution(): Promise<{ country: string; count: number }[]> {
+async function getOriginDistribution(): Promise<{ label: string; count: number }[]> {
   const rows = await db.all(sql`
-    SELECT bo.country, COUNT(s.id) as count
+    SELECT bo.country, bo.region, COUNT(s.id) as count
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
     JOIN bag_origins bo ON bo.bag_id = b.id
-    GROUP BY bo.country
+    GROUP BY bo.country, bo.region
     ORDER BY count DESC
-  `) as { country: string; count: number }[];
-  return rows.map(r => ({ country: String(r.country), count: Number(r.count) }));
+  `) as { country: string; region: string | null; count: number }[];
+  return rows.map(r => ({
+    label: r.region ? `${r.region} · ${r.country}` : String(r.country),
+    count: Number(r.count),
+  }));
+}
+
+async function getBlendDistribution(): Promise<{ label: string; count: number }[]> {
+  const rows = await db.all(sql`
+    SELECT
+      CASE WHEN b.is_blend = 1 THEN 'Blend' ELSE 'Single Origin' END as label,
+      COUNT(s.id) as count
+    FROM shots s
+    JOIN bags b ON s.bag_id = b.id
+    GROUP BY label
+    ORDER BY count DESC
+  `) as { label: string; count: number }[];
+  return rows.map(r => ({ label: String(r.label), count: Number(r.count) }));
 }
 
 type CoffeeBreakdownRow = { roaster: string; name: string; total: number; failed: number; under: number; correct: number; over: number };
@@ -316,9 +332,9 @@ function catmullRomPath(pts: [number, number][]): string {
 
 interface BarSpec { label: string; count: number; color: string; }
 
-function BarChart({ bars, title, subtitle, labelFontSize = 9, stat, statColor }: {
+function BarChart({ bars, title, subtitle, labelFontSize = 9, stat, statColor, footnote }: {
   bars: BarSpec[]; title: string; subtitle: string; labelFontSize?: number;
-  stat?: string; statColor?: string;
+  stat?: string; statColor?: string; footnote?: string;
 }) {
   const n = bars.length;
   const W = 280, H = 110, padL = 8, padR = 8, padTop = 22, padBottom = 22;
@@ -341,6 +357,9 @@ function BarChart({ bars, title, subtitle, labelFontSize = 9, stat, statColor }:
       </div>
       {stat && (
         <p className="px-4 pb-2 text-[13px]" style={{ color: statColor ?? "var(--text-primary)" }}>{stat}</p>
+      )}
+      {footnote && (
+        <p className="px-4 pb-1 text-[11px]" style={{ color: "var(--text-secondary)", opacity: 0.65 }}>{footnote}</p>
       )}
       <div className="px-2 pb-3">
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
@@ -800,7 +819,7 @@ export default async function StatsPage() {
     ratingDist, tasteDist,
     [ratioPoints, timePoints],
     ratingTrend, freshnessPoints, retentionValues, flowRateDist,
-    roastTypeDist, shotsPerCoffee, processMethodDist, originDist,
+    roastTypeDist, shotsPerCoffee, processMethodDist, originDist, blendDist,
     drinkTypeDist, drinkRatingTrend, shotVsDrinkRatings,
     failedStats,
   ] = await Promise.all([
@@ -815,6 +834,7 @@ export default async function StatsPage() {
     getShotsPerCoffee(),
     getProcessMethodDistribution(),
     getOriginDistribution(),
+    getBlendDistribution(),
     getDrinkTypeDistribution(),
     getDrinkRatingTrend(),
     getShotVsDrinkRatings(),
@@ -924,8 +944,8 @@ export default async function StatsPage() {
 
   const PROCESS_LABELS: Record<string, string> = {
     washed: "Washed", natural: "Natural", honey: "Honey",
-    anaerobic: "Anaerobic", ea_washed: "EA Washed",
-    swiss_water: "Swiss Water", other: "Other",
+    anaerobic: "Anaerob.", ea_washed: "EA W.",
+    swiss_water: "Swiss W.", other: "Other",
   };
   const PROCESS_COLORS: Record<string, string> = {
     washed: "#34AADC", natural: "#E8735A", honey: "#F5A623",
@@ -942,7 +962,7 @@ export default async function StatsPage() {
     color: PROCESS_COLORS[m],
   }));
 
-  const originRows = originDist.map(r => ({ label: r.country, count: r.count }));
+  const originRows = originDist;
 
   const coffeeRows = shotsPerCoffee;
 
@@ -1049,27 +1069,27 @@ export default async function StatsPage() {
         />
         <SectionLabel title="Beans" />
         {roastTotal > 0 && (
-          <>
-            <BarChart bars={roastBars} title="Roast level" subtitle={`${roastTagged} tagged`} />
-            {roastUnspecified > 0 && (
-              <p className="-mt-3 mb-4 px-1 text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.7 }}>
-                {roastUnspecified} shot{roastUnspecified !== 1 ? "s" : ""} ({Math.round(roastUnspecified / roastTotal * 100)}%) have no roast level tagged
-              </p>
-            )}
-          </>
+          <BarChart
+            bars={roastBars}
+            title="Roast level"
+            subtitle={`${roastTagged} tagged`}
+            footnote={roastUnspecified > 0 ? `${roastUnspecified} shot${roastUnspecified !== 1 ? "s" : ""} (${Math.round(roastUnspecified / roastTotal * 100)}%) have no roast level tagged` : undefined}
+          />
         )}
         {processTotal > 0 && (
-          <>
-            <BarChart bars={processBars} title="Process method" subtitle={`${processTagged} tagged`} labelFontSize={8} />
-            {processUnspecified > 0 && (
-              <p className="-mt-3 mb-4 px-1 text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.7 }}>
-                {processUnspecified} shot{processUnspecified !== 1 ? "s" : ""} ({Math.round(processUnspecified / processTotal * 100)}%) have no process tagged
-              </p>
-            )}
-          </>
+          <BarChart
+            bars={processBars}
+            title="Process method"
+            subtitle={`${processTagged} tagged`}
+            labelFontSize={8}
+            footnote={processUnspecified > 0 ? `${processUnspecified} shot${processUnspecified !== 1 ? "s" : ""} (${Math.round(processUnspecified / processTotal * 100)}%) have no process tagged` : undefined}
+          />
         )}
         {originRows.length > 0 && (
-          <HorizontalBarChart rows={originRows} title="Origin country" subtitle={`${originRows.length} origin${originRows.length !== 1 ? "s" : ""}`} />
+          <HorizontalBarChart rows={originRows} title="Origin" subtitle={`${originRows.length} origin${originRows.length !== 1 ? "s" : ""}`} />
+        )}
+        {blendDist.length > 0 && (
+          <HorizontalBarChart rows={blendDist} title="Single origin vs blend" subtitle={`${blendDist.reduce((a, r) => a + r.count, 0)} shots`} />
         )}
         {coffeeRows.length > 0 && (
           <StackedHorizontalBarChart rows={coffeeRows} title="Shots per coffee" subtitle={`${coffeeRows.length} coffees`} />
