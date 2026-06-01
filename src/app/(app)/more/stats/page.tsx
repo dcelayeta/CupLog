@@ -686,6 +686,7 @@ function HorizontalBarChart({ rows, title, subtitle }: {
 
 
 const RATING_SEG_COLORS = ["#FF3B30", "#FF9500", "#FFD60A", "#34C759", "#30D158"];
+const RATING_TEXT_COLORS = ["#FF3B30", "#FF9500", "#B8860B", "#34C759", "#30D158"];
 
 function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
   rows: RatingBreakdownRow[];
@@ -716,17 +717,18 @@ function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
       <div className="px-4 pb-3 flex flex-col gap-2.5">
         {rows.map((row, i) => {
           const counts = [row.r1, row.r2, row.r3, row.r4, row.r5, row.unrated];
-          const colors = [...RATING_SEG_COLORS, "#8E8E93"];
+          const segColors = [...RATING_SEG_COLORS, "#8E8E93"];
+          const textColors = [...RATING_TEXT_COLORS, "#8E8E93"];
           const segments: { left: number; width: number; color: string }[] = [];
           let offset = 0;
           counts.forEach((count, j) => {
             if (count > 0) {
-              segments.push({ left: (offset / maxTotal) * 100, width: (count / maxTotal) * 100, color: colors[j] });
+              segments.push({ left: (offset / maxTotal) * 100, width: (count / maxTotal) * 100, color: segColors[j] });
               offset += count;
             }
           });
           const pctLabels = counts
-            .map((count, j) => ({ count, color: colors[j], label: j < 5 ? `${j + 1}★` : "unr" }))
+            .map((count, j) => ({ count, color: textColors[j], label: j < 5 ? `${j + 1}★` : "unr" }))
             .filter(s => s.count > 0)
             .map(s => ({ ...s, pct: Math.round((s.count / row.total) * 100) }));
           return (
