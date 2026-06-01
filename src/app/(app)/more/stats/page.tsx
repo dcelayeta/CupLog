@@ -725,6 +725,10 @@ function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
               offset += count;
             }
           });
+          const pctLabels = counts
+            .map((count, j) => ({ count, color: colors[j], label: j < 5 ? `${j + 1}★` : "unr" }))
+            .filter(s => s.count > 0)
+            .map(s => ({ ...s, pct: Math.round((s.count / row.total) * 100) }));
           return (
             <div key={i}>
               <div className="flex items-center justify-between mb-1">
@@ -742,6 +746,13 @@ function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
                     width: `${seg.width.toFixed(2)}%`,
                     backgroundColor: seg.color,
                   }} />
+                ))}
+              </div>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {pctLabels.map((s, j) => (
+                  <span key={j} className="text-[10px]" style={{ color: s.color, opacity: 0.65 }}>
+                    {s.label} {s.pct}%
+                  </span>
                 ))}
               </div>
             </div>
