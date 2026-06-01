@@ -654,15 +654,16 @@ function StackedHorizontalBarChart({ rows, title, subtitle }: {
       </div>
       <div className="px-4 pb-3 flex flex-col gap-2.5">
         {rows.map((row, i) => {
+          const noData = row.total - row.failed - row.under - row.correct - row.over;
           const segments: { width: number; left: number; color: string }[] = [];
           let offset = 0;
-          for (const [key, color] of [
-            ["failed", STACKED_COLORS.failed],
-            ["under",  STACKED_COLORS.under],
-            ["correct", STACKED_COLORS.correct],
-            ["over",   STACKED_COLORS.over],
-          ] as [keyof typeof STACKED_COLORS, string][]) {
-            const count = row[key] as number;
+          for (const [count, color] of [
+            [row.failed,  STACKED_COLORS.failed],
+            [row.under,   STACKED_COLORS.under],
+            [row.correct, STACKED_COLORS.correct],
+            [row.over,    STACKED_COLORS.over],
+            [noData,      "#8E8E93"],
+          ] as [number, string][]) {
             if (count > 0) {
               segments.push({ left: (offset / maxTotal) * 100, width: (count / maxTotal) * 100, color });
               offset += count;
