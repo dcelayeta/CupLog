@@ -191,42 +191,17 @@ type DrinkBreakdownRow = { name: string; total: number; r1: number; r2: number; 
 async function getDrinkTypeDistribution(): Promise<DrinkBreakdownRow[]> {
   const rows = await db.all(sql`
     SELECT
-      name,
+      detected_drink_name as name,
       COUNT(*) as total,
-      SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) as r1,
-      SUM(CASE WHEN rating = 2 THEN 1 ELSE 0 END) as r2,
-      SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END) as r3,
-      SUM(CASE WHEN rating = 4 THEN 1 ELSE 0 END) as r4,
-      SUM(CASE WHEN rating = 5 THEN 1 ELSE 0 END) as r5,
-      SUM(CASE WHEN rating IS NULL THEN 1 ELSE 0 END) as unrated
-    FROM (
-      SELECT detected_drink_name as name, overall_rating as rating
-      FROM drinks
-      WHERE detected_drink_name IS NOT NULL
-
-      UNION ALL
-
-      SELECT
-        CASE
-          WHEN yield_g * 1.0 / dose_g >= 1.0 AND yield_g * 1.0 / dose_g < 1.5 THEN 'Ristretto'
-          WHEN yield_g * 1.0 / dose_g >= 1.5 AND yield_g * 1.0 / dose_g < 3.0 AND dose_g <= 10 THEN 'Espresso'
-          WHEN yield_g * 1.0 / dose_g >= 1.5 AND yield_g * 1.0 / dose_g < 3.0 AND dose_g > 10 THEN 'Doppio'
-          WHEN yield_g * 1.0 / dose_g >= 3.0 AND yield_g * 1.0 / dose_g < 4.0 THEN 'Lungo'
-          ELSE NULL
-        END as name,
-        NULL as rating
-      FROM shots
-      WHERE id NOT IN (SELECT shot_id FROM drinks WHERE shot_id IS NOT NULL)
-        AND yield_g IS NOT NULL
-        AND CASE
-          WHEN yield_g * 1.0 / dose_g >= 1.0 AND yield_g * 1.0 / dose_g < 1.5 THEN 'x'
-          WHEN yield_g * 1.0 / dose_g >= 1.5 AND yield_g * 1.0 / dose_g < 3.0 THEN 'x'
-          WHEN yield_g * 1.0 / dose_g >= 3.0 AND yield_g * 1.0 / dose_g < 4.0 THEN 'x'
-          ELSE NULL
-        END IS NOT NULL
-    )
-    WHERE name IS NOT NULL
-    GROUP BY name
+      SUM(CASE WHEN overall_rating = 1 THEN 1 ELSE 0 END) as r1,
+      SUM(CASE WHEN overall_rating = 2 THEN 1 ELSE 0 END) as r2,
+      SUM(CASE WHEN overall_rating = 3 THEN 1 ELSE 0 END) as r3,
+      SUM(CASE WHEN overall_rating = 4 THEN 1 ELSE 0 END) as r4,
+      SUM(CASE WHEN overall_rating = 5 THEN 1 ELSE 0 END) as r5,
+      SUM(CASE WHEN overall_rating IS NULL THEN 1 ELSE 0 END) as unrated
+    FROM drinks
+    WHERE detected_drink_name IS NOT NULL
+    GROUP BY detected_drink_name
     ORDER BY total DESC
   `) as { name: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number }[];
   return rows.map(r => ({
