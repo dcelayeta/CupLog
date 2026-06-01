@@ -173,48 +173,51 @@ async function getOriginRatingDistribution(): Promise<OriginBreakdownRow[]> {
   }));
 }
 
-async function getBlendDistribution(): Promise<{ label: string; count: number }[]> {
+async function getBlendDistribution(): Promise<RatingBreakdownRow[]> {
   const rows = await db.all(sql`
     SELECT
       CASE WHEN b.is_blend = 1 THEN 'Blend' ELSE 'Single Origin' END as label,
-      COUNT(s.id) as count
+      COUNT(s.id) as total,
+      SUM(CASE WHEN s.shot_rating = 1 THEN 1 ELSE 0 END) as r1,
+      SUM(CASE WHEN s.shot_rating = 2 THEN 1 ELSE 0 END) as r2,
+      SUM(CASE WHEN s.shot_rating = 3 THEN 1 ELSE 0 END) as r3,
+      SUM(CASE WHEN s.shot_rating = 4 THEN 1 ELSE 0 END) as r4,
+      SUM(CASE WHEN s.shot_rating = 5 THEN 1 ELSE 0 END) as r5,
+      SUM(CASE WHEN s.shot_rating IS NULL THEN 1 ELSE 0 END) as unrated
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
     GROUP BY label
-    ORDER BY count DESC
-  `) as { label: string; count: number }[];
-  return rows.map(r => ({ label: String(r.label), count: Number(r.count) }));
+    ORDER BY total DESC
+  `) as { label: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number }[];
+  return rows.map(r => ({
+    label: String(r.label),
+    total: Number(r.total),
+    r1: Number(r.r1), r2: Number(r.r2), r3: Number(r.r3), r4: Number(r.r4), r5: Number(r.r5),
+    unrated: Number(r.unrated),
+  }));
 }
 
-type CoffeeBreakdownRow = { roaster: string; name: string; total: number; failed: number; under: number; correct: number; over: number };
-
-async function getShotsPerCoffee(): Promise<CoffeeBreakdownRow[]> {
+async function getShotsPerCoffee(): Promise<RatingBreakdownRow[]> {
   const rows = await db.all(sql`
     SELECT
-      b.roaster,
-      b.name,
+      b.name as label,
       COUNT(s.id) as total,
-      SUM(CASE WHEN s.is_failed = 1 THEN 1 ELSE 0 END) as failed,
-      SUM(CASE WHEN s.is_failed = 0 AND s.yield_g IS NOT NULL AND s.dose_g > 0
-               AND (CAST(s.yield_g AS REAL) / s.dose_g) < 1.5 THEN 1 ELSE 0 END) as under_extracted,
-      SUM(CASE WHEN s.is_failed = 0 AND s.yield_g IS NOT NULL AND s.dose_g > 0
-               AND (CAST(s.yield_g AS REAL) / s.dose_g) >= 1.5
-               AND (CAST(s.yield_g AS REAL) / s.dose_g) <= 2.5 THEN 1 ELSE 0 END) as correct,
-      SUM(CASE WHEN s.is_failed = 0 AND s.yield_g IS NOT NULL AND s.dose_g > 0
-               AND (CAST(s.yield_g AS REAL) / s.dose_g) > 2.5 THEN 1 ELSE 0 END) as over_extracted
+      SUM(CASE WHEN s.shot_rating = 1 THEN 1 ELSE 0 END) as r1,
+      SUM(CASE WHEN s.shot_rating = 2 THEN 1 ELSE 0 END) as r2,
+      SUM(CASE WHEN s.shot_rating = 3 THEN 1 ELSE 0 END) as r3,
+      SUM(CASE WHEN s.shot_rating = 4 THEN 1 ELSE 0 END) as r4,
+      SUM(CASE WHEN s.shot_rating = 5 THEN 1 ELSE 0 END) as r5,
+      SUM(CASE WHEN s.shot_rating IS NULL THEN 1 ELSE 0 END) as unrated
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
     GROUP BY lower(b.roaster), lower(b.name)
     ORDER BY total DESC
-  `) as { roaster: string; name: string; total: number; failed: number; under_extracted: number; correct: number; over_extracted: number }[];
+  `) as { label: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number }[];
   return rows.map(r => ({
-    roaster: String(r.roaster),
-    name: String(r.name),
+    label: String(r.label),
     total: Number(r.total),
-    failed: Number(r.failed),
-    under: Number(r.under_extracted),
-    correct: Number(r.correct),
-    over: Number(r.over_extracted),
+    r1: Number(r.r1), r2: Number(r.r2), r3: Number(r.r3), r4: Number(r.r4), r5: Number(r.r5),
+    unrated: Number(r.unrated),
   }));
 }
 
@@ -681,85 +684,6 @@ function HorizontalBarChart({ rows, title, subtitle }: {
   );
 }
 
-const STACKED_COLORS = {
-  failed: "#FF3B30",
-  under:  "#FF9500",
-  correct: "#34C759",
-  over:   "#8B5CF6",
-};
-
-function StackedHorizontalBarChart({ rows, title, subtitle }: {
-  rows: CoffeeBreakdownRow[];
-  title: string;
-  subtitle: string;
-}) {
-  const maxTotal = Math.max(...rows.map(r => r.total), 1);
-
-  return (
-    <div className="rounded-2xl overflow-hidden mb-4"
-      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
-      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
-        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
-      </div>
-      <div className="px-4 pb-1 flex items-center gap-3 flex-wrap">
-        {(["failed", "under", "correct", "over"] as const).map((key) => (
-          <span key={key} className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
-            <span className="inline-block w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: STACKED_COLORS[key] }} />
-            {key === "failed" ? "Failed" : key === "under" ? "Under" : key === "correct" ? "On target" : "Over"}
-          </span>
-        ))}
-        <span className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
-          <span className="inline-block w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: "#8E8E93" }} />
-          No data
-        </span>
-      </div>
-      <p className="px-4 pb-2 text-[11px]" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
-        Extraction ratio — under &lt;1.5 · on target 1.5–2.5 · over &gt;2.5
-      </p>
-      <div className="px-4 pb-3 flex flex-col gap-2.5">
-        {rows.map((row, i) => {
-          const noData = row.total - row.failed - row.under - row.correct - row.over;
-          const segments: { width: number; left: number; color: string }[] = [];
-          let offset = 0;
-          for (const [count, color] of [
-            [row.failed,  STACKED_COLORS.failed],
-            [row.under,   STACKED_COLORS.under],
-            [row.correct, STACKED_COLORS.correct],
-            [row.over,    STACKED_COLORS.over],
-            [noData,      "#8E8E93"],
-          ] as [number, string][]) {
-            if (count > 0) {
-              segments.push({ left: (offset / maxTotal) * 100, width: (count / maxTotal) * 100, color });
-              offset += count;
-            }
-          }
-          return (
-            <div key={i}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[13px] truncate mr-3" style={{ color: "var(--text-primary)", maxWidth: "75%" }}>
-                  {row.name}
-                </span>
-                <span className="text-[12px] flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
-                  {row.total} shot{row.total !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <div className="relative rounded-full overflow-hidden" style={{ height: 8, backgroundColor: "var(--card-secondary)" }}>
-                {segments.map((seg, j) => (
-                  <div key={j} className="absolute inset-y-0" style={{
-                    left: `${seg.left.toFixed(2)}%`,
-                    width: `${seg.width.toFixed(2)}%`,
-                    backgroundColor: seg.color,
-                  }} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 const RATING_SEG_COLORS = ["#FF3B30", "#FF9500", "#FFD60A", "#34C759", "#30D158"];
 
@@ -1006,7 +930,7 @@ export default async function StatsPage() {
   }
   const macroRows = [...macroMap.values()].sort((a, b) => b.total - a.total);
 
-  const coffeeRows = shotsPerCoffee;
+  const coffeeRows: RatingBreakdownRow[] = shotsPerCoffee;
 
   // Drinks section data
   const drinkTypeRows = drinkTypeDist;
@@ -1134,10 +1058,10 @@ export default async function StatsPage() {
           <RatingStackedHorizontalBarChart rows={originRows} title="Origin" subtitle={`${originRows.length} origin${originRows.length !== 1 ? "s" : ""}`} />
         )}
         {blendDist.length > 0 && (
-          <HorizontalBarChart rows={blendDist} title="Single origin vs blend" subtitle={`${blendDist.reduce((a, r) => a + r.count, 0)} shots`} />
+          <RatingStackedHorizontalBarChart rows={blendDist} title="Single origin vs blend" subtitle={`${blendDist.reduce((a, r) => a + r.total, 0)} shots`} />
         )}
         {coffeeRows.length > 0 && (
-          <StackedHorizontalBarChart rows={coffeeRows} title="Shots per coffee" subtitle={`${coffeeRows.length} coffees`} />
+          <RatingStackedHorizontalBarChart rows={coffeeRows} title="Shots per coffee" subtitle={`${coffeeRows.length} coffees`} />
         )}
         <ScatterPlot
           points={freshnessPoints}
