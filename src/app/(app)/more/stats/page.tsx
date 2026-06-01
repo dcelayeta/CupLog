@@ -142,18 +142,34 @@ async function getProcessMethodDistribution(): Promise<{ method: string; count: 
   return rows.map(r => ({ method: String(r.method), count: Number(r.count) }));
 }
 
-async function getOriginDistribution(): Promise<{ label: string; count: number }[]> {
+type OriginBreakdownRow = {
+  label: string; country: string; total: number;
+  r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number;
+};
+
+async function getOriginRatingDistribution(): Promise<OriginBreakdownRow[]> {
   const rows = await db.all(sql`
-    SELECT bo.country, bo.region, COUNT(s.id) as count
+    SELECT bo.country, bo.region,
+      COUNT(s.id) as total,
+      SUM(CASE WHEN s.shot_rating = 1 THEN 1 ELSE 0 END) as r1,
+      SUM(CASE WHEN s.shot_rating = 2 THEN 1 ELSE 0 END) as r2,
+      SUM(CASE WHEN s.shot_rating = 3 THEN 1 ELSE 0 END) as r3,
+      SUM(CASE WHEN s.shot_rating = 4 THEN 1 ELSE 0 END) as r4,
+      SUM(CASE WHEN s.shot_rating = 5 THEN 1 ELSE 0 END) as r5,
+      SUM(CASE WHEN s.shot_rating IS NULL THEN 1 ELSE 0 END) as unrated
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
     JOIN bag_origins bo ON bo.bag_id = b.id
+    WHERE s.is_failed = 0
     GROUP BY bo.country, bo.region
-    ORDER BY count DESC
-  `) as { country: string; region: string | null; count: number }[];
+    ORDER BY total DESC
+  `) as { country: string; region: string | null; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number }[];
   return rows.map(r => ({
     label: r.region ? `${r.region} · ${r.country}` : String(r.country),
-    count: Number(r.count),
+    country: String(r.country),
+    total: Number(r.total),
+    r1: Number(r.r1), r2: Number(r.r2), r3: Number(r.r3), r4: Number(r.r4), r5: Number(r.r5),
+    unrated: Number(r.unrated),
   }));
 }
 
@@ -225,12 +241,12 @@ async function getFailedShotStats(): Promise<{ total: number; totalShots: number
   };
 }
 
-type DrinkBreakdownRow = { name: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number };
+type RatingBreakdownRow = { label: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number };
 
-async function getDrinkTypeDistribution(): Promise<DrinkBreakdownRow[]> {
+async function getDrinkTypeDistribution(): Promise<RatingBreakdownRow[]> {
   const rows = await db.all(sql`
     SELECT
-      detected_drink_name as name,
+      detected_drink_name as label,
       COUNT(*) as total,
       SUM(CASE WHEN overall_rating = 1 THEN 1 ELSE 0 END) as r1,
       SUM(CASE WHEN overall_rating = 2 THEN 1 ELSE 0 END) as r2,
@@ -242,9 +258,9 @@ async function getDrinkTypeDistribution(): Promise<DrinkBreakdownRow[]> {
     WHERE detected_drink_name IS NOT NULL
     GROUP BY detected_drink_name
     ORDER BY total DESC
-  `) as { name: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number }[];
+  `) as { label: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number }[];
   return rows.map(r => ({
-    name: String(r.name),
+    label: String(r.label),
     total: Number(r.total),
     r1: Number(r.r1), r2: Number(r.r2), r3: Number(r.r3), r4: Number(r.r4), r5: Number(r.r5),
     unrated: Number(r.unrated),
@@ -745,10 +761,10 @@ function StackedHorizontalBarChart({ rows, title, subtitle }: {
   );
 }
 
-const DRINK_RATING_COLORS = ["#FF3B30", "#FF9500", "#FFD60A", "#34C759", "#30D158"];
+const RATING_SEG_COLORS = ["#FF3B30", "#FF9500", "#FFD60A", "#34C759", "#30D158"];
 
-function DrinkRatingBarChart({ rows, title, subtitle }: {
-  rows: DrinkBreakdownRow[];
+function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
+  rows: RatingBreakdownRow[];
   title: string;
   subtitle: string;
 }) {
@@ -762,7 +778,7 @@ function DrinkRatingBarChart({ rows, title, subtitle }: {
         <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
       </div>
       <div className="px-4 pb-2 flex items-center gap-3 flex-wrap">
-        {DRINK_RATING_COLORS.map((color, i) => (
+        {RATING_SEG_COLORS.map((color, i) => (
           <span key={i} className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
             <span className="inline-block w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
             {i + 1}★
@@ -776,7 +792,7 @@ function DrinkRatingBarChart({ rows, title, subtitle }: {
       <div className="px-4 pb-3 flex flex-col gap-2.5">
         {rows.map((row, i) => {
           const counts = [row.r1, row.r2, row.r3, row.r4, row.r5, row.unrated];
-          const colors = [...DRINK_RATING_COLORS, "#8E8E93"];
+          const colors = [...RATING_SEG_COLORS, "#8E8E93"];
           const segments: { left: number; width: number; color: string }[] = [];
           let offset = 0;
           counts.forEach((count, j) => {
@@ -789,7 +805,7 @@ function DrinkRatingBarChart({ rows, title, subtitle }: {
             <div key={i}>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[13px] truncate mr-3" style={{ color: "var(--text-primary)", maxWidth: "75%" }}>
-                  {row.name}
+                  {row.label}
                 </span>
                 <span className="text-[12px] flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
                   {row.total}
@@ -819,7 +835,7 @@ export default async function StatsPage() {
     ratingDist, tasteDist,
     [ratioPoints, timePoints],
     ratingTrend, freshnessPoints, retentionValues, flowRateDist,
-    roastTypeDist, shotsPerCoffee, processMethodDist, originDist, blendDist,
+    roastTypeDist, shotsPerCoffee, processMethodDist, originRatingDist, blendDist,
     drinkTypeDist, drinkRatingTrend, shotVsDrinkRatings,
     failedStats,
   ] = await Promise.all([
@@ -833,7 +849,7 @@ export default async function StatsPage() {
     getRoastTypeDistribution(),
     getShotsPerCoffee(),
     getProcessMethodDistribution(),
-    getOriginDistribution(),
+    getOriginRatingDistribution(),
     getBlendDistribution(),
     getDrinkTypeDistribution(),
     getDrinkRatingTrend(),
@@ -962,7 +978,33 @@ export default async function StatsPage() {
     color: PROCESS_COLORS[m],
   }));
 
-  const originRows = originDist;
+  const originRows = originRatingDist;
+
+  const COUNTRY_TO_MACRO: Record<string, string> = {
+    Colombia: "Latin America", Brazil: "Latin America", Guatemala: "Latin America",
+    Honduras: "Latin America", Peru: "Latin America", Bolivia: "Latin America",
+    Ecuador: "Latin America", "Costa Rica": "Latin America", Mexico: "Latin America",
+    Nicaragua: "Latin America", "El Salvador": "Latin America", Panama: "Latin America",
+    Venezuela: "Latin America",
+    Ethiopia: "East Africa", Kenya: "East Africa", Rwanda: "East Africa",
+    Burundi: "East Africa", Tanzania: "East Africa", Uganda: "East Africa",
+    "DR Congo": "East Africa", Malawi: "East Africa", Zambia: "East Africa",
+    Indonesia: "Asia / Pacific", Vietnam: "Asia / Pacific", India: "Asia / Pacific",
+    Philippines: "Asia / Pacific", "Papua New Guinea": "Asia / Pacific", Laos: "Asia / Pacific",
+    Yemen: "Middle East",
+  };
+  const macroMap = new Map<string, RatingBreakdownRow>();
+  for (const row of originRatingDist) {
+    const macro = COUNTRY_TO_MACRO[row.country] ?? "Other";
+    const ex = macroMap.get(macro) ?? { label: macro, total: 0, r1: 0, r2: 0, r3: 0, r4: 0, r5: 0, unrated: 0 };
+    macroMap.set(macro, {
+      label: macro,
+      total: ex.total + row.total,
+      r1: ex.r1 + row.r1, r2: ex.r2 + row.r2, r3: ex.r3 + row.r3,
+      r4: ex.r4 + row.r4, r5: ex.r5 + row.r5, unrated: ex.unrated + row.unrated,
+    });
+  }
+  const macroRows = [...macroMap.values()].sort((a, b) => b.total - a.total);
 
   const coffeeRows = shotsPerCoffee;
 
@@ -1085,8 +1127,11 @@ export default async function StatsPage() {
             footnote={processUnspecified > 0 ? `${processUnspecified} shot${processUnspecified !== 1 ? "s" : ""} (${Math.round(processUnspecified / processTotal * 100)}%) have no process tagged` : undefined}
           />
         )}
+        {macroRows.length > 0 && (
+          <RatingStackedHorizontalBarChart rows={macroRows} title="Origin by region" subtitle={`${macroRows.length} region${macroRows.length !== 1 ? "s" : ""}`} />
+        )}
         {originRows.length > 0 && (
-          <HorizontalBarChart rows={originRows} title="Origin" subtitle={`${originRows.length} origin${originRows.length !== 1 ? "s" : ""}`} />
+          <RatingStackedHorizontalBarChart rows={originRows} title="Origin" subtitle={`${originRows.length} origin${originRows.length !== 1 ? "s" : ""}`} />
         )}
         {blendDist.length > 0 && (
           <HorizontalBarChart rows={blendDist} title="Single origin vs blend" subtitle={`${blendDist.reduce((a, r) => a + r.count, 0)} shots`} />
@@ -1106,7 +1151,7 @@ export default async function StatsPage() {
           <SectionLabel title="Drinks" />
         )}
         {drinkTypeRows.length > 0 && (
-          <DrinkRatingBarChart
+          <RatingStackedHorizontalBarChart
             rows={drinkTypeRows}
             title="Drink types"
             subtitle={`${totalDrinks} logged`}
