@@ -686,7 +686,6 @@ function HorizontalBarChart({ rows, title, subtitle }: {
 
 
 const RATING_SEG_COLORS = ["#FF3B30", "#FF9500", "#FFD60A", "#34C759", "#30D158"];
-const RATING_TEXT_COLORS = ["#FF3B30", "#FF9500", "#B8860B", "#34C759", "#30D158"];
 
 function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
   rows: RatingBreakdownRow[];
@@ -718,7 +717,6 @@ function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
         {rows.map((row, i) => {
           const counts = [row.r1, row.r2, row.r3, row.r4, row.r5, row.unrated];
           const segColors = [...RATING_SEG_COLORS, "#8E8E93"];
-          const textColors = [...RATING_TEXT_COLORS, "#8E8E93"];
           const segments: { left: number; width: number; color: string }[] = [];
           let offset = 0;
           counts.forEach((count, j) => {
@@ -728,7 +726,7 @@ function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
             }
           });
           const pctLabels = counts
-            .map((count, j) => ({ count, color: textColors[j], label: j < 5 ? `${j + 1}★` : "unr" }))
+            .map((count, j) => ({ count, color: segColors[j], label: j < 5 ? `${j + 1}★` : "unr" }))
             .filter(s => s.count > 0)
             .map(s => ({ ...s, pct: Math.round((s.count / row.total) * 100) }));
           return (
@@ -752,8 +750,9 @@ function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
               </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {pctLabels.map((s, j) => (
-                  <span key={j} className="text-[10px]" style={{ color: s.color, opacity: 0.65 }}>
-                    {s.label} {s.pct}%
+                  <span key={j} className="text-[10px]">
+                    <span style={{ color: s.color }}>{s.label}</span>
+                    <span style={{ color: "var(--text-secondary)", opacity: 0.65 }}> {s.pct}%</span>
                   </span>
                 ))}
               </div>
