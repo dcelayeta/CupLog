@@ -131,6 +131,29 @@ async function getRoastTypeDistribution(): Promise<{ roastLevel: string; count: 
   return rows.map(r => ({ roastLevel: String(r.roastLevel), count: Number(r.count) }));
 }
 
+async function getProcessMethodDistribution(): Promise<{ method: string; count: number }[]> {
+  const rows = await db.all(sql`
+    SELECT b.processing_method as method, COUNT(s.id) as count
+    FROM shots s
+    JOIN bags b ON s.bag_id = b.id
+    GROUP BY b.processing_method
+    ORDER BY count DESC
+  `) as { method: string; count: number }[];
+  return rows.map(r => ({ method: String(r.method), count: Number(r.count) }));
+}
+
+async function getOriginDistribution(): Promise<{ country: string; count: number }[]> {
+  const rows = await db.all(sql`
+    SELECT bo.country, COUNT(s.id) as count
+    FROM shots s
+    JOIN bags b ON s.bag_id = b.id
+    JOIN bag_origins bo ON bo.bag_id = b.id
+    GROUP BY bo.country
+    ORDER BY count DESC
+  `) as { country: string; count: number }[];
+  return rows.map(r => ({ country: String(r.country), count: Number(r.count) }));
+}
+
 type CoffeeBreakdownRow = { roaster: string; name: string; total: number; failed: number; under: number; correct: number; over: number };
 
 async function getShotsPerCoffee(): Promise<CoffeeBreakdownRow[]> {
@@ -777,7 +800,7 @@ export default async function StatsPage() {
     ratingDist, tasteDist,
     [ratioPoints, timePoints],
     ratingTrend, freshnessPoints, retentionValues, flowRateDist,
-    roastTypeDist, shotsPerCoffee,
+    roastTypeDist, shotsPerCoffee, processMethodDist, originDist,
     drinkTypeDist, drinkRatingTrend, shotVsDrinkRatings,
     failedStats,
   ] = await Promise.all([
@@ -790,6 +813,8 @@ export default async function StatsPage() {
     getFlowRateDistribution(),
     getRoastTypeDistribution(),
     getShotsPerCoffee(),
+    getProcessMethodDistribution(),
+    getOriginDistribution(),
     getDrinkTypeDistribution(),
     getDrinkRatingTrend(),
     getShotVsDrinkRatings(),
@@ -880,28 +905,44 @@ export default async function StatsPage() {
 
   // Bean section data
   const ROAST_LEVEL_LABELS: Record<string, string> = {
-    light: "Light",
-    medium_light: "Med-Light",
-    medium: "Medium",
-    medium_dark: "Med-Dark",
-    dark: "Dark",
-    unspecified: "Unspecified",
+    light: "Light", medium_light: "Med-Light", medium: "Medium",
+    medium_dark: "Med-Dark", dark: "Dark",
   };
   const ROAST_LEVEL_COLORS: Record<string, string> = {
-    light: "#FFD60A",
-    medium_light: "#FF9500",
-    medium: "#C84B31",
-    medium_dark: "#8B3A2A",
-    dark: "#4A2315",
-    unspecified: "#8E8E93",
+    light: "#FFD60A", medium_light: "#FF9500", medium: "#C84B31",
+    medium_dark: "#8B3A2A", dark: "#4A2315",
   };
-  const roastBars: BarSpec[] = roastTypeDist
-    .filter(r => r.count > 0)
-    .map(r => ({
-      label: ROAST_LEVEL_LABELS[r.roastLevel] ?? r.roastLevel,
-      count: r.count,
-      color: ROAST_LEVEL_COLORS[r.roastLevel] ?? "#8E8E93",
-    }));
+  const roastCountMap = Object.fromEntries(roastTypeDist.map(r => [r.roastLevel, r.count]));
+  const roastUnspecified = roastCountMap["unspecified"] ?? 0;
+  const roastTotal = roastTypeDist.reduce((a, r) => a + r.count, 0);
+  const roastTagged = roastTotal - roastUnspecified;
+  const roastBars: BarSpec[] = (["light", "medium_light", "medium", "medium_dark", "dark"] as const).map(level => ({
+    label: ROAST_LEVEL_LABELS[level],
+    count: roastCountMap[level] ?? 0,
+    color: ROAST_LEVEL_COLORS[level],
+  }));
+
+  const PROCESS_LABELS: Record<string, string> = {
+    washed: "Washed", natural: "Natural", honey: "Honey",
+    anaerobic: "Anaerobic", ea_washed: "EA Washed",
+    swiss_water: "Swiss Water", other: "Other",
+  };
+  const PROCESS_COLORS: Record<string, string> = {
+    washed: "#34AADC", natural: "#E8735A", honey: "#F5A623",
+    anaerobic: "#8B5CF6", ea_washed: "#34C759",
+    swiss_water: "#30D158", other: "#8E8E93",
+  };
+  const processCountMap = Object.fromEntries(processMethodDist.map(r => [r.method, r.count]));
+  const processUnspecified = processCountMap["unspecified"] ?? 0;
+  const processTotal = processMethodDist.reduce((a, r) => a + r.count, 0);
+  const processTagged = processTotal - processUnspecified;
+  const processBars: BarSpec[] = (["washed", "natural", "honey", "anaerobic", "ea_washed", "swiss_water", "other"] as const).map(m => ({
+    label: PROCESS_LABELS[m],
+    count: processCountMap[m] ?? 0,
+    color: PROCESS_COLORS[m],
+  }));
+
+  const originRows = originDist.map(r => ({ label: r.country, count: r.count }));
 
   const coffeeRows = shotsPerCoffee;
 
@@ -1007,8 +1048,28 @@ export default async function StatsPage() {
           stat={avgRetention != null ? `${avgRetention.toFixed(2)}g avg` : undefined}
         />
         <SectionLabel title="Beans" />
-        {roastBars.length > 0 && (
-          <BarChart bars={roastBars} title="Roast level" subtitle={`${roastBars.reduce((a, b) => a + b.count, 0)} shots`} />
+        {roastTotal > 0 && (
+          <>
+            <BarChart bars={roastBars} title="Roast level" subtitle={`${roastTagged} tagged`} />
+            {roastUnspecified > 0 && (
+              <p className="-mt-3 mb-4 px-1 text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.7 }}>
+                {roastUnspecified} shot{roastUnspecified !== 1 ? "s" : ""} ({Math.round(roastUnspecified / roastTotal * 100)}%) have no roast level tagged
+              </p>
+            )}
+          </>
+        )}
+        {processTotal > 0 && (
+          <>
+            <BarChart bars={processBars} title="Process method" subtitle={`${processTagged} tagged`} labelFontSize={8} />
+            {processUnspecified > 0 && (
+              <p className="-mt-3 mb-4 px-1 text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.7 }}>
+                {processUnspecified} shot{processUnspecified !== 1 ? "s" : ""} ({Math.round(processUnspecified / processTotal * 100)}%) have no process tagged
+              </p>
+            )}
+          </>
+        )}
+        {originRows.length > 0 && (
+          <HorizontalBarChart rows={originRows} title="Origin country" subtitle={`${originRows.length} origin${originRows.length !== 1 ? "s" : ""}`} />
         )}
         {coffeeRows.length > 0 && (
           <StackedHorizontalBarChart rows={coffeeRows} title="Shots per coffee" subtitle={`${coffeeRows.length} coffees`} />
