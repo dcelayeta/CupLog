@@ -20,16 +20,20 @@ function ChartCard({
 }) {
   return (
     <div
-      className="rounded-2xl overflow-hidden p-4"
+      className="rounded-2xl overflow-hidden"
       style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
     >
-      <p className="text-[13px] font-medium mb-1" style={{ color: "var(--text-primary)" }}>
-        {title}
-      </p>
-      {legend && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2">{legend}</div>
-      )}
-      {children}
+      <div className="px-4 pt-3 pb-2">
+        <p className="text-[13px] font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+          {title}
+        </p>
+        {legend && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1">{legend}</div>
+        )}
+      </div>
+      <div className="px-3 pb-3">
+        {children}
+      </div>
     </div>
   );
 }
@@ -78,7 +82,7 @@ function GrindVsTasteChart({ shots }: { shots: BagChartShot[] }) {
   for (let g = firstTick; g <= maxG; g += step) xTicks.push(g);
 
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block", overflow: "hidden" }}>
       {/* Balanced zone highlight (taste 3–5) */}
       <rect x={PAD.l} y={toY(5)} width={cw} height={toY(3) - toY(5)} fill="#34C759" fillOpacity="0.1" />
 
@@ -114,7 +118,7 @@ function GrindVsTasteChart({ shots }: { shots: BagChartShot[] }) {
         const x = toX(s.grindSetting!);
         const y = toY(s.tasteBalance!);
         const color = s.shotRating ? RATING_COLORS[Math.round(s.shotRating)] : "#8E8E93";
-        return <circle key={s.id} cx={x} cy={y} r="5.5" fill={color} fillOpacity="0.85" />;
+        return <circle key={s.id} cx={x} cy={y} r="4" fill={color} fillOpacity="0.85" />;
       })}
     </svg>
   );
@@ -140,7 +144,7 @@ function RatingTrendChart({ shots }: { shots: BagChartShot[] }) {
   const labelEvery = n > 10 ? 3 : n > 6 ? 2 : 1;
 
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block", overflow: "hidden" }}>
       {/* Grid lines */}
       {[1, 2, 3, 4, 5].map((r) => (
         <line key={r} x1={PAD.l} y1={toY(r)} x2={PAD.l + cw} y2={toY(r)}
@@ -164,7 +168,7 @@ function RatingTrendChart({ shots }: { shots: BagChartShot[] }) {
         const showLabel = s.grindSetting != null && i % labelEvery === 0;
         return (
           <g key={s.id}>
-            <circle cx={x} cy={y} r="5.5" fill={color} fillOpacity="0.85" />
+            <circle cx={x} cy={y} r="4" fill={color} fillOpacity="0.85" />
             {showLabel && (
               <text
                 x={x}
@@ -199,8 +203,8 @@ function ExtractionRatioChart({ shots }: { shots: BagChartShot[] }) {
 
   if (eligible.length === 0) return null;
 
-  const ROW_H = 28;
-  const ROW_GAP = 5;
+  const ROW_H = 20;
+  const ROW_GAP = 4;
   const LABEL_W = 30;
   const W = 320;
   const PAD_T = 8;
@@ -217,7 +221,7 @@ function ExtractionRatioChart({ shots }: { shots: BagChartShot[] }) {
   const targetEndX = LABEL_W + 8 + toBarW(Math.min(2.5, maxRatio));
 
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block", overflow: "hidden" }}>
       {/* Target zone band */}
       <rect
         x={targetStartX}
@@ -241,10 +245,10 @@ function ExtractionRatioChart({ shots }: { shots: BagChartShot[] }) {
             <text x={LABEL_W - 2} y={y + ROW_H / 2} textAnchor="end" dominantBaseline="middle"
               fontSize="9" fill="var(--text-secondary)">{grindLabel}</text>
 
-            <rect x={LABEL_W + 8} y={y + 5} width={barAreaW} height={ROW_H - 10}
+            <rect x={LABEL_W + 8} y={y + 3} width={barAreaW} height={ROW_H - 6}
               rx="3" fill="currentColor" fillOpacity="0.06" />
 
-            <rect x={LABEL_W + 8} y={y + 5} width={Math.max(bw, 4)} height={ROW_H - 10}
+            <rect x={LABEL_W + 8} y={y + 3} width={Math.max(bw, 4)} height={ROW_H - 6}
               rx="3" fill={barColor} fillOpacity={s.isFailed ? 0.25 : 0.65} />
 
             <text x={LABEL_W + 8 + bw + 4} y={y + ROW_H / 2} dominantBaseline="middle"
