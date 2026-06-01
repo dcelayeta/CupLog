@@ -750,9 +750,8 @@ function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
               </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {pctLabels.map((s, j) => (
-                  <span key={j} className="text-[10px]">
-                    <span style={{ color: s.color }}>{s.label}</span>
-                    <span style={{ color: "var(--text-secondary)", opacity: 0.65 }}> {s.pct}%</span>
+                  <span key={j} className="text-[10px]" style={{ color: "var(--text-secondary)", opacity: 0.65 }}>
+                    {s.label} {s.pct}%
                   </span>
                 ))}
               </div>
