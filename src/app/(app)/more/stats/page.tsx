@@ -131,15 +131,36 @@ async function getRoastTypeDistribution(): Promise<{ roastLevel: string; count: 
   return rows.map(r => ({ roastLevel: String(r.roastLevel), count: Number(r.count) }));
 }
 
-async function getShotsPerCoffee(): Promise<{ roaster: string; name: string; count: number }[]> {
+type CoffeeBreakdownRow = { roaster: string; name: string; total: number; failed: number; under: number; correct: number; over: number };
+
+async function getShotsPerCoffee(): Promise<CoffeeBreakdownRow[]> {
   const rows = await db.all(sql`
-    SELECT b.roaster, b.name, COUNT(s.id) as count
+    SELECT
+      b.roaster,
+      b.name,
+      COUNT(s.id) as total,
+      SUM(CASE WHEN s.is_failed = 1 THEN 1 ELSE 0 END) as failed,
+      SUM(CASE WHEN s.is_failed = 0 AND s.yield_g IS NOT NULL AND s.dose_g > 0
+               AND (CAST(s.yield_g AS REAL) / s.dose_g) < 1.5 THEN 1 ELSE 0 END) as under_extracted,
+      SUM(CASE WHEN s.is_failed = 0 AND s.yield_g IS NOT NULL AND s.dose_g > 0
+               AND (CAST(s.yield_g AS REAL) / s.dose_g) >= 1.5
+               AND (CAST(s.yield_g AS REAL) / s.dose_g) <= 2.5 THEN 1 ELSE 0 END) as correct,
+      SUM(CASE WHEN s.is_failed = 0 AND s.yield_g IS NOT NULL AND s.dose_g > 0
+               AND (CAST(s.yield_g AS REAL) / s.dose_g) > 2.5 THEN 1 ELSE 0 END) as over_extracted
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
     GROUP BY lower(b.roaster), lower(b.name)
-    ORDER BY count DESC
-  `) as { roaster: string; name: string; count: number }[];
-  return rows.map(r => ({ roaster: String(r.roaster), name: String(r.name), count: Number(r.count) }));
+    ORDER BY total DESC
+  `) as { roaster: string; name: string; total: number; failed: number; under_extracted: number; correct: number; over_extracted: number }[];
+  return rows.map(r => ({
+    roaster: String(r.roaster),
+    name: String(r.name),
+    total: Number(r.total),
+    failed: Number(r.failed),
+    under: Number(r.under_extracted),
+    correct: Number(r.correct),
+    over: Number(r.over_extracted),
+  }));
 }
 
 async function getFailedShotStats(): Promise<{ total: number; totalShots: number; byReason: { reason: string; count: number }[] }> {
@@ -607,6 +628,78 @@ function HorizontalBarChart({ rows, title, subtitle }: {
   );
 }
 
+const STACKED_COLORS = {
+  failed: "#FF3B30",
+  under:  "#FF9500",
+  correct: "#34C759",
+  over:   "#8B5CF6",
+};
+
+function StackedHorizontalBarChart({ rows, title, subtitle }: {
+  rows: CoffeeBreakdownRow[];
+  title: string;
+  subtitle: string;
+}) {
+  const maxTotal = Math.max(...rows.map(r => r.total), 1);
+
+  return (
+    <div className="rounded-2xl overflow-hidden mb-4"
+      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
+        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
+      </div>
+      <div className="px-4 pb-2 flex items-center gap-3 flex-wrap">
+        {(["failed", "under", "correct", "over"] as const).map((key) => (
+          <span key={key} className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+            <span className="inline-block w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: STACKED_COLORS[key] }} />
+            {key === "failed" ? "Failed" : key === "under" ? "Under" : key === "correct" ? "On target" : "Over"}
+          </span>
+        ))}
+      </div>
+      <div className="px-4 pb-3 flex flex-col gap-2.5">
+        {rows.map((row, i) => {
+          const segments: { width: number; left: number; color: string }[] = [];
+          let offset = 0;
+          for (const [key, color] of [
+            ["failed", STACKED_COLORS.failed],
+            ["under",  STACKED_COLORS.under],
+            ["correct", STACKED_COLORS.correct],
+            ["over",   STACKED_COLORS.over],
+          ] as [keyof typeof STACKED_COLORS, string][]) {
+            const count = row[key] as number;
+            if (count > 0) {
+              segments.push({ left: (offset / maxTotal) * 100, width: (count / maxTotal) * 100, color });
+              offset += count;
+            }
+          }
+          return (
+            <div key={i}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[13px] truncate mr-3" style={{ color: "var(--text-primary)", maxWidth: "75%" }}>
+                  {row.name}
+                </span>
+                <span className="text-[12px] flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
+                  {row.total} shot{row.total !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="relative rounded-full overflow-hidden" style={{ height: 8, backgroundColor: "var(--card-secondary)" }}>
+                {segments.map((seg, j) => (
+                  <div key={j} className="absolute inset-y-0" style={{
+                    left: `${seg.left.toFixed(2)}%`,
+                    width: `${seg.width.toFixed(2)}%`,
+                    backgroundColor: seg.color,
+                  }} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function StatsPage() {
@@ -740,10 +833,7 @@ export default async function StatsPage() {
       color: ROAST_LEVEL_COLORS[r.roastLevel] ?? "#8E8E93",
     }));
 
-  const coffeeRows = shotsPerCoffee.map(r => ({
-    label: `${r.roaster} ${r.name}`,
-    count: r.count,
-  }));
+  const coffeeRows = shotsPerCoffee;
 
   // Drinks section data
   const drinkTypeRows = drinkTypeDist.map(r => ({ label: r.name, count: r.count }));
@@ -851,7 +941,7 @@ export default async function StatsPage() {
           <BarChart bars={roastBars} title="Roast level" subtitle={`${roastBars.reduce((a, b) => a + b.count, 0)} shots`} />
         )}
         {coffeeRows.length > 0 && (
-          <HorizontalBarChart rows={coffeeRows} title="Shots per coffee" subtitle={`${coffeeRows.length} coffees`} />
+          <StackedHorizontalBarChart rows={coffeeRows} title="Shots per coffee" subtitle={`${coffeeRows.length} coffees`} />
         )}
         <ScatterPlot
           points={freshnessPoints}
