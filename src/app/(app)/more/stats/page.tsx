@@ -186,13 +186,23 @@ async function getFailedShotStats(): Promise<{ total: number; totalShots: number
   };
 }
 
-async function getDrinkTypeDistribution(): Promise<{ name: string; count: number }[]> {
+type DrinkBreakdownRow = { name: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number };
+
+async function getDrinkTypeDistribution(): Promise<DrinkBreakdownRow[]> {
   const rows = await db.all(sql`
-    SELECT name, SUM(count) as count FROM (
-      SELECT detected_drink_name as name, COUNT(*) as count
+    SELECT
+      name,
+      COUNT(*) as total,
+      SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) as r1,
+      SUM(CASE WHEN rating = 2 THEN 1 ELSE 0 END) as r2,
+      SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END) as r3,
+      SUM(CASE WHEN rating = 4 THEN 1 ELSE 0 END) as r4,
+      SUM(CASE WHEN rating = 5 THEN 1 ELSE 0 END) as r5,
+      SUM(CASE WHEN rating IS NULL THEN 1 ELSE 0 END) as unrated
+    FROM (
+      SELECT detected_drink_name as name, overall_rating as rating
       FROM drinks
       WHERE detected_drink_name IS NOT NULL
-      GROUP BY detected_drink_name
 
       UNION ALL
 
@@ -204,17 +214,27 @@ async function getDrinkTypeDistribution(): Promise<{ name: string; count: number
           WHEN yield_g * 1.0 / dose_g >= 3.0 AND yield_g * 1.0 / dose_g < 4.0 THEN 'Lungo'
           ELSE NULL
         END as name,
-        COUNT(*) as count
+        NULL as rating
       FROM shots
       WHERE id NOT IN (SELECT shot_id FROM drinks WHERE shot_id IS NOT NULL)
         AND yield_g IS NOT NULL
-      GROUP BY name
-      HAVING name IS NOT NULL
+        AND CASE
+          WHEN yield_g * 1.0 / dose_g >= 1.0 AND yield_g * 1.0 / dose_g < 1.5 THEN 'x'
+          WHEN yield_g * 1.0 / dose_g >= 1.5 AND yield_g * 1.0 / dose_g < 3.0 THEN 'x'
+          WHEN yield_g * 1.0 / dose_g >= 3.0 AND yield_g * 1.0 / dose_g < 4.0 THEN 'x'
+          ELSE NULL
+        END IS NOT NULL
     )
+    WHERE name IS NOT NULL
     GROUP BY name
-    ORDER BY count DESC
-  `) as { name: string; count: number }[];
-  return rows.map(r => ({ name: String(r.name), count: Number(r.count) }));
+    ORDER BY total DESC
+  `) as { name: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number }[];
+  return rows.map(r => ({
+    name: String(r.name),
+    total: Number(r.total),
+    r1: Number(r.r1), r2: Number(r.r2), r3: Number(r.r3), r4: Number(r.r4), r5: Number(r.r5),
+    unrated: Number(r.unrated),
+  }));
 }
 
 async function getDrinkRatingTrend(): Promise<{ rating: number; drinkName: string | null }[]> {
@@ -700,6 +720,73 @@ function StackedHorizontalBarChart({ rows, title, subtitle }: {
   );
 }
 
+const DRINK_RATING_COLORS = ["#FF3B30", "#FF9500", "#FFD60A", "#34C759", "#30D158"];
+
+function DrinkRatingBarChart({ rows, title, subtitle }: {
+  rows: DrinkBreakdownRow[];
+  title: string;
+  subtitle: string;
+}) {
+  const maxTotal = Math.max(...rows.map(r => r.total), 1);
+
+  return (
+    <div className="rounded-2xl overflow-hidden mb-4"
+      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
+        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
+      </div>
+      <div className="px-4 pb-2 flex items-center gap-3 flex-wrap">
+        {DRINK_RATING_COLORS.map((color, i) => (
+          <span key={i} className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+            <span className="inline-block w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
+            {i + 1}★
+          </span>
+        ))}
+        <span className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+          <span className="inline-block w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: "#8E8E93" }} />
+          Unrated
+        </span>
+      </div>
+      <div className="px-4 pb-3 flex flex-col gap-2.5">
+        {rows.map((row, i) => {
+          const counts = [row.r1, row.r2, row.r3, row.r4, row.r5, row.unrated];
+          const colors = [...DRINK_RATING_COLORS, "#8E8E93"];
+          const segments: { left: number; width: number; color: string }[] = [];
+          let offset = 0;
+          counts.forEach((count, j) => {
+            if (count > 0) {
+              segments.push({ left: (offset / maxTotal) * 100, width: (count / maxTotal) * 100, color: colors[j] });
+              offset += count;
+            }
+          });
+          return (
+            <div key={i}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[13px] truncate mr-3" style={{ color: "var(--text-primary)", maxWidth: "75%" }}>
+                  {row.name}
+                </span>
+                <span className="text-[12px] flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
+                  {row.total}
+                </span>
+              </div>
+              <div className="relative rounded-full overflow-hidden" style={{ height: 8, backgroundColor: "var(--card-secondary)" }}>
+                {segments.map((seg, j) => (
+                  <div key={j} className="absolute inset-y-0" style={{
+                    left: `${seg.left.toFixed(2)}%`,
+                    width: `${seg.width.toFixed(2)}%`,
+                    backgroundColor: seg.color,
+                  }} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function StatsPage() {
@@ -836,8 +923,8 @@ export default async function StatsPage() {
   const coffeeRows = shotsPerCoffee;
 
   // Drinks section data
-  const drinkTypeRows = drinkTypeDist.map(r => ({ label: r.name, count: r.count }));
-  const totalDrinks = drinkTypeDist.reduce((a, r) => a + r.count, 0);
+  const drinkTypeRows = drinkTypeDist;
+  const totalDrinks = drinkTypeDist.reduce((a, r) => a + r.total, 0);
 
   const drinkRatingWindow = Math.max(3, Math.round(drinkRatingTrend.length / 8));
   const avgDrinkRating = drinkRatingTrend.length > 0
@@ -955,7 +1042,7 @@ export default async function StatsPage() {
           <SectionLabel title="Drinks" />
         )}
         {drinkTypeRows.length > 0 && (
-          <HorizontalBarChart
+          <DrinkRatingBarChart
             rows={drinkTypeRows}
             title="Drink types"
             subtitle={`${totalDrinks} logged`}
