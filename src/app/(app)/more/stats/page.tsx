@@ -644,14 +644,21 @@ function StackedHorizontalBarChart({ rows, title, subtitle }: {
         <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
         <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
       </div>
-      <div className="px-4 pb-2 flex items-center gap-3 flex-wrap">
+      <div className="px-4 pb-1 flex items-center gap-3 flex-wrap">
         {(["failed", "under", "correct", "over"] as const).map((key) => (
           <span key={key} className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
             <span className="inline-block w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: STACKED_COLORS[key] }} />
             {key === "failed" ? "Failed" : key === "under" ? "Under" : key === "correct" ? "On target" : "Over"}
           </span>
         ))}
+        <span className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+          <span className="inline-block w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: "#8E8E93" }} />
+          No data
+        </span>
       </div>
+      <p className="px-4 pb-2 text-[11px]" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
+        Extraction ratio — under &lt;1.5 · on target 1.5–2.5 · over &gt;2.5
+      </p>
       <div className="px-4 pb-3 flex flex-col gap-2.5">
         {rows.map((row, i) => {
           const noData = row.total - row.failed - row.under - row.correct - row.over;
