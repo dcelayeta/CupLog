@@ -134,6 +134,22 @@ export async function getLatestShotId(): Promise<number | null> {
   return row?.id ?? null;
 }
 
+export async function getLastShotDefaultsPerBag(): Promise<Record<number, LastShotDefaults>> {
+  const rows = await db
+    .select({
+      bagId: shots.bagId,
+      doseG: shots.doseG,
+      grindSetting: shots.grindSetting,
+      lagG: shots.lagG,
+      temperatureC: shots.temperatureC,
+      springWeightLbs: shots.springWeightLbs,
+      wdtUsed: shots.wdtUsed,
+    })
+    .from(shots)
+    .where(sql`${shots.id} IN (SELECT MAX(id) FROM shots GROUP BY bag_id)`);
+  return Object.fromEntries(rows.map(r => [r.bagId, r]));
+}
+
 export async function getLastShotDefaults(): Promise<LastShotDefaults | null> {
   const [row] = await db
     .select({

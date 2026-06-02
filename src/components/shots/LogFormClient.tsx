@@ -19,6 +19,7 @@ type Props = {
   equipmentProfile: EquipmentProfile | null;
   averageRetention: number | null;
   lastShot: LastShotDefaults | null;
+  bagDefaults: Record<number, LastShotDefaults>;
   thresholds: ExtractionThreshold[];
 };
 
@@ -96,7 +97,7 @@ function NumberInput({
   value,
   onChange,
   placeholder,
-  step = "0.1",
+  integer = false,
   min,
   max,
 }: {
@@ -104,24 +105,69 @@ function NumberInput({
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
-  step?: string;
+  integer?: boolean;
   min?: string;
   max?: string;
 }) {
   return (
     <input
-      type="number"
+      type="text"
+      inputMode={integer ? "numeric" : "decimal"}
       name={name}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      step={step}
       min={min}
       max={max}
       className="text-right outline-none bg-transparent text-[17px] w-[90px]"
       style={{ color: "var(--text-primary)" }}
-      inputMode="decimal"
     />
+  );
+}
+
+function StepperInput({
+  name,
+  value,
+  onChange,
+  step = 0.1,
+  min = 0,
+  max = 9.9,
+}: {
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+  step?: number;
+  min?: number;
+  max?: number;
+}) {
+  const decimals = step.toString().includes(".") ? step.toString().split(".")[1].length : 0;
+  const num = parseFloat(value) || 0;
+  const adjust = (delta: number) => {
+    const next = Math.max(min, Math.min(max, Math.round((num + delta) * 1000) / 1000));
+    onChange(next.toFixed(decimals));
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <input type="hidden" name={name} value={value} />
+      <button type="button" onPointerDown={() => adjust(-step)}
+        className="w-8 h-8 rounded-full flex items-center justify-center text-[22px] font-light select-none"
+        style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}>
+        −
+      </button>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="text-center outline-none bg-transparent text-[17px] w-[48px]"
+        style={{ color: "var(--text-primary)" }}
+      />
+      <button type="button" onPointerDown={() => adjust(step)}
+        className="w-8 h-8 rounded-full flex items-center justify-center text-[22px] font-light select-none"
+        style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}>
+        +
+      </button>
+    </div>
   );
 }
 
@@ -142,6 +188,7 @@ export default function LogFormClient({
   equipmentProfile,
   averageRetention,
   lastShot,
+  bagDefaults,
   thresholds,
 }: Props) {
   const [state, formAction, isPending] = useActionState(logShot, null);
@@ -276,7 +323,18 @@ export default function LogFormClient({
             <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Bag</span>
             <select
               value={bagId}
-              onChange={(e) => setBagId(e.target.value)}
+              onChange={(e) => {
+                const newId = e.target.value;
+                setBagId(newId);
+                const d = bagDefaults[Number(newId)];
+                if (d) {
+                  setDoseG(d.doseG.toString());
+                  setGrindSetting(d.grindSetting?.toString() ?? "");
+                  setLagG(d.lagG?.toString() ?? "");
+                  setSpringWeightLbs(d.springWeightLbs?.toString() ?? "");
+                  setWdtUsed(d.wdtUsed);
+                }
+              }}
               className="text-right outline-none bg-transparent text-[17px] max-w-[200px] truncate"
               style={{ color: "var(--accent)" }}
             >
@@ -347,16 +405,16 @@ export default function LogFormClient({
             </div>
           )}
           <Row label="Dose (g)">
-            <NumberInput name="doseG" value={doseG} onChange={setDoseG} placeholder="18" step="0.1" min="5" max="30" />
+            <NumberInput name="doseG" value={doseG} onChange={setDoseG} placeholder="18" min="5" max="30" />
           </Row>
           <Row label={isFailed ? "Yield (g)" : "Yield (g)"}>
-            <NumberInput name="yieldG" value={yieldG} onChange={setYieldG} placeholder={isFailed ? "—" : "36"} step="0.1" min="0" max="100" />
+            <NumberInput name="yieldG" value={yieldG} onChange={setYieldG} placeholder={isFailed ? "—" : "36"} min="0" max="100" />
           </Row>
           <Row label="Shot Time (s)">
-            <NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder={isFailed ? "—" : "28"} step="1" min="0" max="120" />
+            <NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder={isFailed ? "—" : "28"} integer min="0" max="120" />
           </Row>
           <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass || adjustedDoseG)}>
-            <NumberInput name="lagG" value={lagG} onChange={setLagG} placeholder="—" step="0.5" min="0" />
+            <NumberInput name="lagG" value={lagG} onChange={setLagG} placeholder="—" min="0" />
           </Row>
 
           {/* Live preview */}
@@ -386,16 +444,16 @@ export default function LogFormClient({
           )}
 
           <Row label="Grind Setting">
-            <NumberInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} placeholder="—" step="0.5" min="0" />
+            <NumberInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} placeholder="—" min="0" />
           </Row>
           <Row label="Pre-infusion (s)">
-            <NumberInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} placeholder="—" step="1" min="0" />
+            <NumberInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} placeholder="—" integer min="0" />
           </Row>
           <Row label="Spring Weight (lbs)">
-            <NumberInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} placeholder="—" step="1" min="0" />
+            <NumberInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} placeholder="—" integer min="0" />
           </Row>
           <Row label="Retention (g)">
-            <NumberInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} placeholder="—" step="0.1" min="0" />
+            <StepperInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} step={0.1} min={0} max={5} />
           </Row>
           <div
             className="flex items-center px-6 min-h-[52px]"
@@ -633,7 +691,7 @@ export default function LogFormClient({
               {/* Milk (ml) */}
               <div className="flex items-center px-6 min-h-[52px]">
                 <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Milk (ml)</span>
-                <NumberInput name="milkQuantityMl" value={milkQuantityMl} onChange={setMilkQuantityMl} placeholder="—" step="10" min="0" />
+                <NumberInput name="milkQuantityMl" value={milkQuantityMl} onChange={setMilkQuantityMl} placeholder="—" min="0" />
               </div>
 
               {/* Milk Type (only when milk > 0) */}
@@ -658,13 +716,13 @@ export default function LogFormClient({
               {/* Foam (ml) */}
               <div className="row-divider-t flex items-center px-6 min-h-[52px]">
                 <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Foam (ml)</span>
-                <NumberInput name="_foamMl" value={foamMl} onChange={setFoamMl} placeholder="—" step="10" min="0" />
+                <NumberInput name="_foamMl" value={foamMl} onChange={setFoamMl} placeholder="—" min="0" />
               </div>
 
               {/* Hot Water (ml) */}
               <div className="row-divider-t flex items-center px-6 min-h-[52px]">
                 <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Hot Water (ml)</span>
-                <NumberInput name="_hotWaterMl" value={hotWaterMl} onChange={setHotWaterMl} placeholder="—" step="10" min="0" />
+                <NumberInput name="_hotWaterMl" value={hotWaterMl} onChange={setHotWaterMl} placeholder="—" min="0" />
               </div>
 
               {/* Chocolate toggle */}
