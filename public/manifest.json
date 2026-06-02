@@ -1,6 +1,6 @@
 {
-  "name": "CupLog",
-  "short_name": "CupLog",
+  "name": "Yield",
+  "short_name": "Yield",
   "description": "Espresso shot and bean bag tracker",
   "start_url": "/",
   "display": "standalone",

@@ -72,7 +72,7 @@ function isUrl(text: string): boolean {
 
 async function fetchPageText(url: string): Promise<string> {
   const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; CupLog/1.0)" },
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; Yield/1.0)" },
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`Failed to fetch URL (${res.status})`);

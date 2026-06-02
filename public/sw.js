@@ -1,4 +1,4 @@
-const CACHE_NAME = "cuplog-shell-v1";
+const CACHE_NAME = "yield-shell-v1";
 const SHELL_URLS = ["/", "/log", "/bags", "/history", "/more"];
 
 self.addEventListener("install", (event) => {

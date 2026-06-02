@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type Theme = "light" | "auto" | "dark";
 
-const STORAGE_KEY = "cuplog-theme";
+const STORAGE_KEY = "yield-theme";
 
 function applyTheme(theme: Theme) {
   if (theme === "auto") {

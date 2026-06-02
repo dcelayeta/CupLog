@@ -157,7 +157,7 @@ export default async function HomePage() {
   return (
     <div className="pt-6 pb-24 px-4">
       <h1 className="text-[34px] font-display mb-1" style={{ color: "var(--text-primary)" }}>
-        CupLog
+        Yield
       </h1>
       <p className="text-[15px] mb-6" style={{ color: "var(--text-secondary)" }}>
         {totalShots === 0
