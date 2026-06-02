@@ -1,4 +1,4 @@
-# CupLog
+# Yield
 
 Personal espresso shot logging and bean inventory PWA for home baristas. Tracks bean bags, espresso pulls, and finished drinks with automatic drink detection, bean freshness windows, and AI-powered shot analysis.
 
@@ -12,7 +12,7 @@ Personal espresso shot logging and bean inventory PWA for home baristas. Tracks 
 | Database | libSQL / SQLite locally → Turso in production |
 | ORM | Drizzle ORM |
 | Styling | Tailwind CSS v4 |
-| Hosting | Vercel (planned) |
+| Hosting | Vercel |
 | AI | Anthropic Claude API (`@anthropic-ai/sdk`) |
 | Language | TypeScript |
 
@@ -24,13 +24,19 @@ Personal espresso shot logging and bean inventory PWA for home baristas. Tracks 
 npm install
 
 # create .env.local:
-# TURSO_DATABASE_URL=file:local.db
+# TURSO_DATABASE_URL=libsql://...
 # TURSO_AUTH_TOKEN=
 # ANTHROPIC_API_KEY=sk-ant-...
 
-npx drizzle-kit push    # apply schema to local SQLite
-npx tsx src/db/seed.ts  # optional: load seed data
+npx drizzle-kit push    # apply schema to Turso dev DB
 npm run dev
+```
+
+To sync production data to your dev database:
+
+```bash
+# also requires .env.production.local with prod TURSO_DATABASE_URL / TURSO_AUTH_TOKEN
+npx tsx scripts/sync-prod-to-dev.ts
 ```
 
 ---
@@ -48,7 +54,7 @@ npm run dev
 
 | Route | Description |
 |---|---|
-| `/more/stats` | Rating histograms, scatter plots, trend charts |
+| `/more/stats` | Rating histograms, scatter plots, trend charts, bean stats |
 | `/more/drinks` | Standalone drink history |
 | `/more/recipes` | Static espresso drink reference |
 | `/more/equipment` | Equipment profile + cleaning tracking |
@@ -62,13 +68,14 @@ npm run dev
 ### Infrastructure
 - [x] Next.js App Router with TypeScript and Tailwind CSS v4
 - [x] Drizzle ORM with libSQL (local SQLite) and Turso (production) support
-- [x] Full database schema — 8 tables
-- [x] Seed data: 3 bags, equipment profile, extraction thresholds
+- [x] Full database schema — 10 tables
 - [x] PWA configuration — `manifest.json`, service worker, iOS meta tags, home screen icons
-- [x] iOS-native design system: CSS tokens, light + dark mode, typography scale, spacing
+- [x] iOS-native design system: CSS tokens, light + dark + auto theme, typography scale, spacing
+- [x] Theme stored in `localStorage` with inline script to apply before first paint (no flash)
 - [x] 480px max-width centered column — app stays phone-width on wide monitors
 - [x] Fixed bottom tab bar with safe-area insets
 - [x] Fixed-position save buttons constrained to the 480px column (`.fixed-col`)
+- [x] Prod → dev database sync script (`scripts/sync-prod-to-dev.ts`)
 
 ### Home Page
 - [x] All-time averages grid: rating, taste balance, dose, yield, time, ratio
@@ -86,6 +93,7 @@ npm run dev
 - [x] Duplicate bag detection — Replace / Add as new / Cancel modal
 - [x] AI bag entry — paste bag label text, Claude extracts structured fields
 - [x] "New bag of same coffee" shortcut on bag detail
+- [x] Per-bag shot analysis charts — Grind vs Taste scatter, Rating Trend, Extraction Ratio bar (server-side SVG)
 
 ### Shots (Log + History)
 - [x] Log form — bag selector, dose, yield, shot time, lag (g), grind setting, pre-infusion, spring weight, WDT toggle, grinder retention
@@ -94,20 +102,41 @@ npm run dev
 - [x] Live adjusted dose display (`dose − retention`) and "stopped at Xg" lag helper
 - [x] Taste section: sour↔bitter spectrum (1=Very Sour · 4=Balanced · 7=Very Bitter) + 5-star shot rating
 - [x] Drink section: milk type/quantity, foam, hot water, live drink detection badge
+- [x] Pressure and temperature stored as schema defaults (9 bar, 93°C) — not shown in UI
 - [x] Shot history — filters: bag chips, text search, date range, time/ratio classification chips
+- [x] Per-shot freshness label uses the bag's own peak window (not global defaults)
 - [x] Archived bag label (`[Archived]`) on shots from removed bags
 - [x] Shot detail — all fields, classifications, freshness badge, taste display, drink composition bar
 - [x] Edit shot (including drink), delete shot (confirm step)
 - [x] AI shot analysis — structured coaching response; verdict badge; cached in DB; never re-calls API on return visits
 
 ### More → Stats
+
+**Shots section**
 - [x] Rating distribution histogram (colored bars 1★–5★)
 - [x] Taste balance distribution histogram (7 buckets, sour→bitter)
+- [x] Flow rate distribution histogram (g/s buckets, color-coded by target range)
 - [x] Ratio vs taste scatter — dots colored by rating; balanced zone highlighted
 - [x] Time vs taste scatter — same format
 - [x] Rating over time trend — dots colored by taste balance; rolling average overlay
-- [x] Roast age vs taste scatter — validates freshness window effectiveness
+- [x] Failed shots section — failure reason horizontal bar chart
+
+**Technique section**
 - [x] Grinder retention trend — connected dots to surface drift/cleaning need
+- [x] Roast age vs taste scatter — validates freshness window effectiveness
+
+**Beans section**
+- [x] Roast level distribution — all 5 levels always shown; unspecified count as footnote
+- [x] Process method distribution — abbreviated labels; unspecified count as footnote
+- [x] Origin by macro region — stacked rating bar (1★–5★) per region (Latin America, East Africa, etc.)
+- [x] Origin — stacked rating bar per region·country
+- [x] Single origin vs blend — stacked rating bar
+- [x] Shots per coffee — stacked rating bar per bag
+
+**Drinks section**
+- [x] Drink types — stacked rating bar (logged drinks only, not inferred from shots)
+- [x] Drink rating over time trend — rolling average overlay
+- [x] Shot vs drink rating bubble chart — diagonal reference line; bubble size = count
 
 ### More → Equipment
 - [x] Multiple equipment profiles, switch active profile
@@ -132,18 +161,20 @@ npm run dev
 
 ---
 
-## Database Schema (8 tables)
+## Database Schema (10 tables)
 
 | Table | Purpose |
 |---|---|
-| `bags` | Bean inventory — roaster, name, roast level, processing method, freshness window |
-| `bag_origins` | Per-bean origin data; supports blends with multiple origins |
+| `bags` | Bean inventory — roaster, name, roast level, processing method, freshness window, blend flag |
+| `bag_origins` | Per-bean origin data (country, region); supports blends with multiple origins |
 | `equipment_profiles` | Machine + grinder config, cleaning intervals, last-cleaned dates |
 | `extraction_thresholds` | DB-driven time/ratio classification ranges |
-| `shots` | Every espresso pull — dose, yield, time, grind, taste, rating, notes |
+| `shots` | Every espresso pull — dose, yield, time, grind, taste, rating, notes; pressure + temp stored as defaults |
 | `drinks` | Drink built on a shot — milk, foam, hot water, detected name, rating |
 | `coaching_state` | Single-row AI coach context — experience level, patterns, bean notes |
 | `shot_analyses` | Cached AI analysis results per shot |
+| `bag_analyses` | Cached AI dial-in analysis per bag |
+| `coffee_faqs` | Static FAQ content |
 
 ---
 
@@ -158,14 +189,16 @@ npm run dev
 - **`lagG` field** — Breville Bambino has no 3-way solenoid valve; 6–8g drip-through after pump stop is normal; stop before target yield and record resting weight
 - **`tasteBalance` single control** — 1=Very Sour · 4=Balanced · 7=Very Bitter. Individual taste columns (acidity, sweetness, bitterness, body, aroma) remain in the schema but are unused in the UI
 - **AI analysis caching** — results stored in `shot_analyses`; return visits never trigger an API call. Only *recent* shots (within 48h) update `coaching_state`
-- **SVG server components for charts** — all stat charts render server-side as inline SVG; no charting library
+- **SVG server components for charts** — all stat charts and per-bag charts render server-side as inline SVG; no charting library
+- **Extraction ratio ≠ extraction quality** — `yield_g / dose_g` is brew ratio (ristretto/normale/lungo style), not EY%. True extraction yield requires TDS measurement (refractometer). Charts label by rating instead of over/under extracted
+- **Macro region mapping** — country → macro region (Latin America, East Africa, etc.) is a static JS lookup; not stored in DB
 
 ---
 
 ## Deployment Checklist
 
-- [ ] Create Turso database
-- [ ] Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in Vercel environment
-- [ ] Set `ANTHROPIC_API_KEY` in Vercel environment
-- [ ] Run `npx drizzle-kit push` against Turso to apply schema
-- [ ] Deploy to Vercel
+- [x] Turso database created (prod: `cuplog`, dev: `cuplog-dev`)
+- [x] `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` set in Vercel environment
+- [x] `ANTHROPIC_API_KEY` set in Vercel environment
+- [x] Schema applied via `npx drizzle-kit push`
+- [x] Deployed to Vercel
