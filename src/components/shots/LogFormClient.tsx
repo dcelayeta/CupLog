@@ -147,10 +147,10 @@ function StepperInput({
     onChange(next.toFixed(decimals));
   };
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <input type="hidden" name={name} value={value} />
       <button type="button" onPointerDown={() => adjust(-step)}
-        className="w-8 h-8 rounded-full flex items-center justify-center text-[22px] font-light select-none"
+        className="w-7 h-7 rounded-full flex items-center justify-center text-[20px] font-light select-none"
         style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}>
         −
       </button>
@@ -159,11 +159,11 @@ function StepperInput({
         inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="text-center outline-none bg-transparent text-[17px] w-[48px]"
+        className="text-center outline-none bg-transparent text-[17px] w-[44px]"
         style={{ color: "var(--text-primary)" }}
       />
       <button type="button" onPointerDown={() => adjust(step)}
-        className="w-8 h-8 rounded-full flex items-center justify-center text-[22px] font-light select-none"
+        className="w-7 h-7 rounded-full flex items-center justify-center text-[20px] font-light select-none"
         style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}>
         +
       </button>
