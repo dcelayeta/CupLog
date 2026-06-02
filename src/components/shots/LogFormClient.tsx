@@ -405,10 +405,10 @@ export default function LogFormClient({
             </div>
           )}
           <Row label="Dose (g)">
-            <NumberInput name="doseG" value={doseG} onChange={setDoseG} placeholder="18" min="5" max="30" />
+            <StepperInput name="doseG" value={doseG} onChange={setDoseG} step={0.1} min={0} max={30} />
           </Row>
-          <Row label={isFailed ? "Yield (g)" : "Yield (g)"}>
-            <NumberInput name="yieldG" value={yieldG} onChange={setYieldG} placeholder={isFailed ? "—" : "36"} min="0" max="100" />
+          <Row label="Yield (g)">
+            <StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} />
           </Row>
           <Row label="Shot Time (s)">
             <NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder={isFailed ? "—" : "28"} integer min="0" max="120" />
@@ -444,7 +444,7 @@ export default function LogFormClient({
           )}
 
           <Row label="Grind Setting">
-            <NumberInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} placeholder="—" min="0" />
+            <StepperInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} step={0.5} min={0} max={50} />
           </Row>
           <Row label="Pre-infusion (s)">
             <NumberInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} placeholder="—" integer min="0" />
