@@ -178,6 +178,19 @@ export async function getAverageRetention(limit = 10): Promise<number | null> {
   return val != null ? Math.round(val * 100) / 100 : null;
 }
 
+export async function getAverageDailyDose(lookbackDays = 30): Promise<number | null> {
+  const [row] = await db.all(sql`
+    SELECT
+      SUM(dose_g) as total_dose,
+      CAST(julianday('now') - julianday(MIN(pulled_at)) AS INTEGER) as elapsed_days
+    FROM shots
+    WHERE is_failed = 0
+      AND pulled_at >= datetime('now', ${`-${lookbackDays} days`})
+  `) as { total_dose: number | null; elapsed_days: number | null }[];
+  if (!row?.total_dose || !row?.elapsed_days || row.elapsed_days < 1) return null;
+  return Math.round((row.total_dose / row.elapsed_days) * 10) / 10;
+}
+
 export async function getShotsForHistory(bagId?: number): Promise<ShotRow[]> {
   const conditions = bagId ? [eq(shots.bagId, bagId)] : [];
 

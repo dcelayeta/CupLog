@@ -77,7 +77,13 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigins[] }) {
+export default function PlannerClient({
+  activeBags,
+  dailyDoseG,
+}: {
+  activeBags: BagWithOrigins[];
+  dailyDoseG: number | null;
+}) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -109,11 +115,35 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
     };
   });
 
+  // Per-bag run-out dates (only for bags with weightG set)
+  type RunOut = { id: number; label: string; remainingG: number; runOutDate: Date };
+  const runOuts: RunOut[] = dailyDoseG
+    ? activeBags
+        .filter((bag) => bag.weightG != null)
+        .map((bag) => {
+          const totalWeight = (bag.weightG ?? 0) + (bag.weightCorrectionG ?? 0);
+          const used = bag.totalDoseG ?? 0;
+          const remaining = Math.max(0, totalWeight - used);
+          const daysLeft = remaining / dailyDoseG;
+          return {
+            id: bag.id,
+            label: `${bag.roaster} · ${bag.name}`,
+            remainingG: Math.round(remaining),
+            runOutDate: addDays(today, Math.round(daysLeft)),
+          };
+        })
+    : [];
+
   // Timeline window: today-7 to furthest useSoonEnd+14
   const windowStart = addDays(today, -7);
   let windowEnd = addDays(candidate.useSoonEnd, 14);
   for (const bw of bagWindows) {
     const e = addDays(bw.useSoonEnd, 14);
+    if (e > windowEnd) windowEnd = e;
+  }
+
+  for (const ro of runOuts) {
+    const e = addDays(ro.runOutDate, 7);
     if (e > windowEnd) windowEnd = e;
   }
 
@@ -175,7 +205,7 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
 
   const BAR_H = 10;
 
-  function renderBar(w: ReturnType<typeof buildWindow>, isCandidate = false) {
+  function renderBar(w: ReturnType<typeof buildWindow>, isCandidate = false, runOutDate?: Date) {
     const segments: { startPct: number; widthPct: number; color: string; opacity: number }[] = [];
     const addSeg = (a: Date, b: Date, color: string, opacity: number) => {
       const s = toPct(a);
@@ -223,6 +253,21 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
             zIndex: 10,
           }}
         />
+        {/* Run-out marker */}
+        {runOutDate && toPct(runOutDate) > 0 && toPct(runOutDate) < 100 && (
+          <div
+            className="absolute"
+            style={{
+              left: `${toPct(runOutDate)}%`,
+              top: -4,
+              bottom: -4,
+              width: 2,
+              backgroundColor: "var(--destructive)",
+              opacity: 0.75,
+              zIndex: 11,
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -440,14 +485,22 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
         </div>
 
         {/* Active bag rows */}
-        {bagWindows.map((bw) => (
-          <div key={bw.id} className="mb-3">
-            <p className="text-[11px] mb-1.5 truncate" style={{ color: "var(--text-secondary)" }}>
-              {bw.label}
-            </p>
-            {renderBar(bw)}
-          </div>
-        ))}
+        {bagWindows.map((bw) => {
+          const ro = runOuts.find((r) => r.id === bw.id);
+          return (
+            <div key={bw.id} className="mb-3">
+              <p className="text-[11px] mb-1.5 truncate" style={{ color: "var(--text-secondary)" }}>
+                {bw.label}
+                {ro && (
+                  <span style={{ color: "var(--destructive)", opacity: 0.75 }}>
+                    {" · "}{ro.remainingG}g left · runs out {fmtShort(ro.runOutDate)}
+                  </span>
+                )}
+              </p>
+              {renderBar(bw, false, ro?.runOutDate)}
+            </div>
+          );
+        })}
 
         {/* Separator before candidate */}
         <div style={{ borderTop: "1px dashed var(--card-secondary)", marginTop: 4, marginBottom: 10 }} />
@@ -480,7 +533,7 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
         </div>
 
         {/* Legend */}
-        <div className="flex gap-4 mt-4">
+        <div className="flex gap-4 mt-4 flex-wrap">
           {[
             { color: "#30D158", label: "Peak" },
             { color: "#FF9500", label: "Use soon" },
@@ -491,6 +544,12 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
               <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{item.label}</span>
             </div>
           ))}
+          {runOuts.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-0.5 h-3 flex-shrink-0" style={{ backgroundColor: "var(--destructive)", opacity: 0.75 }} />
+              <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>Runs out</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -514,6 +573,41 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
           </span>
           <span className="text-[15px]" style={{ color: ready.color }}>{ready.text}</span>
         </div>
+
+        {/* Consumption rate */}
+        {dailyDoseG && (
+          <div className="flex items-center px-6 min-h-[52px] row-divider">
+            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Avg. daily dose</span>
+            <span className="text-[15px]" style={{ color: "var(--text-secondary)" }}>{dailyDoseG}g / day</span>
+          </div>
+        )}
+
+        {/* Per-bag run-out rows */}
+        {runOuts.map((ro, i) => {
+          const daysUntilRunOut = daysBetween(today, ro.runOutDate);
+          const runsOutBeforePeak = ro.runOutDate < candidate.peakStart;
+          const daysShort = runsOutBeforePeak ? daysBetween(ro.runOutDate, candidate.peakStart) : 0;
+          return (
+            <div key={i} className="row-divider">
+              <div className="flex items-center px-6 min-h-[52px]">
+                <span className="text-[15px] flex-1 truncate pr-4" style={{ color: "var(--text-secondary)" }}>
+                  Runs out · {ro.label}
+                </span>
+                <span
+                  className="text-[15px] flex-shrink-0"
+                  style={{ color: runsOutBeforePeak ? "var(--destructive)" : "var(--text-secondary)" }}
+                >
+                  {fmtShort(ro.runOutDate)} ({daysUntilRunOut}d)
+                </span>
+              </div>
+              {runsOutBeforePeak && (
+                <p className="px-6 pb-3 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                  Runs out {daysShort} day{daysShort !== 1 ? "s" : ""} before the candidate peaks — consider an earlier roast date or a bridge bag.
+                </p>
+              )}
+            </div>
+          );
+        })}
 
         {/* Per-bag overlap rows */}
         {bagOverlaps.map((b, i) => (
@@ -550,6 +644,15 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
           <div className="px-6 py-4">
             <p className="text-[15px]" style={{ color: "var(--text-secondary)" }}>
               No active bags to compare against.
+            </p>
+          </div>
+        )}
+
+        {/* Prompt to fill in weight for bags missing it */}
+        {dailyDoseG && bagWindows.length > 0 && activeBags.some((b) => b.weightG == null) && (
+          <div className="px-6 pb-4">
+            <p className="text-[13px]" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
+              Add bag weight in the bag edit form to see run-out estimates for bags missing it.
             </p>
           </div>
         )}
