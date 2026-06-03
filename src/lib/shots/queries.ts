@@ -178,17 +178,23 @@ export async function getAverageRetention(limit = 10): Promise<number | null> {
   return val != null ? Math.round(val * 100) / 100 : null;
 }
 
-export async function getAverageDailyDose(lookbackDays = 30): Promise<number | null> {
-  const [row] = await db.all(sql`
+export async function getPerBagDailyDose(bagIds: number[]): Promise<Record<number, number>> {
+  if (bagIds.length === 0) return {};
+  const idList = sql.join(bagIds.map((id) => sql`${id}`), sql`, `);
+  const rows = await db.all(sql`
     SELECT
-      SUM(dose_g) as total_dose,
-      CAST(julianday('now') - julianday(MIN(pulled_at)) AS INTEGER) as elapsed_days
+      bag_id,
+      SUM(dose_g) AS total_dose,
+      MAX(1, CAST(julianday('now') - julianday(MIN(pulled_at)) AS INTEGER)) AS days_active
     FROM shots
     WHERE is_failed = 0
-      AND pulled_at >= datetime('now', ${`-${lookbackDays} days`})
-  `) as { total_dose: number | null; elapsed_days: number | null }[];
-  if (!row?.total_dose || !row?.elapsed_days || row.elapsed_days < 1) return null;
-  return Math.round((row.total_dose / row.elapsed_days) * 10) / 10;
+      AND bag_id IN (${idList})
+      AND pulled_at >= datetime('now', '-60 days')
+    GROUP BY bag_id
+  `) as { bag_id: number; total_dose: number; days_active: number }[];
+  return Object.fromEntries(
+    rows.map((r) => [r.bag_id, Math.round((r.total_dose / r.days_active) * 10) / 10])
+  );
 }
 
 export async function getShotsForHistory(bagId?: number): Promise<ShotRow[]> {

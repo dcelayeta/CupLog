@@ -79,10 +79,10 @@ function SectionHeader({ title }: { title: string }) {
 
 export default function PlannerClient({
   activeBags,
-  dailyDoseG,
+  perBagDailyDose,
 }: {
   activeBags: BagWithOrigins[];
-  dailyDoseG: number | null;
+  perBagDailyDose: Record<number, number>;
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -115,24 +115,29 @@ export default function PlannerClient({
     };
   });
 
-  // Per-bag run-out dates (only for bags with weightG set)
-  type RunOut = { id: number; label: string; remainingG: number; runOutDate: Date };
-  const runOuts: RunOut[] = dailyDoseG
-    ? activeBags
-        .filter((bag) => bag.weightG != null)
-        .map((bag) => {
-          const totalWeight = (bag.weightG ?? 0) + (bag.weightCorrectionG ?? 0);
-          const used = bag.totalDoseG ?? 0;
-          const remaining = Math.max(0, totalWeight - used);
-          const daysLeft = remaining / dailyDoseG;
-          return {
-            id: bag.id,
-            label: `${bag.roaster} · ${bag.name}`,
-            remainingG: Math.round(remaining),
-            runOutDate: addDays(today, Math.round(daysLeft)),
-          };
-        })
-    : [];
+  // Per-bag run-out dates using each bag's own shot rate
+  type RunOut = { id: number; label: string; remainingG: number; dailyG: number; runOutDate: Date };
+  const runOuts: RunOut[] = activeBags
+    .filter((bag) => bag.weightG != null && perBagDailyDose[bag.id] != null)
+    .map((bag) => {
+      const totalWeight = (bag.weightG ?? 0) + (bag.weightCorrectionG ?? 0);
+      const used = bag.totalDoseG ?? 0;
+      const remaining = Math.max(0, totalWeight - used);
+      const dailyG = perBagDailyDose[bag.id];
+      const daysLeft = dailyG > 0 ? remaining / dailyG : Infinity;
+      return {
+        id: bag.id,
+        label: `${bag.roaster} · ${bag.name}`,
+        remainingG: Math.round(remaining),
+        dailyG,
+        runOutDate: addDays(today, Math.round(daysLeft)),
+      };
+    });
+
+  const totalDailyDoseG =
+    Object.values(perBagDailyDose).length > 0
+      ? Math.round(Object.values(perBagDailyDose).reduce((a, b) => a + b, 0) * 10) / 10
+      : null;
 
   // Timeline window: today-7 to furthest useSoonEnd+14
   const windowStart = addDays(today, -7);
@@ -575,10 +580,10 @@ export default function PlannerClient({
         </div>
 
         {/* Consumption rate */}
-        {dailyDoseG && (
+        {totalDailyDoseG && (
           <div className="flex items-center px-6 min-h-[52px] row-divider">
-            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Avg. daily dose</span>
-            <span className="text-[15px]" style={{ color: "var(--text-secondary)" }}>{dailyDoseG}g / day</span>
+            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Total daily dose</span>
+            <span className="text-[15px]" style={{ color: "var(--text-secondary)" }}>{totalDailyDoseG}g / day</span>
           </div>
         )}
 
@@ -600,11 +605,10 @@ export default function PlannerClient({
                   {fmtShort(ro.runOutDate)} ({daysUntilRunOut}d)
                 </span>
               </div>
-              {runsOutBeforePeak && (
-                <p className="px-6 pb-3 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                  Runs out {daysShort} day{daysShort !== 1 ? "s" : ""} before the candidate peaks — consider an earlier roast date or a bridge bag.
-                </p>
-              )}
+              <p className="px-6 pb-3 text-[13px]" style={{ color: "var(--text-secondary)", opacity: 0.7 }}>
+                {ro.remainingG}g remaining at {ro.dailyG}g/day from this bag
+                {runsOutBeforePeak && ` — runs out ${daysShort} day${daysShort !== 1 ? "s" : ""} before the candidate peaks`}
+              </p>
             </div>
           );
         })}
@@ -649,7 +653,7 @@ export default function PlannerClient({
         )}
 
         {/* Prompt to fill in weight for bags missing it */}
-        {dailyDoseG && bagWindows.length > 0 && activeBags.some((b) => b.weightG == null) && (
+        {bagWindows.length > 0 && activeBags.some((b) => b.weightG == null) && (
           <div className="px-6 pb-4">
             <p className="text-[13px]" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
               Add bag weight in the bag edit form to see run-out estimates for bags missing it.
