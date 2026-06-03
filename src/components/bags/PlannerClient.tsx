@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { estimatePeakWindow } from "@/lib/bags/freshness";
+import { estimatePeakWindow, describePeakWindow } from "@/lib/bags/freshness";
 import type { RoastLevel, ProcessingMethod } from "@/lib/bags/freshness";
 import type { BagWithOrigins } from "@/lib/bags/queries";
 
@@ -553,6 +553,13 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
             </p>
           </div>
         )}
+
+        {/* Freshness explanation */}
+        <div className="px-6 py-4 row-divider-t">
+          <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+            {describePeakWindow(roastLevel, processingMethod, effectiveIsDecaf, peakStartDay, peakEndDay)}
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import FreshnessIndicator from "@/components/bags/FreshnessIndicator";
 import BagActions from "@/components/bags/BagActions";
 import BagAnalysisClient from "@/components/bags/BagAnalysisClient";
 import BagDialInClient from "@/components/bags/BagDialInClient";
-import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
+import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS, describePeakWindow } from "@/lib/bags/freshness";
 import BagShotCharts from "@/components/bags/BagShotCharts";
 
 const ROAST_LABELS: Record<string, string> = {
@@ -60,57 +60,6 @@ function Divider() {
   );
 }
 
-function describePeakWindow(
-  roastLevel: string,
-  processingMethod: string,
-  isDecaf: boolean,
-  peakStartDay: number,
-  peakEndDay: number
-): string {
-  const windowDays = peakEndDay - peakStartDay;
-
-  // Decaf path
-  if (isDecaf || processingMethod === "ea_washed" || processingMethod === "swiss_water") {
-    const name =
-      processingMethod === "ea_washed" ? "EA Washed" :
-      processingMethod === "swiss_water" ? "Swiss Water Process" :
-      "Decaffeinated";
-    return `Auto-estimated. ${name} coffee degasses faster than regular beans — the decaffeination process opens the bean structure, reducing CO₂ content and accelerating flavor development. Peak freshness starts around day ${peakStartDay} and holds through day ${peakEndDay} (${windowDays} day window).`;
-  }
-
-  // Roast-level baselines (before any processing adjustment)
-  const bases: Record<string, { start: number; end: number; intro: string }> = {
-    light:        { start: 14, end: 42, intro: "Light roasts need significantly more rest — the dense cell structure degasses slowly" },
-    medium_light: { start: 10, end: 38, intro: "Medium-light roasts benefit from a longer rest than medium before reaching peak flavor" },
-    medium:       { start:  7, end: 35, intro: "Medium roasts follow typical degassing curves" },
-    medium_dark:  { start:  5, end: 28, intro: "Medium-dark roasts degas faster due to higher roast temperatures" },
-    dark:         { start:  3, end: 21, intro: "Dark roasts degas very quickly — high temperatures break down cell structure and release CO₂ rapidly" },
-  };
-  const base = bases[roastLevel] ?? null;
-
-  // Processing adjustments
-  const adjustments: Partial<Record<string, { days: number; reason: string }>> = {
-    natural:   { days: 4, reason: "fermentation compounds and higher mucilage content require more degassing time" },
-    anaerobic: { days: 4, reason: "intense fermentation produces more CO₂ and requires additional degassing time" },
-    honey:     { days: 2, reason: "partial mucilage retention means slightly more degassing time than washed" },
-  };
-  const adj = adjustments[processingMethod] ?? null;
-
-  // Unspecified roast level
-  if (!base) {
-    if (adj) {
-      return `Auto-estimated. Roast level not specified, medium defaults applied — baseline peak from day 7–35. The ${processingMethod.replace("_", " ")} process adds ~${adj.days} days — ${adj.reason} — shifting the window to days ${peakStartDay}–${peakEndDay}.`;
-    }
-    return `Auto-estimated. Roast level not specified, medium defaults applied — peak freshness estimated days ${peakStartDay}–${peakEndDay} after roasting (${windowDays} day window).`;
-  }
-
-  if (adj) {
-    const baseWindowDays = base.end - base.start;
-    return `Auto-estimated. ${base.intro}, with a baseline peak from day ${base.start}–${base.end} (${baseWindowDays} days). The ${processingMethod.replace("_", " ")} process adds ~${adj.days} days — ${adj.reason} — shifting the window to days ${peakStartDay}–${peakEndDay}.`;
-  }
-
-  return `Auto-estimated. ${base.intro} — peak freshness from day ${peakStartDay}–${peakEndDay} after roasting, a ${windowDays} day window.`;
-}
 
 function FreshnessTimeline({
   peakStartDay,
