@@ -134,19 +134,49 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
 
   const todayPct = toPct(today);
 
-  // Analysis
+  // ── Analysis ────────────────────────────────────────────────────────────────
+
   const daysUntilPeak = daysBetween(today, candidate.peakStart);
   const daysPastPeak = daysBetween(candidate.peakEnd, today);
+
+  // Latest peak end and use-soon end across all active bags
   const latestBagPeakEnd = bagWindows.reduce<Date | null>(
     (acc, bw) => (acc === null || bw.peakEnd > acc ? bw.peakEnd : acc),
     null
   );
+  const latestBagUseSoonEnd = bagWindows.reduce<Date | null>(
+    (acc, bw) => (acc === null || bw.useSoonEnd > acc ? bw.useSoonEnd : acc),
+    null
+  );
+
+  // Gap between latest peak end and candidate peak start (negative = overlap)
   const gapDays = latestBagPeakEnd ? daysBetween(latestBagPeakEnd, candidate.peakStart) : null;
 
-  function renderBar(w: ReturnType<typeof buildWindow>, isCandidate = false) {
-    const BAR_H = 10;
-    const segments: { startPct: number; widthPct: number; color: string; opacity: number }[] = [];
+  // Days of true dead zone: after even use-soon ends before candidate peaks
+  const deadZoneDays =
+    latestBagUseSoonEnd && gapDays !== null && gapDays > 0
+      ? Math.max(0, daysBetween(latestBagUseSoonEnd, candidate.peakStart))
+      : 0;
 
+  // Per-bag peak overlap with candidate
+  const bagOverlaps = bagWindows
+    .map((bw) => {
+      const overlapStart = Math.max(bw.peakStart.getTime(), candidate.peakStart.getTime());
+      const overlapEnd = Math.min(bw.peakEnd.getTime(), candidate.peakEnd.getTime());
+      const days = Math.max(0, Math.round((overlapEnd - overlapStart) / 86400000));
+      return { label: bw.label, days };
+    })
+    .filter((b) => b.days > 0);
+
+  // Total days where candidate peak overlaps with at least one active bag's peak
+  const simultaneousPeakDays = Math.max(0, gapDays !== null ? -gapDays : 0);
+
+  // ── Render helpers ───────────────────────────────────────────────────────────
+
+  const BAR_H = 10;
+
+  function renderBar(w: ReturnType<typeof buildWindow>, isCandidate = false) {
+    const segments: { startPct: number; widthPct: number; color: string; opacity: number }[] = [];
     const addSeg = (a: Date, b: Date, color: string, opacity: number) => {
       const s = toPct(a);
       const e = toPct(b);
@@ -181,7 +211,6 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
             }}
           />
         ))}
-        {/* Today marker */}
         <div
           className="absolute"
           style={{
@@ -198,24 +227,134 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
     );
   }
 
+  // Candidate bar with date tick marks below
+  function renderCandidateBar() {
+    const peakStartPct = toPct(candidate.peakStart);
+    const peakEndPct = toPct(candidate.peakEnd);
+
+    // Clamp label anchor so text doesn't overflow the container
+    const clampLabelPct = (pct: number) => Math.max(5, Math.min(95, pct));
+
+    return (
+      <div className="relative" style={{ height: BAR_H + 20 }}>
+        {/* Bar */}
+        <div className="absolute inset-x-0 top-0">
+          {renderBar(candidate, true)}
+        </div>
+        {/* Tick + date for peak start */}
+        <div
+          className="absolute"
+          style={{ left: `${peakStartPct}%`, top: BAR_H + 1, bottom: 0, width: 1, backgroundColor: "#30D158", opacity: 0.5 }}
+        />
+        <span
+          className="absolute text-[10px] font-medium whitespace-nowrap"
+          style={{
+            left: `${clampLabelPct(peakStartPct)}%`,
+            top: BAR_H + 4,
+            transform: "translateX(-50%)",
+            color: "#30D158",
+            opacity: 0.85,
+          }}
+        >
+          {fmtShort(candidate.peakStart)}
+        </span>
+        {/* Tick + date for peak end */}
+        <div
+          className="absolute"
+          style={{ left: `${peakEndPct}%`, top: BAR_H + 1, bottom: 0, width: 1, backgroundColor: "#FF9500", opacity: 0.5 }}
+        />
+        <span
+          className="absolute text-[10px] font-medium whitespace-nowrap"
+          style={{
+            left: `${clampLabelPct(peakEndPct)}%`,
+            top: BAR_H + 4,
+            transform: "translateX(-50%)",
+            color: "#FF9500",
+            opacity: 0.85,
+          }}
+        >
+          {fmtShort(candidate.peakEnd)}
+        </span>
+      </div>
+    );
+  }
+
   const readyText = () => {
     if (daysPastPeak >= 0) return { text: "Past peak", color: "var(--destructive)" };
     if (daysUntilPeak <= 0) return { text: "In peak window now", color: "var(--success)" };
     return { text: `${daysUntilPeak} day${daysUntilPeak !== 1 ? "s" : ""}`, color: "var(--text-secondary)" };
   };
 
-  const gapMessage = () => {
+  type Verdict = { icon: string; color: string; headline: string; detail: string | null; warning: string | null };
+
+  const buildVerdict = (): Verdict | null => {
     if (gapDays === null || bagWindows.length === 0) return null;
-    if (gapDays < 0)
-      return { icon: "✓", color: "#30D158", text: `${Math.abs(gapDays)}-day overlap with current bags — good coverage.` };
-    if (gapDays === 0)
-      return { icon: "✓", color: "#30D158", text: "Seamless handoff from current bags." };
-    if (gapDays <= 7)
-      return { icon: "⚑", color: "#FF9500", text: `${gapDays}-day gap after current bags' peak — brief but manageable.` };
-    return { icon: "✕", color: "#FF3B30", text: `${gapDays}-day gap after current bags' peak — consider an earlier roast date.` };
+
+    if (gapDays > 21) {
+      return {
+        icon: "✕",
+        color: "#FF3B30",
+        headline: `${gapDays}-day gap after current bags' peak.`,
+        detail: deadZoneDays > 0
+          ? `Even using the "use soon" window, you'll have ${deadZoneDays} days with no fresh coffee. Consider buying a bag with an earlier roast date.`
+          : `Your current bags' "use soon" window partially covers the gap, but consider buying sooner.`,
+        warning: null,
+      };
+    }
+
+    if (gapDays > 7) {
+      return {
+        icon: "⚑",
+        color: "#FF9500",
+        headline: `${gapDays}-day gap after current bags' peak.`,
+        detail: deadZoneDays > 0
+          ? `${deadZoneDays} days with no fresh coffee after the use-soon window ends. Ordering slightly sooner would close this.`
+          : `Bridged by the use-soon window — acceptable, but not ideal.`,
+        warning: null,
+      };
+    }
+
+    if (gapDays >= -6) {
+      const isSeamless = gapDays === 0;
+      const hasGap = gapDays > 0;
+      return {
+        icon: "✓",
+        color: "#30D158",
+        headline: isSeamless
+          ? "Seamless handoff from current bags."
+          : hasGap
+          ? `${gapDays}-day gap — use-soon window will bridge it.`
+          : `${Math.abs(gapDays)}-day overlap — smooth transition.`,
+        detail: hasGap
+          ? null
+          : gapDays < 0
+          ? `From ${fmtShort(candidate.peakStart)} to ${fmtShort(new Date(Math.min(...bagWindows.map(b => b.peakEnd.getTime()))))}, you'll have ${bagOverlaps.length > 1 ? "multiple bags" : "two bags"} in peak simultaneously. Stick to one primarily to minimize retention waste.`
+          : null,
+        warning: null,
+      };
+    }
+
+    if (gapDays >= -21) {
+      return {
+        icon: "⚑",
+        color: "#FF9500",
+        headline: `${simultaneousPeakDays}-day overlap — ${bagOverlaps.length > 1 ? "multiple bags" : "two bags"} in peak at the same time.`,
+        detail: `You'll be dividing use between bags during the overlap. Each switch between bags wastes 7–8g to purge grinder retention — commit to one as your primary and only switch occasionally.`,
+        warning: null,
+      };
+    }
+
+    // > 21 days of overlap
+    return {
+      icon: "✕",
+      color: "#FF3B30",
+      headline: `${simultaneousPeakDays}-day overlap — too many peak bags at once.`,
+      detail: `With ${bagOverlaps.length + 1} bags in peak simultaneously for this long, you risk coffee going stale before you can use it. Each grinder switch wastes 7–8g of retained coffee. Consider waiting for a later roast date or finishing current bags first.`,
+      warning: null,
+    };
   };
 
-  const msg = gapMessage();
+  const verdict = buildVerdict();
   const ready = readyText();
 
   return (
@@ -284,7 +423,7 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
         className="mx-4 rounded-2xl px-4 pt-3 pb-4"
         style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
       >
-        {/* Today label row */}
+        {/* Today label */}
         <div className="relative" style={{ height: 14, marginBottom: 10 }}>
           <span
             className="absolute text-[10px] font-medium whitespace-nowrap"
@@ -310,19 +449,19 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
           </div>
         ))}
 
-        {/* Separator */}
+        {/* Separator before candidate */}
         <div style={{ borderTop: "1px dashed var(--card-secondary)", marginTop: 4, marginBottom: 10 }} />
 
-        {/* Candidate row */}
-        <div className="mb-3">
+        {/* Candidate row with date labels */}
+        <div className="mb-1">
           <p className="text-[11px] font-semibold mb-1.5" style={{ color: "var(--accent)" }}>
             Candidate · {ROAST_LEVELS.find((l) => l.value === roastLevel)?.label} · {PROCESSING_METHODS.find((m) => m.value === processingMethod)?.label}
           </p>
-          {renderBar(candidate, true)}
+          {renderCandidateBar()}
         </div>
 
         {/* Month axis */}
-        <div className="relative" style={{ height: 14, marginTop: 6 }}>
+        <div className="relative" style={{ height: 14, marginTop: 10 }}>
           {monthMarkers.map((m, i) => (
             <span
               key={i}
@@ -360,27 +499,58 @@ export default function PlannerClient({ activeBags }: { activeBags: BagWithOrigi
         className="mx-4 rounded-2xl overflow-hidden"
         style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
       >
+        {/* Peak window */}
         <div className="flex items-center px-6 min-h-[52px] row-divider">
           <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Peak window</span>
           <span className="text-[15px]" style={{ color: "var(--text-secondary)" }}>
             {fmtShort(candidate.peakStart)} – {fmtShort(candidate.peakEnd)}
           </span>
         </div>
+
+        {/* Ready in / status */}
         <div className="flex items-center px-6 min-h-[52px] row-divider">
           <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>
             {daysUntilPeak > 0 ? "Ready in" : "Status"}
           </span>
           <span className="text-[15px]" style={{ color: ready.color }}>{ready.text}</span>
         </div>
-        {msg && (
-          <div className="flex items-start gap-3 px-6 py-4">
-            <span className="text-[15px] mt-[1px]" style={{ color: msg.color }}>{msg.icon}</span>
-            <p className="text-[15px]" style={{ color: "var(--text-primary)" }}>{msg.text}</p>
+
+        {/* Per-bag overlap rows */}
+        {bagOverlaps.map((b, i) => (
+          <div key={i} className="flex items-center px-6 min-h-[52px] row-divider">
+            <span className="text-[15px] flex-1 truncate pr-4" style={{ color: "var(--text-secondary)" }}>
+              Overlap · {b.label}
+            </span>
+            <span className="text-[15px] flex-shrink-0" style={{ color: "#FF9500" }}>
+              {b.days} day{b.days !== 1 ? "s" : ""}
+            </span>
+          </div>
+        ))}
+
+        {/* Verdict */}
+        {verdict && (
+          <div className="px-6 py-4">
+            <div className="flex items-start gap-2 mb-1">
+              <span className="text-[15px] font-semibold flex-shrink-0" style={{ color: verdict.color }}>
+                {verdict.icon}
+              </span>
+              <p className="text-[15px] font-medium" style={{ color: "var(--text-primary)" }}>
+                {verdict.headline}
+              </p>
+            </div>
+            {verdict.detail && (
+              <p className="text-[13px] mt-1" style={{ color: "var(--text-secondary)", paddingLeft: 20 }}>
+                {verdict.detail}
+              </p>
+            )}
           </div>
         )}
+
         {bagWindows.length === 0 && (
           <div className="px-6 py-4">
-            <p className="text-[15px]" style={{ color: "var(--text-secondary)" }}>No active bags to compare against.</p>
+            <p className="text-[15px]" style={{ color: "var(--text-secondary)" }}>
+              No active bags to compare against.
+            </p>
           </div>
         )}
       </div>
