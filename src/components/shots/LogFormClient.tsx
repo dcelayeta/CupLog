@@ -691,7 +691,7 @@ export default function LogFormClient({
               {/* Milk (ml) */}
               <div className="flex items-center px-6 min-h-[52px]">
                 <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Milk (ml)</span>
-                <NumberInput name="milkQuantityMl" value={milkQuantityMl} onChange={setMilkQuantityMl} placeholder="—" min="0" />
+                <StepperInput name="milkQuantityMl" value={milkQuantityMl} onChange={setMilkQuantityMl} step={10} min={0} max={300} />
               </div>
 
               {/* Milk Type (only when milk > 0) */}
@@ -716,13 +716,13 @@ export default function LogFormClient({
               {/* Foam (ml) */}
               <div className="row-divider-t flex items-center px-6 min-h-[52px]">
                 <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Foam (ml)</span>
-                <NumberInput name="_foamMl" value={foamMl} onChange={setFoamMl} placeholder="—" min="0" />
+                <StepperInput name="_foamMl" value={foamMl} onChange={setFoamMl} step={5} min={0} max={300} />
               </div>
 
               {/* Hot Water (ml) */}
               <div className="row-divider-t flex items-center px-6 min-h-[52px]">
                 <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Hot Water (ml)</span>
-                <NumberInput name="_hotWaterMl" value={hotWaterMl} onChange={setHotWaterMl} placeholder="—" min="0" />
+                <StepperInput name="_hotWaterMl" value={hotWaterMl} onChange={setHotWaterMl} step={10} min={0} max={300} />
               </div>
 
               {/* Chocolate toggle */}
