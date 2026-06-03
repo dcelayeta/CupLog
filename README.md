@@ -60,6 +60,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 | `/more/equipment` | Equipment profile + cleaning tracking |
 | `/more/thresholds` | Extraction time/ratio classification ranges |
 | `/more/coaching-state` | AI coach rolling context editor |
+| `/api/export` | Download all data as JSON backup |
 
 ---
 
@@ -97,11 +98,12 @@ npx tsx scripts/sync-prod-to-dev.ts
 
 ### Shots (Log + History)
 - [x] Log form — bag selector, dose, yield, shot time, lag (g), grind setting, pre-infusion, spring weight, WDT toggle, grinder retention
-- [x] Defaults from last shot: dose, grind setting, spring weight, WDT
+- [x] Defaults from last shot per bag: dose, grind setting, lag, spring weight, WDT
+- [x] StepperInput (−/+ buttons) for dose, yield, grind, retention, milk, foam, hot water — avoids decimal keyboard on iOS
 - [x] Live ratio + classification badge preview
 - [x] Live adjusted dose display (`dose − retention`) and "stopped at Xg" lag helper
 - [x] Taste section: sour↔bitter spectrum (1=Very Sour · 4=Balanced · 7=Very Bitter) + 5-star shot rating
-- [x] Drink section: milk type/quantity, foam, hot water, live drink detection badge
+- [x] Drink section: milk type/quantity, foam (5ml steps), hot water, live drink detection badge
 - [x] Pressure and temperature stored as schema defaults (9 bar, 93°C) — not shown in UI
 - [x] Shot history — filters: bag chips, text search, date range, time/ratio classification chips
 - [x] Per-shot freshness label uses the bag's own peak window (not global defaults)
@@ -159,6 +161,9 @@ npx tsx scripts/sync-prod-to-dev.ts
 ### More → AI Coaching State
 - [x] Manual editor for AI coach rolling context (experience level, patterns, bean notes)
 
+### More → Data
+- [x] Export Backup — `GET /api/export` downloads all user data as a timestamped JSON file
+
 ---
 
 ## Database Schema (10 tables)
@@ -187,7 +192,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - **Per-bag freshness windows** — `estimatePeakWindow(roastLevel, processingMethod, isDecaf)` covers 15 roast/process combinations; stored on the bag so the user can override
 - **Hardcoded drink detection** — `detectDrink()` in `drinkDetection.ts` is a pure synchronous function; runs client-side for live preview and server-side on save
 - **`lagG` field** — Breville Bambino has no 3-way solenoid valve; 6–8g drip-through after pump stop is normal; stop before target yield and record resting weight
-- **`tasteBalance` single control** — 1=Very Sour · 4=Balanced · 7=Very Bitter. Individual taste columns (acidity, sweetness, bitterness, body, aroma) remain in the schema but are unused in the UI
+- **`tasteBalance` single control** — 1=Very Sour · 4=Balanced · 7=Very Bitter. Individual taste columns (acidity, sweetness, bitterness, body, aroma) were removed from the schema; columns still exist in the DB as inert nullables
 - **AI analysis caching** — results stored in `shot_analyses`; return visits never trigger an API call. Only *recent* shots (within 48h) update `coaching_state`
 - **SVG server components for charts** — all stat charts and per-bag charts render server-side as inline SVG; no charting library
 - **Extraction ratio ≠ extraction quality** — `yield_g / dose_g` is brew ratio (ristretto/normale/lungo style), not EY%. True extraction yield requires TDS measurement (refractometer). Charts label by rating instead of over/under extracted
