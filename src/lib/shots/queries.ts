@@ -178,6 +178,41 @@ export async function getAverageRetention(limit = 10): Promise<number | null> {
   return val != null ? Math.round(val * 100) / 100 : null;
 }
 
+export type AverageDailyDose = {
+  total: number | null;
+  regular: number | null;
+  decaf: number | null;
+};
+
+export async function getAverageDailyDose(): Promise<AverageDailyDose> {
+  const rows = await db.all(sql`
+    SELECT
+      b.is_decaf,
+      ROUND(
+        SUM(s.dose_g) * 1.0 /
+        MAX(1, CAST(julianday('now') - julianday(MIN(s.pulled_at)) AS INTEGER)),
+        1
+      ) AS daily_g
+    FROM shots s
+    JOIN bags b ON s.bag_id = b.id
+    WHERE s.is_failed = 0
+      AND s.pulled_at >= datetime('now', '-60 days')
+    GROUP BY b.is_decaf
+  `) as { is_decaf: number; daily_g: number }[];
+
+  let regular: number | null = null;
+  let decaf: number | null = null;
+  for (const row of rows) {
+    if (row.is_decaf) decaf = row.daily_g;
+    else regular = row.daily_g;
+  }
+  const total =
+    regular != null || decaf != null
+      ? Math.round(((regular ?? 0) + (decaf ?? 0)) * 10) / 10
+      : null;
+  return { total, regular, decaf };
+}
+
 export async function getPerBagDailyDose(bagIds: number[]): Promise<Record<number, number>> {
   if (bagIds.length === 0) return {};
   const idList = sql.join(bagIds.map((id) => sql`${id}`), sql`, `);

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { estimatePeakWindow, describePeakWindow } from "@/lib/bags/freshness";
 import type { RoastLevel, ProcessingMethod } from "@/lib/bags/freshness";
 import type { BagWithOrigins } from "@/lib/bags/queries";
+import type { AverageDailyDose } from "@/lib/shots/queries";
 
 const ROAST_LEVELS: { value: RoastLevel; label: string }[] = [
   { value: "unspecified", label: "Unspecified" },
@@ -80,9 +81,11 @@ function SectionHeader({ title }: { title: string }) {
 export default function PlannerClient({
   activeBags,
   perBagDailyDose,
+  averageDailyDose,
 }: {
   activeBags: BagWithOrigins[];
   perBagDailyDose: Record<number, number>;
+  averageDailyDose: AverageDailyDose;
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -91,6 +94,17 @@ export default function PlannerClient({
   const [roastLevel, setRoastLevel] = useState<RoastLevel>("medium");
   const [processingMethod, setProcessingMethod] = useState<ProcessingMethod>("washed");
   const [isDecaf, setIsDecaf] = useState(false);
+  const [candidateWeightRaw, setCandidateWeightRaw] = useState(300);
+  const [weightUnit, setWeightUnit] = useState<"g" | "oz">("g");
+
+  const handleUnitToggle = (newUnit: "g" | "oz") => {
+    if (newUnit === weightUnit) return;
+    if (newUnit === "oz") setCandidateWeightRaw(Math.round((candidateWeightRaw / 28.3495) * 10) / 10);
+    else setCandidateWeightRaw(Math.round(candidateWeightRaw * 28.3495));
+    setWeightUnit(newUnit);
+  };
+
+  const candidateWeightG = weightUnit === "oz" ? Math.round(candidateWeightRaw * 28.3495) : candidateWeightRaw;
 
   const isDecafMethod = processingMethod === "ea_washed" || processingMethod === "swiss_water";
   const effectiveIsDecaf = isDecaf || isDecafMethod;
@@ -134,9 +148,41 @@ export default function PlannerClient({
       };
     });
 
-  const totalDailyDoseG =
-    Object.values(perBagDailyDose).length > 0
-      ? Math.round(Object.values(perBagDailyDose).reduce((a, b) => a + b, 0) * 10) / 10
+  // Candidate daily rate: use regular or decaf average based on type
+  const candidateDailyRate = effectiveIsDecaf
+    ? (averageDailyDose.decaf ?? averageDailyDose.total)
+    : (averageDailyDose.regular ?? averageDailyDose.total);
+
+  // Candidate run-out date: how long 300g lasts at current rate, starting from peak start
+  const candidateRunOutDate =
+    candidateDailyRate != null && candidateDailyRate > 0
+      ? addDays(candidate.peakStart, Math.round(candidateWeightG / candidateDailyRate))
+      : null;
+
+  // Grams from candidate bag that fall inside peak window
+  const candidatePeakWindowStart = new Date(Math.max(candidate.peakStart.getTime(), today.getTime()));
+  const candidatePeakWindowDays = Math.max(0, daysBetween(candidatePeakWindowStart, candidate.peakEnd));
+  const candidatePeakGrams =
+    candidateDailyRate != null
+      ? Math.min(candidateWeightG, Math.round(candidatePeakWindowDays * candidateDailyRate))
+      : null;
+
+  // Per-bag: grams remaining that will be consumed during their peak window
+  type BagPeakGrams = { id: number; label: string; peakGrams: number };
+  const existingPeakGrams: BagPeakGrams[] = runOuts.map((ro) => {
+    const bw = bagWindows.find((b) => b.id === ro.id)!;
+    const windowStart = new Date(Math.max(bw.peakStart.getTime(), today.getTime()));
+    const windowEnd = new Date(Math.min(bw.peakEnd.getTime(), ro.runOutDate.getTime()));
+    const daysInPeak = Math.max(0, daysBetween(windowStart, windowEnd));
+    return { id: ro.id, label: ro.label, peakGrams: Math.round(daysInPeak * ro.dailyG) };
+  });
+
+  const totalExistingPeakGrams = existingPeakGrams.reduce((s, b) => s + b.peakGrams, 0);
+  const totalPeakGrams =
+    candidatePeakGrams != null ? totalExistingPeakGrams + candidatePeakGrams : totalExistingPeakGrams;
+  const daysOfPeakCoffee =
+    averageDailyDose.total != null && averageDailyDose.total > 0
+      ? Math.round(totalPeakGrams / averageDailyDose.total)
       : null;
 
   // Timeline window: today-7 to furthest useSoonEnd+14
@@ -149,6 +195,10 @@ export default function PlannerClient({
 
   for (const ro of runOuts) {
     const e = addDays(ro.runOutDate, 7);
+    if (e > windowEnd) windowEnd = e;
+  }
+  if (candidateRunOutDate) {
+    const e = addDays(candidateRunOutDate, 7);
     if (e > windowEnd) windowEnd = e;
   }
 
@@ -281,6 +331,7 @@ export default function PlannerClient({
   function renderCandidateBar() {
     const peakStartPct = toPct(candidate.peakStart);
     const peakEndPct = toPct(candidate.peakEnd);
+    const runOutPct = candidateRunOutDate ? toPct(candidateRunOutDate) : null;
 
     // Clamp label anchor so text doesn't overflow the container
     const clampLabelPct = (pct: number) => Math.max(5, Math.min(95, pct));
@@ -289,7 +340,7 @@ export default function PlannerClient({
       <div className="relative" style={{ height: BAR_H + 20 }}>
         {/* Bar */}
         <div className="absolute inset-x-0 top-0">
-          {renderBar(candidate, true)}
+          {renderBar(candidate, true, candidateRunOutDate ?? undefined)}
         </div>
         {/* Tick + date for peak start */}
         <div
@@ -325,6 +376,22 @@ export default function PlannerClient({
         >
           {fmtShort(candidate.peakEnd)}
         </span>
+        {/* Run-out label if within view and different from peak end */}
+        {runOutPct != null && runOutPct > 0 && runOutPct < 100 && candidateRunOutDate &&
+          Math.abs(runOutPct - peakEndPct) > 5 && (
+          <span
+            className="absolute text-[10px] font-medium whitespace-nowrap"
+            style={{
+              left: `${clampLabelPct(runOutPct)}%`,
+              top: BAR_H + 4,
+              transform: "translateX(-50%)",
+              color: "var(--destructive)",
+              opacity: 0.75,
+            }}
+          >
+            {fmtShort(candidateRunOutDate)}
+          </span>
+        )}
       </div>
     );
   }
@@ -451,7 +518,7 @@ export default function PlannerClient({
           </select>
         </div>
         {!isDecafMethod && (
-          <div className="flex items-center px-6 min-h-[52px]">
+          <div className="flex items-center px-6 min-h-[52px] row-divider">
             <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Decaf</span>
             <button
               type="button"
@@ -466,6 +533,36 @@ export default function PlannerClient({
             </button>
           </div>
         )}
+        <div className="flex items-center px-6 min-h-[52px]">
+          <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Weight</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={candidateWeightRaw}
+              onChange={(e) => setCandidateWeightRaw(Number(e.target.value) || 0)}
+              className="text-right outline-none bg-transparent text-[17px] w-16"
+              style={{ color: "var(--accent)" }}
+              min={0}
+              step={weightUnit === "oz" ? 0.5 : 10}
+            />
+            <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--card-secondary)" }}>
+              {(["g", "oz"] as const).map((unit) => (
+                <button
+                  key={unit}
+                  type="button"
+                  onClick={() => handleUnitToggle(unit)}
+                  className="px-2.5 py-1 text-[13px] font-medium"
+                  style={{
+                    backgroundColor: weightUnit === unit ? "var(--accent)" : "transparent",
+                    color: weightUnit === unit ? "white" : "var(--text-secondary)",
+                  }}
+                >
+                  {unit}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       <SectionHeader title="Freshness Timeline" />
@@ -579,11 +676,41 @@ export default function PlannerClient({
           <span className="text-[15px]" style={{ color: ready.color }}>{ready.text}</span>
         </div>
 
-        {/* Consumption rate */}
-        {totalDailyDoseG && (
+        {/* Daily rate */}
+        {averageDailyDose.total != null && (
           <div className="flex items-center px-6 min-h-[52px] row-divider">
-            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Total daily dose</span>
-            <span className="text-[15px]" style={{ color: "var(--text-secondary)" }}>{totalDailyDoseG}g / day</span>
+            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Daily rate</span>
+            <span className="text-[15px]" style={{ color: "var(--text-secondary)" }}>
+              {averageDailyDose.regular != null && averageDailyDose.decaf != null
+                ? `${averageDailyDose.regular}g + ${averageDailyDose.decaf}g decaf`
+                : `${averageDailyDose.total}g / day`}
+            </span>
+          </div>
+        )}
+
+        {/* Candidate peak grams */}
+        {candidatePeakGrams != null && (
+          <div className="flex items-center px-6 min-h-[52px] row-divider">
+            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Candidate in peak</span>
+            <span className="text-[15px]" style={{ color: "var(--text-secondary)" }}>
+              {candidatePeakGrams}g of {candidateWeightG}g
+            </span>
+          </div>
+        )}
+
+        {/* Peak pipeline total */}
+        {daysOfPeakCoffee != null && (
+          <div className="px-6 py-4 row-divider">
+            <div className="flex items-center">
+              <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Peak pipeline</span>
+              <span className="text-[17px] font-semibold" style={{ color: "var(--success)" }}>
+                {daysOfPeakCoffee} day{daysOfPeakCoffee !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-secondary)" }}>
+              {totalPeakGrams}g total at {averageDailyDose.total}g/day
+              {existingPeakGrams.length > 0 && ` — ${totalExistingPeakGrams}g from current bags + ${candidatePeakGrams ?? 0}g from candidate`}
+            </p>
           </div>
         )}
 

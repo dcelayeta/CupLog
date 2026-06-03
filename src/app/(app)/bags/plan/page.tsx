@@ -1,11 +1,14 @@
 import { getBags } from "@/lib/bags/queries";
-import { getPerBagDailyDose } from "@/lib/shots/queries";
+import { getPerBagDailyDose, getAverageDailyDose } from "@/lib/shots/queries";
 import PlannerClient from "@/components/bags/PlannerClient";
 import Link from "next/link";
 
 export default async function PlanPage() {
   const activeBags = await getBags("active");
-  const perBagDailyDose = await getPerBagDailyDose(activeBags.map((b) => b.id));
+  const [perBagDailyDose, averageDailyDose] = await Promise.all([
+    getPerBagDailyDose(activeBags.map((b) => b.id)),
+    getAverageDailyDose(),
+  ]);
 
   return (
     <div className="pt-4 pb-24">
@@ -21,7 +24,7 @@ export default async function PlanPage() {
           Planner
         </h1>
       </div>
-      <PlannerClient activeBags={activeBags} perBagDailyDose={perBagDailyDose} />
+      <PlannerClient activeBags={activeBags} perBagDailyDose={perBagDailyDose} averageDailyDose={averageDailyDose} />
     </div>
   );
 }
