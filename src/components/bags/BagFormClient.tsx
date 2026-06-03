@@ -81,7 +81,7 @@ function StepperInput({
         inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="text-center outline-none bg-transparent text-[17px] w-[52px]"
+        className="text-center outline-none bg-transparent text-[17px] w-[44px]"
         style={{ color: "var(--text-primary)" }}
       />
       <button type="button" onPointerDown={() => adjust(step)}
