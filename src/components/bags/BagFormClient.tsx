@@ -47,6 +47,52 @@ const PROCESSING_METHODS = [
   { value: "other", label: "Other" },
 ];
 
+function StepperInput({
+  name,
+  value,
+  onChange,
+  step = 1,
+  min = 0,
+  max = 9999,
+}: {
+  name?: string;
+  value: string;
+  onChange: (v: string) => void;
+  step?: number;
+  min?: number;
+  max?: number;
+}) {
+  const decimals = step.toString().includes(".") ? step.toString().split(".")[1].length : 0;
+  const num = parseFloat(value) || 0;
+  const adjust = (delta: number) => {
+    const next = Math.max(min, Math.min(max, Math.round((num + delta) * 1000) / 1000));
+    onChange(next === 0 && value === "" ? "" : next.toFixed(decimals));
+  };
+  return (
+    <div className="flex items-center gap-1">
+      {name && <input type="hidden" name={name} value={value} />}
+      <button type="button" onPointerDown={() => adjust(-step)}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-[20px] font-light select-none"
+        style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}>
+        −
+      </button>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="text-center outline-none bg-transparent text-[17px] w-[52px]"
+        style={{ color: "var(--text-primary)" }}
+      />
+      <button type="button" onPointerDown={() => adjust(step)}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-[20px] font-light select-none"
+        style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}>
+        +
+      </button>
+    </div>
+  );
+}
+
 function SectionHeader({ label }: { label: string }) {
   return (
     <p
@@ -154,6 +200,11 @@ export default function BagFormClient({
 
   const [isBlend, setIsBlend] = useState(activeData?.isBlend ?? false);
   const [isDecaf, setIsDecaf] = useState(activeData?.isDecaf ?? false);
+  const [price, setPrice] = useState(activeData?.price != null ? String(activeData.price) : "");
+  const [weightG, setWeightG] = useState(activeData?.weightG != null ? String(activeData.weightG) : "");
+  const [weightCorrectionG, setWeightCorrectionG] = useState(String(initialData?.weightCorrectionG ?? 0));
+  const [peakStartDay, setPeakStartDay] = useState(initialData?.peakStartDay != null ? String(initialData.peakStartDay) : "");
+  const [peakEndDay, setPeakEndDay] = useState(initialData?.peakEndDay != null ? String(initialData.peakEndDay) : "");
   const [origins, setOrigins] = useState<OriginRow[]>(
     activeData?.origins?.length
       ? activeData.origins.map((o) => ({
@@ -181,6 +232,8 @@ export default function BagFormClient({
           }))
         : [{ ...BLANK_ORIGIN }]
     );
+    if (data.price != null) setPrice(String(data.price));
+    if (data.weightG != null) setWeightG(String(data.weightG));
     setFormKey((k) => k + 1); // remount uncontrolled inputs
   };
   const [duplicateBag, setDuplicateBag] = useState<Bag | null>(null);
@@ -430,45 +483,23 @@ export default function BagFormClient({
               </FieldRow>
               <Divider />
               <FieldRow label="Price">
-                <input
-                  name="price"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0"
-                  defaultValue={mode === "edit" ? (initialData?.price ?? "") : (aiData?.price ?? "")}
-                  placeholder="0.00"
-                  className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
-                  style={{ color: "var(--text-primary)" }}
-                />
+                <StepperInput name="price" value={price} onChange={setPrice} step={0.5} min={0} max={999} />
               </FieldRow>
               <Divider />
               <FieldRow label="Weight (g)">
-                <input
-                  name="weightG"
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  defaultValue={mode === "edit" ? (initialData?.weightG ?? "") : (aiData?.weightG ?? "")}
-                  placeholder="250"
-                  className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
-                  style={{ color: "var(--text-primary)" }}
-                />
+                <StepperInput name="weightG" value={weightG} onChange={setWeightG} step={10} min={0} max={2000} />
               </FieldRow>
               {mode === "edit" && (
                 <>
                   <Divider />
-                  <FieldRow label="Weight Correction (g)">
-                    <input
-                      name="weightCorrectionG"
-                      type="number"
-                      inputMode="numeric"
-                      defaultValue={initialData?.weightCorrectionG ?? 0}
-                      placeholder="0"
-                      className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
-                      style={{ color: "var(--text-primary)" }}
-                    />
+                  <FieldRow label="Correction (g)">
+                    <StepperInput name="weightCorrectionG" value={weightCorrectionG} onChange={setWeightCorrectionG} step={10} min={-2000} max={2000} />
                   </FieldRow>
+                  {weightG !== "" && (
+                    <p className="px-6 pb-3 text-[13px] text-right" style={{ color: "var(--text-secondary)" }}>
+                      Adjusted: {Number(weightG) + Number(weightCorrectionG)}g
+                    </p>
+                  )}
                 </>
               )}
             </GroupedCard>
@@ -479,29 +510,11 @@ export default function BagFormClient({
             <SectionHeader label="Peak Freshness Window" />
             <GroupedCard>
               <FieldRow label="Peak Start (day)">
-                <input
-                  name="peakStartDay"
-                  type="number"
-                  inputMode="numeric"
-                  min="1"
-                  defaultValue={initialData?.peakStartDay ?? ""}
-                  placeholder="Auto"
-                  className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
-                  style={{ color: "var(--text-primary)" }}
-                />
+                <StepperInput name="peakStartDay" value={peakStartDay} onChange={setPeakStartDay} step={1} min={1} max={60} />
               </FieldRow>
               <Divider />
               <FieldRow label="Peak End (day)">
-                <input
-                  name="peakEndDay"
-                  type="number"
-                  inputMode="numeric"
-                  min="1"
-                  defaultValue={initialData?.peakEndDay ?? ""}
-                  placeholder="Auto"
-                  className="text-right w-24 bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
-                  style={{ color: "var(--text-primary)" }}
-                />
+                <StepperInput name="peakEndDay" value={peakEndDay} onChange={setPeakEndDay} step={1} min={1} max={90} />
               </FieldRow>
             </GroupedCard>
             <p className="px-4 mt-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
@@ -637,19 +650,15 @@ export default function BagFormClient({
                         >
                           Blend %
                         </span>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min="0"
-                          max="100"
-                          value={origin.blendPercentage}
-                          onChange={(e) =>
-                            updateOrigin(i, "blendPercentage", e.target.value)
-                          }
-                          placeholder="Optional"
-                          className="flex-1 text-right bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
-                          style={{ color: "var(--text-secondary)" }}
-                        />
+                        <div className="flex-1 flex justify-end">
+                          <StepperInput
+                            value={origin.blendPercentage}
+                            onChange={(v) => updateOrigin(i, "blendPercentage", v)}
+                            step={5}
+                            min={0}
+                            max={100}
+                          />
+                        </div>
                       </div>
                     </>
                   )}
