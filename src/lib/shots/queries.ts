@@ -178,6 +178,24 @@ export async function getAverageRetention(limit = 10): Promise<number | null> {
   return val != null ? Math.round(val * 100) / 100 : null;
 }
 
+export type ShotDosageRecord = {
+  pulledAt: string;
+  doseG: number;
+  isDecaf: number; // 0 | 1 from SQLite integer
+};
+
+export async function getShotDosageHistory(days = 45): Promise<ShotDosageRecord[]> {
+  const cutoff = `-${days} days`;
+  return db.all(sql`
+    SELECT s.pulled_at AS pulledAt, s.dose_g AS doseG, CAST(b.is_decaf AS INTEGER) AS isDecaf
+    FROM shots s
+    JOIN bags b ON s.bag_id = b.id
+    WHERE s.is_failed = 0
+      AND s.pulled_at >= datetime('now', ${cutoff})
+    ORDER BY s.pulled_at ASC
+  `) as Promise<ShotDosageRecord[]>;
+}
+
 export type AverageDailyDose = {
   total: number | null;
   regular: number | null;

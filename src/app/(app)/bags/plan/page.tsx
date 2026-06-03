@@ -1,13 +1,12 @@
 import { getBags } from "@/lib/bags/queries";
-import { getPerBagDailyDose, getAverageDailyDose } from "@/lib/shots/queries";
+import { getShotDosageHistory } from "@/lib/shots/queries";
 import PlannerClient from "@/components/bags/PlannerClient";
 import Link from "next/link";
 
 export default async function PlanPage() {
-  const activeBags = await getBags("active");
-  const [perBagDailyDose, averageDailyDose] = await Promise.all([
-    getPerBagDailyDose(activeBags.map((b) => b.id)),
-    getAverageDailyDose(),
+  const [activeBags, shotDosageHistory] = await Promise.all([
+    getBags("active"),
+    getShotDosageHistory(45),
   ]);
 
   return (
@@ -24,7 +23,7 @@ export default async function PlanPage() {
           Planner
         </h1>
       </div>
-      <PlannerClient activeBags={activeBags} perBagDailyDose={perBagDailyDose} averageDailyDose={averageDailyDose} />
+      <PlannerClient activeBags={activeBags} shotDosageHistory={shotDosageHistory} />
     </div>
   );
 }
