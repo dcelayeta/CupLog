@@ -78,24 +78,58 @@ function Row({ label, children, noDivider }: { label: string; children: React.Re
   );
 }
 
-function NumberInput({ name, value, onChange, placeholder, step = "0.1", min, max }: {
+function NumberInput({ name, value, onChange, placeholder, integer = false, min, max }: {
   name: string; value: string; onChange: (v: string) => void; placeholder: string;
-  step?: string; min?: string; max?: string;
+  integer?: boolean; min?: string; max?: string;
 }) {
   return (
     <input
-      type="number"
+      type="text"
+      inputMode={integer ? "numeric" : "decimal"}
       name={name}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      step={step}
       min={min}
       max={max}
       className="text-right outline-none bg-transparent text-[17px] w-[90px]"
       style={{ color: "var(--text-primary)" }}
-      inputMode="decimal"
     />
+  );
+}
+
+function StepperInput({ name, value, onChange, step = 0.1, min = 0, max = 9.9 }: {
+  name: string; value: string; onChange: (v: string) => void;
+  step?: number; min?: number; max?: number;
+}) {
+  const decimals = step.toString().includes(".") ? step.toString().split(".")[1].length : 0;
+  const num = parseFloat(value) || 0;
+  const adjust = (delta: number) => {
+    const next = Math.max(min, Math.min(max, Math.round((num + delta) * 1000) / 1000));
+    onChange(next.toFixed(decimals));
+  };
+  return (
+    <div className="flex items-center gap-1">
+      <input type="hidden" name={name} value={value} />
+      <button type="button" onPointerDown={() => adjust(-step)}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-[20px] font-light select-none"
+        style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}>
+        −
+      </button>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="text-center outline-none bg-transparent text-[17px] w-[44px]"
+        style={{ color: "var(--text-primary)" }}
+      />
+      <button type="button" onPointerDown={() => adjust(step)}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-[20px] font-light select-none"
+        style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}>
+        +
+      </button>
+    </div>
   );
 }
 
@@ -306,10 +340,10 @@ export default function ShotEditFormClient({
             />
             <input type="hidden" name="pulledAt" value={pulledAt ? new Date(pulledAt).toISOString() : ""} />
           </Row>
-          <Row label="Dose (g)"><NumberInput name="doseG" value={doseG} onChange={setDoseG} placeholder="18" step="0.1" min="5" max="30" /></Row>
-          <Row label="Yield (g)"><NumberInput name="yieldG" value={yieldG} onChange={setYieldG} placeholder={isFailed ? "—" : "36"} step="0.1" min={isFailed ? "0" : "10"} max="100" /></Row>
-          <Row label="Shot Time (s)"><NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder={isFailed ? "—" : "28"} step="1" min={isFailed ? "0" : "5"} max="120" /></Row>
-          <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass)}><NumberInput name="lagG" value={lagG} onChange={setLagG} placeholder="—" step="0.5" min="0" /></Row>
+          <Row label="Dose (g)"><StepperInput name="doseG" value={doseG} onChange={setDoseG} step={0.1} min={0} max={30} /></Row>
+          <Row label="Yield (g)"><StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} /></Row>
+          <Row label="Shot Time (s)"><NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder={isFailed ? "—" : "28"} integer min={isFailed ? "0" : "5"} max="120" /></Row>
+          <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass)}><NumberInput name="lagG" value={lagG} onChange={setLagG} placeholder="—" min="0" /></Row>
 
           {(liveRatio || timeClass || ratioClass) && (
             <div className="px-6 py-3 flex items-center gap-2 flex-wrap" style={{ backgroundColor: "var(--card-secondary)" }}>
@@ -322,10 +356,10 @@ export default function ShotEditFormClient({
             </div>
           )}
 
-          <Row label="Grind Setting"><NumberInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} placeholder="—" step="0.5" min="0" /></Row>
-          <Row label="Pre-infusion (s)"><NumberInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} placeholder="—" step="1" min="0" /></Row>
-          <Row label="Spring Weight (lbs)"><NumberInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} placeholder="—" step="1" min="0" /></Row>
-          <Row label="Retention (g)"><NumberInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} placeholder="—" step="0.1" min="0" /></Row>
+          <Row label="Grind Setting"><StepperInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} step={0.5} min={0} max={50} /></Row>
+          <Row label="Pre-infusion (s)"><NumberInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} placeholder="—" integer min="0" /></Row>
+          <Row label="Spring Weight (lbs)"><NumberInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} placeholder="—" integer min="0" /></Row>
+          <Row label="Retention (g)"><StepperInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} step={0.1} min={0} max={5} /></Row>
           <div className="flex items-center px-6 min-h-[52px]">
             <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>WDT Used</span>
             <button type="button" onClick={() => setWdtUsed(!wdtUsed)} className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200" style={{ backgroundColor: wdtUsed ? "var(--accent)" : "#E5E5EA" }}>
@@ -502,7 +536,7 @@ export default function ShotEditFormClient({
               {/* Milk (ml) */}
               <div className="flex items-center px-6 min-h-[52px]">
                 <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Milk (ml)</span>
-                <NumberInput name="milkQuantityMl" value={milkQuantityMl} onChange={setMilkQuantityMl} placeholder="—" step="10" min="0" />
+                <NumberInput name="milkQuantityMl" value={milkQuantityMl} onChange={setMilkQuantityMl} placeholder="—" integer min="0" />
               </div>
 
               {/* Milk Type (only when milk > 0) */}
@@ -519,13 +553,13 @@ export default function ShotEditFormClient({
               {/* Foam (ml) */}
               <div className="row-divider-t flex items-center px-6 min-h-[52px]">
                 <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Foam (ml)</span>
-                <NumberInput name="_foamMl" value={foamMl} onChange={setFoamMl} placeholder="—" step="10" min="0" />
+                <NumberInput name="_foamMl" value={foamMl} onChange={setFoamMl} placeholder="—" integer min="0" />
               </div>
 
               {/* Hot Water (ml) */}
               <div className="row-divider-t flex items-center px-6 min-h-[52px]">
                 <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Hot Water (ml)</span>
-                <NumberInput name="_hotWaterMl" value={hotWaterMl} onChange={setHotWaterMl} placeholder="—" step="10" min="0" />
+                <NumberInput name="_hotWaterMl" value={hotWaterMl} onChange={setHotWaterMl} placeholder="—" integer min="0" />
               </div>
 
               {/* Chocolate toggle */}

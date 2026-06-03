@@ -60,11 +60,6 @@ export type ShotDetail = {
   wdtUsed: boolean;
   distributionToolUsed: boolean;
   grinderRetentionG: number | null;
-  acidity: number | null;
-  sweetness: number | null;
-  bitterness: number | null;
-  body: number | null;
-  aroma: number | null;
   tasteBalance: number | null;
   shotRating: number | null;
   flowCharacteristics: string | null;
@@ -276,11 +271,6 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       wdtUsed: shots.wdtUsed,
       distributionToolUsed: shots.distributionToolUsed,
       grinderRetentionG: shots.grinderRetentionG,
-      acidity: shots.acidity,
-      sweetness: shots.sweetness,
-      bitterness: shots.bitterness,
-      body: shots.body,
-      aroma: shots.aroma,
       tasteBalance: shots.tasteBalance,
       shotRating: shots.shotRating,
       flowCharacteristics: shots.flowCharacteristics,

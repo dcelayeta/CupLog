@@ -135,11 +135,6 @@ export const shots = sqliteTable("shots", {
   wdtUsed: integer("wdt_used", { mode: "boolean" }).notNull().default(false),
   distributionToolUsed: integer("distribution_tool_used", { mode: "boolean" }).notNull().default(false),
   grinderRetentionG: real("grinder_retention_g"),
-  acidity: integer("acidity"),
-  sweetness: integer("sweetness"),
-  bitterness: integer("bitterness"),
-  body: integer("body"),
-  aroma: integer("aroma"),
   tasteBalance: integer("taste_balance"), // 1=very sour … 4=balanced … 7=very bitter
   shotRating: integer("shot_rating"), // 1–5 stars
   flowCharacteristics: text("flow_characteristics", {

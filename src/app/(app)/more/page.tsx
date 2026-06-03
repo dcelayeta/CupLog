@@ -98,6 +98,14 @@ export default async function MorePage() {
         <ThemeSelector />
       </div>
 
+      <SectionHeader title="Data" />
+      <div
+        className="mx-4 rounded-2xl overflow-hidden"
+        style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+      >
+        <NavRow href="/api/export" label="Export Backup" description="Download all data as JSON" />
+      </div>
+
       <SectionHeader title="Equipment" />
       <div
         className="mx-4 rounded-2xl overflow-hidden"
