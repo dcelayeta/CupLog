@@ -1,0 +1,25 @@
+import { getBags } from "@/lib/bags/queries";
+import PlannerClient from "@/components/bags/PlannerClient";
+import Link from "next/link";
+
+export default async function PlanPage() {
+  const activeBags = await getBags("active");
+
+  return (
+    <div className="pt-4 pb-24">
+      <div className="flex items-center px-4 mb-4 gap-3">
+        <Link
+          href="/bags"
+          className="text-[17px]"
+          style={{ color: "var(--accent)" }}
+        >
+          ‹ Bags
+        </Link>
+        <h1 className="text-[34px] font-display leading-none" style={{ color: "var(--text-primary)" }}>
+          Planner
+        </h1>
+      </div>
+      <PlannerClient activeBags={activeBags} />
+    </div>
+  );
+}

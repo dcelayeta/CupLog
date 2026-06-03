@@ -27,13 +27,22 @@ export default async function BagsPage({
         >
           Bags
         </h1>
-        <Link
-          href="/bags/new"
-          className="px-4 py-2 rounded-full text-[15px] font-semibold"
-          style={{ backgroundColor: "var(--card)", color: "var(--accent)", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
-        >
-          Add
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/bags/plan"
+            className="px-4 py-2 rounded-full text-[15px] font-semibold"
+            style={{ backgroundColor: "var(--card)", color: "var(--accent)", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
+          >
+            Plan
+          </Link>
+          <Link
+            href="/bags/new"
+            className="px-4 py-2 rounded-full text-[15px] font-semibold"
+            style={{ backgroundColor: "var(--card)", color: "var(--accent)", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
+          >
+            Add
+          </Link>
+        </div>
       </div>
 
       <BagsListClient bags={bags} reserveBags={reserveBags} status={status} query={query} />
