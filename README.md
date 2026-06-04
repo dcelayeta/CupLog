@@ -95,6 +95,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] AI bag entry — paste bag label text, Claude extracts structured fields
 - [x] "New bag of same coffee" shortcut on bag detail
 - [x] Per-bag shot analysis charts — Grind vs Taste scatter, Rating Trend, Extraction Ratio bar (server-side SVG)
+- [x] Buy Planner — candidate bag input (roast level, process, weight); phase-based cascade run-out for caf and decaf bags independently; three-state buy decision (Buy it / Caution / Pass) with past-peak stale detection; freshness timeline with bean-type visual hierarchy (non-matching type dimmed); per-bag phase-aware rate labels; rolling consumption window slider
 
 ### Shots (Log + History)
 - [x] Log form — bag selector, dose, yield, shot time, lag (g), grind setting, pre-infusion, spring weight, WDT toggle, grinder retention
