@@ -82,7 +82,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] All-time averages grid: rating, taste balance, dose, yield, time, ratio
 - [x] Active beans freshness card — mini 5-zone timeline bar per bag with today marker; taps to bag detail
 - [x] Equipment cleaning overdue warning — red banner when machine or grinder is past cleaning interval
-- [x] Almost empty warning — orange banner when estimated days remaining drops below a configurable threshold (default 7d), using per-bag daily consumption rate; falls back to 50g when no rate data is available; subtitle shows cups left (based on per-bag avg dose, fallback 18g); links to bag detail (single) or bag list (multiple); threshold adjustable in More → Thresholds
+- [x] Almost empty warning — orange banner when estimated cups remaining drops below a configurable threshold (default 14 cups); cups calculated from rolling 10-shot avg dose per bag (fallback: all-time avg, then 18g); links to bag detail (single) or bag list (multiple); threshold adjustable in More → Thresholds
 - [x] Entering peak notification — green banner on the day a bag reaches its estimated peak start; links to bag detail or bag list
 - [x] Last shot card — roaster/bag, detected drink, stats, taste, notes
 

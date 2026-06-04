@@ -7,7 +7,7 @@ import { getBags } from "@/lib/bags/queries";
 import ClientDateTime from "@/components/ClientDateTime";
 import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 import { getActiveEquipmentProfile } from "@/lib/equipment/queries";
-import { getPerBagDailyDose } from "@/lib/shots/queries";
+import { getRecentAvgDosePerBag } from "@/lib/shots/queries";
 import { getAppConfig } from "@/lib/config/queries";
 import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
 
@@ -149,15 +149,10 @@ function formatTime(secs: number | null): string {
 
 
 export default async function HomePage() {
-  const [activeBags, equipment, config] = await Promise.all([
-    getBags("active"), getActiveEquipmentProfile(), getAppConfig(),
+  const [activeBags, equipment, config, stats, lastShot] = await Promise.all([
+    getBags("active"), getActiveEquipmentProfile(), getAppConfig(), getStats(), getLastShot(),
   ]);
-  const bagIds = activeBags.map((b) => b.id);
-  const [stats, lastShot, perBagRates] = await Promise.all([
-    getStats(),
-    getLastShot(),
-    bagIds.length > 0 ? getPerBagDailyDose(bagIds) : Promise.resolve({} as Record<number, number>),
-  ]);
+  const recentAvgDose = await getRecentAvgDosePerBag(activeBags.map((b) => b.id));
 
   const totalShots = Number(stats?.total_shots ?? 0);
   const failedShots = Number(stats?.failed_shots ?? 0);
@@ -215,24 +210,27 @@ export default async function HomePage() {
 
       {/* ── Almost empty warnings ─────────────────────────────────────────── */}
       {(() => {
-        const warningDays = config.lowInventoryWarningDays ?? 7;
-        const lowBags = activeBags.filter((bag) => {
-          if (bag.weightG == null) return false;
+        const warningCups = config.lowInventoryWarningCups ?? 14;
+        const cupsForBag = (bag: typeof activeBags[number]) => {
+          if (bag.weightG == null) return null;
           const remaining = bag.weightG - (bag.totalDoseG ?? 0) + (bag.weightCorrectionG ?? 0);
-          if (remaining <= 0) return false;
-          const rate = perBagRates[bag.id];
-          if (rate != null && rate > 0) return (remaining / rate) < warningDays;
-          return remaining < 50;
+          if (remaining <= 0) return 0;
+          const avgDose =
+            recentAvgDose[bag.id] ??
+            (bag.shotCount != null && bag.shotCount > 0 && bag.totalDoseG != null
+              ? bag.totalDoseG / bag.shotCount
+              : 18);
+          return Math.floor(remaining / avgDose);
+        };
+        const lowBags = activeBags.filter((bag) => {
+          const cups = cupsForBag(bag);
+          return cups !== null && cups < warningCups;
         });
         if (lowBags.length === 0) return null;
         const href = lowBags.length === 1 ? `/bags/${lowBags[0].id}` : "/bags";
         const names = lowBags.map((b) => {
-          const remaining = b.weightG != null ? b.weightG - (b.totalDoseG ?? 0) + (b.weightCorrectionG ?? 0) : null;
-          const avgDose = b.shotCount != null && b.shotCount > 0 && b.totalDoseG != null
-            ? b.totalDoseG / b.shotCount
-            : 18;
-          const cupsLeft = remaining != null ? Math.round(remaining / avgDose) : null;
-          const suffix = cupsLeft != null ? ` · ~${cupsLeft} cup${cupsLeft !== 1 ? "s" : ""} left` : "";
+          const cups = cupsForBag(b);
+          const suffix = cups != null ? ` · ~${cups} cup${cups !== 1 ? "s" : ""} left` : "";
           return `${b.roaster} — ${b.name}${suffix}`;
         }).join(" · ");
         return (

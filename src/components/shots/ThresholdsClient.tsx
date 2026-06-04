@@ -101,10 +101,10 @@ function Section({
 
 export default function ThresholdsClient({
   thresholds,
-  lowInventoryWarningDays: initialWarningDays,
+  lowInventoryWarningCups: initialWarningCups,
 }: {
   thresholds: ExtractionThreshold[];
-  lowInventoryWarningDays: number;
+  lowInventoryWarningCups: number;
 }) {
   const [rows, setRows] = useState<EditableThreshold[]>(
     thresholds.map((t) => ({
@@ -116,7 +116,7 @@ export default function ThresholdsClient({
       sortOrder: t.sortOrder,
     }))
   );
-  const [warningDays, setWarningDays] = useState(initialWarningDays);
+  const [warningCups, setWarningCups] = useState(initialWarningCups);
   const [isPending, startTransition] = useTransition();
   const [isRestoring, startRestore] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -139,7 +139,7 @@ export default function ThresholdsClient({
           await saveThreshold(row.id, { label: row.label.trim(), minValue, maxValue });
         }
       }
-      await saveAppConfig({ lowInventoryWarningDays: warningDays });
+      await saveAppConfig({ lowInventoryWarningCups: warningCups });
       setSaved(true);
     });
   };
@@ -168,24 +168,24 @@ export default function ThresholdsClient({
             <div className="flex-1">
               <p className="text-[15px]" style={{ color: "var(--text-primary)" }}>Low inventory alert</p>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                Warn when estimated days remaining drops below this threshold. Falls back to 50g when no consumption data is available.
+                Warn when estimated cups remaining drops below this threshold. Uses your average dose across the last 10 shots for that bag (fallback: all-time avg, then 18g).
               </p>
             </div>
             <div className="flex items-center gap-2 ml-4 flex-shrink-0">
               <button
                 type="button"
-                onClick={() => { setSaved(false); setWarningDays((d) => Math.max(1, d - 1)); }}
+                onClick={() => { setSaved(false); setWarningCups((c) => Math.max(1, c - 1)); }}
                 className="w-8 h-8 rounded-full flex items-center justify-center text-[20px] leading-none"
                 style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}
               >
                 −
               </button>
-              <span className="text-[17px] font-semibold w-14 text-center" style={{ color: "var(--text-primary)" }}>
-                {warningDays}d
+              <span className="text-[17px] font-semibold w-16 text-center" style={{ color: "var(--text-primary)" }}>
+                {warningCups} cups
               </span>
               <button
                 type="button"
-                onClick={() => { setSaved(false); setWarningDays((d) => Math.min(30, d + 1)); }}
+                onClick={() => { setSaved(false); setWarningCups((c) => Math.min(60, c + 1)); }}
                 className="w-8 h-8 rounded-full flex items-center justify-center text-[20px] leading-none"
                 style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}
               >

@@ -231,6 +231,26 @@ export async function getAverageDailyDose(): Promise<AverageDailyDose> {
   return { total, regular, decaf };
 }
 
+export async function getRecentAvgDosePerBag(
+  bagIds: number[],
+  limit = 10
+): Promise<Record<number, number>> {
+  if (bagIds.length === 0) return {};
+  const idList = sql.join(bagIds.map((id) => sql`${id}`), sql`, `);
+  const rows = await db.all(sql`
+    SELECT bag_id, ROUND(AVG(dose_g), 1) AS avg_dose
+    FROM (
+      SELECT bag_id, dose_g,
+        ROW_NUMBER() OVER (PARTITION BY bag_id ORDER BY pulled_at DESC) AS rn
+      FROM shots
+      WHERE is_failed = 0 AND bag_id IN (${idList})
+    )
+    WHERE rn <= ${limit}
+    GROUP BY bag_id
+  `) as { bag_id: number; avg_dose: number }[];
+  return Object.fromEntries(rows.map((r) => [r.bag_id, r.avg_dose]));
+}
+
 export async function getPerBagDailyDose(bagIds: number[]): Promise<Record<number, number>> {
   if (bagIds.length === 0) return {};
   const idList = sql.join(bagIds.map((id) => sql`${id}`), sql`, `);
