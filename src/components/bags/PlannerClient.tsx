@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { estimatePeakWindow, describePeakWindow, getDaysSinceRoast } from "@/lib/bags/freshness";
 import type { RoastLevel, ProcessingMethod } from "@/lib/bags/freshness";
 import type { BagWithOrigins } from "@/lib/bags/queries";
@@ -101,6 +101,64 @@ function SectionHeader({ title }: { title: string }) {
 
 type RunOutRange = { earliest: Date; latest: Date };
 
+type PhaseStep = { rate: number; triggeredByLabel?: string };
+
+function calculateCascadedRunouts(
+  bags: Array<{ id: number; urgencyWeight: number; remainingG: number; label: string }>,
+  rate: number,
+  today: Date
+): { runouts: Map<number, RunOutRange>; lastEmptyDate: Date; phases: Map<number, PhaseStep[]> } {
+  const runouts = new Map<number, RunOutRange>();
+  const phases = new Map<number, PhaseStep[]>();
+  const pool = bags
+    .filter((b) => b.urgencyWeight > 0 && b.remainingG > 0)
+    .map((b) => ({ ...b }));
+
+  if (pool.length === 0) return { runouts, lastEmptyDate: today, phases };
+
+  let currentDate = today;
+  let lastEmptyDate = today;
+  let remaining = pool;
+  let lastEmptyLabel: string | undefined = undefined;
+
+  while (remaining.length > 0) {
+    const totalUrgency = remaining.reduce((s, b) => s + b.urgencyWeight, 0);
+
+    let firstBag = remaining[0];
+    let firstDays = Infinity;
+    for (const b of remaining) {
+      const bagRate = rate * (b.urgencyWeight / totalUrgency);
+      const days = b.remainingG / bagRate;
+      if (days < firstDays) { firstDays = days; firstBag = b; }
+    }
+
+    for (const b of remaining) {
+      const bagRate = Math.round((rate * (b.urgencyWeight / totalUrgency)) * 10) / 10;
+      const steps = phases.get(b.id) ?? [];
+      steps.push({ rate: bagRate, triggeredByLabel: lastEmptyLabel });
+      phases.set(b.id, steps);
+    }
+
+    const firstRate = rate * (firstBag.urgencyWeight / totalUrgency);
+    runouts.set(firstBag.id, {
+      earliest: addDays(currentDate, Math.round(firstBag.remainingG / (firstRate * 1.2))),
+      latest: addDays(currentDate, Math.round(firstBag.remainingG / (firstRate * 0.8))),
+    });
+
+    for (const b of remaining) {
+      b.remainingG -= (rate * (b.urgencyWeight / totalUrgency)) * firstDays;
+    }
+
+    const phaseEnd = addDays(currentDate, Math.round(firstDays));
+    lastEmptyDate = phaseEnd;
+    currentDate = phaseEnd;
+    lastEmptyLabel = firstBag.label;
+    remaining = remaining.filter((b) => b.remainingG > 0.5);
+  }
+
+  return { runouts, lastEmptyDate, phases };
+}
+
 type BagComputed = {
   id: number;
   label: string;
@@ -111,6 +169,7 @@ type BagComputed = {
   allocatedRate: number | null;
   remainingG: number | null;
   runOutRange: RunOutRange | null;
+  phaseSteps: PhaseStep[];
 };
 
 export default function PlannerClient({
@@ -130,6 +189,7 @@ export default function PlannerClient({
   const [isDecaf, setIsDecaf] = useState(false);
   const [candidateWeightRaw, setCandidateWeightRaw] = useState(300);
   const [weightUnit, setWeightUnit] = useState<"g" | "oz">("g");
+  const [tooltipBagId, setTooltipBagId] = useState<number | null>(null);
 
   const handleUnitToggle = (newUnit: "g" | "oz") => {
     if (newUnit === weightUnit) return;
@@ -213,20 +273,28 @@ export default function PlannerClient({
     .filter((b) => b.urgencyWeight > 0)
     .reduce((s, b) => s + b.urgencyWeight, 0);
 
-  const cafBagsComputed: BagComputed[] = activeCafBagsTagged.map(({ bag, zone, urgencyWeight }) => {
+  const cafBagsWithRemaining = activeCafBagsTagged.map(({ bag, zone, urgencyWeight }) => {
+    const totalWeight = (bag.weightG ?? 0) + (bag.weightCorrectionG ?? 0);
+    const remainingG = bag.weightG != null ? Math.max(0, totalWeight - (bag.totalDoseG ?? 0)) : null;
+    return { bag, zone, urgencyWeight, remainingG };
+  });
+
+  const { runouts: cascadeRunouts, lastEmptyDate: lastCafEmptyDate, phases: cafCascadePhases } =
+    cafRate != null
+      ? calculateCascadedRunouts(
+          cafBagsWithRemaining
+            .filter((b) => b.urgencyWeight > 0 && b.remainingG != null)
+            .map((b) => ({ id: b.bag.id, urgencyWeight: b.urgencyWeight, remainingG: b.remainingG!, label: `${b.bag.roaster} · ${b.bag.name}` })),
+          cafRate,
+          today
+        )
+      : { runouts: new Map<number, RunOutRange>(), lastEmptyDate: today, phases: new Map<number, PhaseStep[]>() };
+
+  const cafBagsComputed: BagComputed[] = cafBagsWithRemaining.map(({ bag, zone, urgencyWeight, remainingG }) => {
     const bw = bagWindows.find((w) => w.id === bag.id)!;
     const allocatedRate =
       cafRate != null && totalCafUrgencyWeight > 0 && urgencyWeight > 0
         ? Math.round((cafRate * (urgencyWeight / totalCafUrgencyWeight)) * 10) / 10
-        : null;
-    const totalWeight = (bag.weightG ?? 0) + (bag.weightCorrectionG ?? 0);
-    const remainingG = bag.weightG != null ? Math.max(0, totalWeight - (bag.totalDoseG ?? 0)) : null;
-    const runOutRange: RunOutRange | null =
-      remainingG != null && allocatedRate != null && allocatedRate > 0
-        ? {
-            earliest: addDays(today, Math.round(remainingG / (allocatedRate * 1.2))),
-            latest: addDays(today, Math.round(remainingG / (allocatedRate * 0.8))),
-          }
         : null;
     return {
       id: bag.id,
@@ -237,15 +305,15 @@ export default function PlannerClient({
       urgencyWeight,
       allocatedRate,
       remainingG: remainingG != null ? Math.round(remainingG) : null,
-      runOutRange,
+      runOutRange: cascadeRunouts.get(bag.id) ?? null,
+      phaseSteps: cafCascadePhases.get(bag.id) ?? [],
     };
   });
 
-  // ── Decaf bags: run at full decaf rate ───────────────────────────────────────
-  const decafBagsComputed: BagComputed[] = activeBags
+  // ── Decaf bags: urgency-weighted cascade ────────────────────────────────────
+  const activeDecafBagsTagged = activeBags
     .filter((b) => b.isDecaf)
     .map((bag) => {
-      const bw = bagWindows.find((w) => w.id === bag.id)!;
       const { peakStartDay: ps, peakEndDay: pe } =
         bag.peakStartDay != null && bag.peakEndDay != null
           ? { peakStartDay: bag.peakStartDay, peakEndDay: bag.peakEndDay }
@@ -256,27 +324,49 @@ export default function PlannerClient({
             );
       const days = getDaysSinceRoast(bag.roastDate);
       const zone = getUrgencyZone(days, ps, pe);
-      const totalWeight = (bag.weightG ?? 0) + (bag.weightCorrectionG ?? 0);
-      const remainingG = bag.weightG != null ? Math.max(0, totalWeight - (bag.totalDoseG ?? 0)) : null;
-      const runOutRange: RunOutRange | null =
-        remainingG != null && decafRate != null && decafRate > 0
-          ? {
-              earliest: addDays(today, Math.round(remainingG / (decafRate * 1.2))),
-              latest: addDays(today, Math.round(remainingG / (decafRate * 0.8))),
-            }
-          : null;
-      return {
-        id: bag.id,
-        label: `${bag.roaster} · ${bag.name}`,
-        bag,
-        bw,
-        zone,
-        urgencyWeight: URGENCY_WEIGHTS[zone],
-        allocatedRate: decafRate,
-        remainingG: remainingG != null ? Math.round(remainingG) : null,
-        runOutRange,
-      };
+      return { bag, zone, urgencyWeight: URGENCY_WEIGHTS[zone] };
     });
+
+  const totalDecafUrgencyWeight = activeDecafBagsTagged
+    .filter((b) => b.urgencyWeight > 0)
+    .reduce((s, b) => s + b.urgencyWeight, 0);
+
+  const decafBagsWithRemaining = activeDecafBagsTagged.map(({ bag, zone, urgencyWeight }) => {
+    const totalWeight = (bag.weightG ?? 0) + (bag.weightCorrectionG ?? 0);
+    const remainingG = bag.weightG != null ? Math.max(0, totalWeight - (bag.totalDoseG ?? 0)) : null;
+    return { bag, zone, urgencyWeight, remainingG };
+  });
+
+  const { runouts: decafCascadeRunouts, lastEmptyDate: lastDecafEmptyDate, phases: decafCascadePhases } =
+    decafRate != null
+      ? calculateCascadedRunouts(
+          decafBagsWithRemaining
+            .filter((b) => b.urgencyWeight > 0 && b.remainingG != null)
+            .map((b) => ({ id: b.bag.id, urgencyWeight: b.urgencyWeight, remainingG: b.remainingG!, label: `${b.bag.roaster} · ${b.bag.name}` })),
+          decafRate,
+          today
+        )
+      : { runouts: new Map<number, RunOutRange>(), lastEmptyDate: today, phases: new Map<number, PhaseStep[]>() };
+
+  const decafBagsComputed: BagComputed[] = decafBagsWithRemaining.map(({ bag, zone, urgencyWeight, remainingG }) => {
+    const bw = bagWindows.find((w) => w.id === bag.id)!;
+    const allocatedRate =
+      decafRate != null && totalDecafUrgencyWeight > 0 && urgencyWeight > 0
+        ? Math.round((decafRate * (urgencyWeight / totalDecafUrgencyWeight)) * 10) / 10
+        : null;
+    return {
+      id: bag.id,
+      label: `${bag.roaster} · ${bag.name}`,
+      bag,
+      bw,
+      zone,
+      urgencyWeight,
+      allocatedRate,
+      remainingG: remainingG != null ? Math.round(remainingG) : null,
+      runOutRange: decafCascadeRunouts.get(bag.id) ?? null,
+      phaseSteps: decafCascadePhases.get(bag.id) ?? [],
+    };
+  });
 
   // Combined run-out map for timeline
   const allBagsRunOuts = new Map<number, { remainingG: number; runOutRange: RunOutRange } | null>(
@@ -292,10 +382,14 @@ export default function PlannerClient({
   const relevantRate = effectiveIsDecaf ? decafRate : cafRate;
   const candidateRunOutRange: RunOutRange | null =
     relevantRate != null && relevantRate > 0
-      ? {
-          earliest: addDays(candidate.peakStart, Math.round(candidateWeightG / (relevantRate * 1.2))),
-          latest: addDays(candidate.peakStart, Math.round(candidateWeightG / (relevantRate * 0.8))),
-        }
+      ? (() => {
+          const lastEmptyDate = effectiveIsDecaf ? lastDecafEmptyDate : lastCafEmptyDate;
+          const startDate = new Date(Math.max(lastEmptyDate.getTime(), candidate.peakStart.getTime()));
+          return {
+            earliest: addDays(startDate, Math.round(candidateWeightG / (relevantRate * 1.2))),
+            latest: addDays(startDate, Math.round(candidateWeightG / (relevantRate * 0.8))),
+          };
+        })()
       : null;
 
   // ── Peak pipeline ────────────────────────────────────────────────────────────
@@ -306,19 +400,22 @@ export default function PlannerClient({
       ? Math.min(candidateWeightG, Math.round(candidatePeakWindowDays * relevantRate))
       : null;
 
-  const existingPeakGrams = [...cafBagsComputed, ...decafBagsComputed]
-    .filter((b) => b.allocatedRate != null && b.remainingG != null)
-    .map((b) => {
-      const windowStart = new Date(Math.max(b.bw.peakStart.getTime(), today.getTime()));
-      const runOutEnd = b.runOutRange ? b.runOutRange.latest : b.bw.peakEnd;
-      const windowEnd = new Date(Math.min(b.bw.peakEnd.getTime(), runOutEnd.getTime()));
-      const daysInPeak = Math.max(0, daysBetween(windowStart, windowEnd));
-      return Math.round(daysInPeak * (b.allocatedRate ?? 0));
-    });
-
-  const totalExistingPeakGrams = existingPeakGrams.reduce((s, g) => s + g, 0);
+  const peakGramsForBags = (bags: BagComputed[]) =>
+    bags
+      .filter((b) => b.allocatedRate != null && b.remainingG != null)
+      .reduce((sum, b) => {
+        const windowStart = new Date(Math.max(b.bw.peakStart.getTime(), today.getTime()));
+        const runOutEnd = b.runOutRange ? b.runOutRange.latest : b.bw.peakEnd;
+        const windowEnd = new Date(Math.min(b.bw.peakEnd.getTime(), runOutEnd.getTime()));
+        return sum + Math.round(Math.max(0, daysBetween(windowStart, windowEnd)) * (b.allocatedRate ?? 0));
+      }, 0);
+  const cafExistingPeakTotal = peakGramsForBags(cafBagsComputed);
+  const decafExistingPeakTotal = peakGramsForBags(decafBagsComputed);
+  const totalExistingPeakGrams = cafExistingPeakTotal + decafExistingPeakTotal;
   const totalPeakGrams =
     candidatePeakGrams != null ? totalExistingPeakGrams + candidatePeakGrams : totalExistingPeakGrams;
+  const cafTotalPeakGrams = cafExistingPeakTotal + (!effectiveIsDecaf ? (candidatePeakGrams ?? 0) : 0);
+  const decafTotalPeakGrams = decafExistingPeakTotal + (effectiveIsDecaf ? (candidatePeakGrams ?? 0) : 0);
   const totalDailyRate = (cafRate ?? 0) + (decafRate ?? 0);
   const daysOfPeakCoffee =
     totalDailyRate > 0 && (cafRate != null || decafRate != null)
@@ -376,31 +473,47 @@ export default function PlannerClient({
       ? Math.max(0, daysBetween(latestBagUseSoonEnd, candidate.peakStart))
       : 0;
 
-  const bagOverlaps = bagWindows
-    .map((bw) => {
-      const overlapStart = Math.max(bw.peakStart.getTime(), candidate.peakStart.getTime());
-      const overlapEnd = Math.min(bw.peakEnd.getTime(), candidate.peakEnd.getTime());
-      const days = Math.max(0, Math.round((overlapEnd - overlapStart) / 86400000));
-      return { label: bw.label, days };
+  const bagOverlaps = [...cafBagsComputed, ...decafBagsComputed]
+    .filter((b) => b.runOutRange != null)
+    .map((b) => {
+      const runOutMid = new Date((b.runOutRange!.earliest.getTime() + b.runOutRange!.latest.getTime()) / 2);
+      const overlapEnd = new Date(Math.min(runOutMid.getTime(), candidate.peakEnd.getTime()));
+      const days = Math.max(0, daysBetween(candidate.peakStart, overlapEnd));
+      return { label: b.label, days, isDecaf: b.bag.isDecaf };
     })
     .filter((b) => b.days > 0);
 
   const simultaneousPeakDays = Math.max(0, gapDays !== null ? -gapDays : 0);
 
   // ── Buy date recommendation ──────────────────────────────────────────────────
+  // "Buy the bag peakStartDay days before your current bags run out so it peaks right as they empty."
   const relevantRateForBuy = effectiveIsDecaf ? decafRate : cafRate;
+  const lastRelevantEmptyDate = effectiveIsDecaf ? lastDecafEmptyDate : lastCafEmptyDate;
   const buyOnDate =
     relevantRateForBuy != null && relevantRateForBuy > 0
-      ? addDays(candidate.peakStart, -Math.round(candidateWeightG / relevantRateForBuy))
+      ? addDays(lastRelevantEmptyDate, -peakStartDay)
       : null;
   const daysUntilBuyOn = buyOnDate ? daysBetween(today, buyOnDate) : null;
 
-  type BuyState = "buy_now" | "good" | "too_early";
-  const buyState: BuyState | null = (() => {
-    if (!buyOnDate || daysUntilBuyOn == null) return null;
-    if (daysUntilBuyOn <= 3) return "buy_now";
-    if (simultaneousPeakDays >= 14) return "too_early";
-    return "good";
+  type DecisionState = "buy" | "caution" | "pass";
+  const buyDecision: {
+    state: DecisionState; readyDate: Date; daysOverPeak: number; overlapDays: number; isPastPeak?: boolean;
+  } | null = (() => {
+    if (relevantRateForBuy == null || relevantRateForBuy <= 0) return null;
+    if (daysPastPeak > 0) {
+      return { state: "pass" as DecisionState, readyDate: candidate.peakEnd, daysOverPeak: daysPastPeak, overlapDays: 0, isPastPeak: true };
+    }
+    const readyDate = candidate.peakStart;
+    const lastRunout = effectiveIsDecaf ? lastDecafEmptyDate : lastCafEmptyDate;
+    const estimatedFinishDate = addDays(lastRunout, Math.round(candidateWeightG / relevantRateForBuy));
+    const daysOverPeak = daysBetween(candidate.peakEnd, estimatedFinishDate);
+    const overlapStart = new Date(Math.max(readyDate.getTime(), today.getTime()));
+    const overlapEnd = new Date(Math.min(lastRunout.getTime(), candidate.peakEnd.getTime()));
+    const overlapDays = Math.max(0, daysBetween(overlapStart, overlapEnd));
+    const state: DecisionState =
+      daysOverPeak <= 0 && overlapDays <= 7 ? "buy" :
+      daysOverPeak <= 7 || overlapDays <= 14 ? "caution" : "pass";
+    return { state, readyDate, daysOverPeak, overlapDays };
   })();
 
   // ── Render helpers ───────────────────────────────────────────────────────────
@@ -771,6 +884,38 @@ export default function PlannerClient({
         )}
       </div>
 
+      {/* ── Buy Recommendation ────────────────────────────────────────────── */}
+      {buyDecision != null && (() => {
+        const { state, readyDate, daysOverPeak, isPastPeak } = buyDecision;
+        const isReady = readyDate <= today;
+        const readyStr = isReady ? "Ready now" : `Ready ${fmtShort(readyDate)}`;
+        const roastDaysAgo = daysBetween(candidateRoast, today);
+        const cfg = state === "buy"
+          ? { title: "Buy it", border: "#34C759", bg: "rgba(52,199,89,0.12)", text: "#34C759" }
+          : state === "caution"
+          ? { title: "Caution", border: "#FF9500", bg: "rgba(255,149,0,0.12)", text: "#FF9500" }
+          : { title: "Pass", border: "#FF3B30", bg: "rgba(255,59,48,0.12)", text: "#FF3B30" };
+        const subtitle = isPastPeak
+          ? `This coffee was roasted ${roastDaysAgo} day${roastDaysAgo !== 1 ? "s" : ""} ago. Based on the profile you selected, the peak window ended ${daysOverPeak} day${daysOverPeak !== 1 ? "s" : ""} ago — it may already be stale.`
+          : state === "buy"
+          ? `${readyStr}. Fits your inventory — you'll finish this bag comfortably within peak.`
+          : state === "caution"
+          ? `${readyStr}. Tight fit — you'll finish this ${Math.abs(daysOverPeak)} day${Math.abs(daysOverPeak) !== 1 ? "s" : ""} ${daysOverPeak > 0 ? "after" : "before"} peak ends at your current consumption rate.`
+          : `${readyStr}. Your current beans will carry you past this bag's peak — hold off and pick up the next roast date when your inventory thins out.`;
+        return (
+          <>
+            <SectionHeader title="Buy Recommendation" />
+            <div
+              className="mx-4"
+              style={{ backgroundColor: cfg.bg, borderLeft: `4px solid ${cfg.border}`, borderRadius: 12, padding: "16px 20px" }}
+            >
+              <p className="text-[20px] font-semibold mb-1" style={{ color: cfg.text }}>{cfg.title}</p>
+              <p className="text-[14px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
+            </div>
+          </>
+        );
+      })()}
+
       {/* ── Freshness Timeline ─────────────────────────────────────────────── */}
       <SectionHeader title="Freshness Timeline" />
       <div
@@ -788,8 +933,18 @@ export default function PlannerClient({
 
         {bagWindows.map((bw) => {
           const info = allBagsRunOuts.get(bw.id);
+          const bagForBw = activeBags.find((b) => b.id === bw.id);
+          const isDimmed = bagForBw != null && bagForBw.isDecaf !== effectiveIsDecaf;
           return (
-            <div key={bw.id} className="mb-3">
+            <div
+              key={bw.id}
+              className="mb-3"
+              style={{
+                opacity: isDimmed ? 0.35 : 1,
+                filter: isDimmed ? "saturate(0.4)" : "none",
+                transition: "opacity 0.2s ease, filter 0.2s ease",
+              }}
+            >
               <p className="text-[11px] mb-1.5 truncate" style={{ color: "var(--text-secondary)" }}>
                 {bw.label}
                 {info && (
@@ -844,42 +999,12 @@ export default function PlannerClient({
         </div>
       </div>
 
-      {/* ── Analysis ──────────────────────────────────────────────────────── */}
-      <SectionHeader title="Analysis" />
+      {/* ── Full Analysis ─────────────────────────────────────────────────── */}
+      <SectionHeader title="Full Analysis" />
       <div
         className="mx-4 rounded-2xl overflow-hidden"
         style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
       >
-        {/* Buy recommendation — prominent card at top */}
-        {buyState != null && (
-          <div
-            className="px-6 py-4 row-divider"
-            style={{
-              borderLeft: `3px solid ${
-                buyState === "good" ? "var(--success)" :
-                buyState === "buy_now" ? "var(--accent)" :
-                "var(--warning)"
-              }`,
-            }}
-          >
-            <p className="text-[17px] font-semibold" style={{ color: "var(--text-primary)" }}>
-              {buyState === "buy_now" && "Buy now"}
-              {buyState === "good" && `Buy on or after ${fmtShort(buyOnDate!)}`}
-              {buyState === "too_early" && `Wait until ${fmtShort(buyOnDate!)} to buy`}
-            </p>
-            <p className="text-[13px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
-              {buyState === "buy_now" && (
-                daysUntilBuyOn! < -7
-                  ? "Ideal timing has passed — buy soon to avoid a freshness gap."
-                  : "Peaks just as your current bags are running out."
-              )}
-              {buyState === "good" && "Peaks just as your current bags run out."}
-              {buyState === "too_early" &&
-                `Buying now creates ${simultaneousPeakDays} days of overlap with current bags in peak — each grinder switch wastes 7–8g.`}
-            </p>
-          </div>
-        )}
-
         {/* Peak window */}
         <div className="flex items-center px-6 min-h-[52px] row-divider">
           <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Peak window</span>
@@ -915,73 +1040,93 @@ export default function PlannerClient({
                 {daysOfPeakCoffee} day{daysOfPeakCoffee !== 1 ? "s" : ""}
               </span>
             </div>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-secondary)" }}>
-              {totalPeakGrams}g total at {totalDailyRate}g/day
-              {existingPeakGrams.length > 0 &&
-                ` — ${totalExistingPeakGrams}g from current bags + ${candidatePeakGrams ?? 0}g from candidate`}
-            </p>
+            {cafRate != null && (
+              <p className="text-[13px] mt-1" style={{ color: "var(--text-secondary)", opacity: effectiveIsDecaf ? 0.45 : 1, transition: "opacity 0.2s ease" }}>
+                {"Caffeinated: "}
+                {effectiveIsDecaf
+                  ? `${cafExistingPeakTotal}g at ${cafRate}g/day — context only`
+                  : `${cafTotalPeakGrams}g at ${cafRate}g/day${cafExistingPeakTotal > 0 ? ` — ${cafExistingPeakTotal}g from current bags + ${candidatePeakGrams ?? 0}g from candidate` : ""}`}
+              </p>
+            )}
+            {decafRate != null && (
+              <p className="text-[13px] mt-0.5" style={{ color: "var(--text-secondary)", opacity: effectiveIsDecaf ? 1 : 0.45, transition: "opacity 0.2s ease" }}>
+                {"Decaffeinated: "}
+                {effectiveIsDecaf
+                  ? `${decafTotalPeakGrams}g at ${decafRate}g/day${decafExistingPeakTotal > 0 ? ` — ${decafExistingPeakTotal}g from current bags + ${candidatePeakGrams ?? 0}g from candidate` : ""}`
+                  : `${decafExistingPeakTotal}g at ${decafRate}g/day — context only`}
+              </p>
+            )}
           </div>
         )}
 
-        {/* Per-bag run-out rows (caf) */}
-        {cafBagsComputed.filter((b) => b.runOutRange != null).map((b, i) => {
-          const daysUntilMidRunOut = daysBetween(today, new Date((b.runOutRange!.earliest.getTime() + b.runOutRange!.latest.getTime()) / 2));
-          const runsOutBeforePeak = b.runOutRange!.latest < candidate.peakStart;
-          return (
-            <div key={i} className="row-divider">
-              <div className="flex items-center px-6 min-h-[52px]">
-                <span className="text-[15px] flex-1 truncate pr-4" style={{ color: "var(--text-secondary)" }}>
-                  Runs out · {b.label}
-                </span>
-                <span
-                  className="text-[15px] flex-shrink-0"
-                  style={{ color: runsOutBeforePeak ? "var(--destructive)" : "var(--text-secondary)" }}
+        {/* Per-bag run-out rows — matching type first, then dimmed context rows */}
+        {(() => {
+          const withType = [
+            ...cafBagsComputed.filter((b) => b.runOutRange != null).map((b) => ({ ...b, isSameType: !effectiveIsDecaf })),
+            ...decafBagsComputed.filter((b) => b.runOutRange != null).map((b) => ({ ...b, isSameType: effectiveIsDecaf })),
+          ];
+          const sameType = withType.filter((b) => b.isSameType);
+          const other = withType.filter((b) => !b.isSameType);
+          const sorted = [...sameType, ...other];
+          return sorted.map((b, i) => {
+            const isFirstOther = !b.isSameType && (i === 0 || sorted[i - 1].isSameType);
+            const runsOutBeforePeak = b.runOutRange!.latest < candidate.peakStart;
+            const rateLabel = b.phaseSteps.length > 1
+              ? b.phaseSteps.map((s, j) => j === 0 ? `${s.rate}g/day` : ` → ${s.rate}g/day after ${s.triggeredByLabel} empties`).join("")
+              : `${b.phaseSteps[0]?.rate ?? b.allocatedRate ?? "?"}g/day`;
+            const isTooltipOpen = tooltipBagId === b.id;
+            const typeLabel = b.bag.isDecaf ? "decaf" : "caf";
+            return (
+              <Fragment key={b.id}>
+                {isFirstOther && sameType.length > 0 && (
+                  <div style={{ height: 1, backgroundColor: "var(--card-secondary)", margin: "0 24px" }} />
+                )}
+                <div
+                  className="row-divider"
+                  style={{ opacity: b.isSameType ? 1 : 0.45, transition: "opacity 0.2s ease" }}
+                  onClick={() => { if (!b.isSameType) setTooltipBagId(isTooltipOpen ? null : b.id); }}
                 >
-                  {fmtRange(b.runOutRange!.earliest, b.runOutRange!.latest)}
-                </span>
-              </div>
-              <p className="px-6 pb-3 text-[13px]" style={{ color: "var(--text-secondary)", opacity: 0.7 }}>
-                {b.remainingG}g at {b.allocatedRate}g/day
-                {b.urgencyWeight > 0 && totalCafUrgencyWeight > 0
-                  ? ` (${Math.round((b.urgencyWeight / totalCafUrgencyWeight) * 100)}% of caf share — ${b.zone.replace("_", " ")})`
-                  : ""}
-                {runsOutBeforePeak && " · runs out before this bag peaks"}
-              </p>
-            </div>
-          );
-        })}
+                  <div className="flex items-center px-6 min-h-[52px]">
+                    <span className="text-[15px] flex-1 truncate pr-4" style={{ color: "var(--text-secondary)" }}>
+                      Runs out · {b.label}
+                    </span>
+                    <span className="text-[15px] flex-shrink-0" style={{ color: runsOutBeforePeak ? "var(--destructive)" : "var(--text-secondary)" }}>
+                      {fmtRange(b.runOutRange!.earliest, b.runOutRange!.latest)}
+                    </span>
+                  </div>
+                  <p className="px-6 pb-2 text-[13px]" style={{ color: "var(--text-secondary)", opacity: 0.7 }}>
+                    {b.remainingG}g · {rateLabel} · {b.zone.replace("_", " ")}
+                    {runsOutBeforePeak && " · runs out before this bag peaks"}
+                  </p>
+                  {!b.isSameType && (
+                    <p className="px-6 pb-3 text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.55 }}>
+                      {typeLabel} — planning context only
+                      {isTooltipOpen && (
+                        <span className="block mt-0.5" style={{ opacity: 0.85 }}>
+                          Shown for context — not factored into this candidate&apos;s planning
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </Fragment>
+            );
+          });
+        })()}
 
-        {/* Per-bag run-out rows (decaf) */}
-        {decafBagsComputed.filter((b) => b.runOutRange != null).map((b, i) => {
-          const runsOutBeforePeak = b.runOutRange!.latest < candidate.peakStart;
-          return (
-            <div key={`d${i}`} className="row-divider">
-              <div className="flex items-center px-6 min-h-[52px]">
-                <span className="text-[15px] flex-1 truncate pr-4" style={{ color: "var(--text-secondary)" }}>
-                  Runs out · {b.label}
-                </span>
-                <span className="text-[15px] flex-shrink-0" style={{ color: runsOutBeforePeak ? "var(--destructive)" : "var(--text-secondary)" }}>
-                  {fmtRange(b.runOutRange!.earliest, b.runOutRange!.latest)}
-                </span>
-              </div>
-              <p className="px-6 pb-3 text-[13px]" style={{ color: "var(--text-secondary)", opacity: 0.7 }}>
-                {b.remainingG}g at {b.allocatedRate}g/day (full decaf rate)
-              </p>
+        {/* Per-bag overlap rows — same type only */}
+        {bagOverlaps
+          .filter((b) => b.isDecaf === effectiveIsDecaf)
+          .map((b, i) => (
+            <div key={i} className="flex items-center px-6 min-h-[52px] row-divider">
+              <span className="text-[15px] flex-1 truncate pr-4" style={{ color: "var(--text-secondary)" }}>
+                Overlap · {b.label}
+              </span>
+              <span className="text-[15px] flex-shrink-0" style={{ color: "#FF9500" }}>
+                {b.days} day{b.days !== 1 ? "s" : ""}
+              </span>
             </div>
-          );
-        })}
-
-        {/* Per-bag overlap rows */}
-        {bagOverlaps.map((b, i) => (
-          <div key={i} className="flex items-center px-6 min-h-[52px] row-divider">
-            <span className="text-[15px] flex-1 truncate pr-4" style={{ color: "var(--text-secondary)" }}>
-              Overlap · {b.label}
-            </span>
-            <span className="text-[15px] flex-shrink-0" style={{ color: "#FF9500" }}>
-              {b.days} day{b.days !== 1 ? "s" : ""}
-            </span>
-          </div>
-        ))}
+          ))}
 
         {/* Verdict */}
         {verdict && (
@@ -1024,6 +1169,7 @@ export default function PlannerClient({
           </p>
         </div>
       </div>
+
     </div>
   );
 }
