@@ -497,7 +497,7 @@ export default function BagFormClient({
                   </FieldRow>
                   {weightG !== "" && (
                     <p className="px-6 pb-3 text-[13px] text-right" style={{ color: "var(--text-secondary)" }}>
-                      Adjusted: {Number(weightG) + Number(weightCorrectionG)}g
+                      Est. remaining: {Math.max(0, Number(weightG) + Number(weightCorrectionG) - (initialData?.totalDoseG ?? 0))}g
                     </p>
                   )}
                 </>
