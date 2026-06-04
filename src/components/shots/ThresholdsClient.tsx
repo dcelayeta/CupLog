@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { saveThreshold, restoreDefaultThresholds } from "@/lib/shots/thresholds";
+import { saveAppConfig } from "@/lib/config/queries";
 import type { ExtractionThreshold } from "@/db/schema";
 
 type EditableThreshold = {
@@ -100,8 +101,10 @@ function Section({
 
 export default function ThresholdsClient({
   thresholds,
+  lowInventoryWarningDays: initialWarningDays,
 }: {
   thresholds: ExtractionThreshold[];
+  lowInventoryWarningDays: number;
 }) {
   const [rows, setRows] = useState<EditableThreshold[]>(
     thresholds.map((t) => ({
@@ -113,6 +116,7 @@ export default function ThresholdsClient({
       sortOrder: t.sortOrder,
     }))
   );
+  const [warningDays, setWarningDays] = useState(initialWarningDays);
   const [isPending, startTransition] = useTransition();
   const [isRestoring, startRestore] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -135,6 +139,7 @@ export default function ThresholdsClient({
           await saveThreshold(row.id, { label: row.label.trim(), minValue, maxValue });
         }
       }
+      await saveAppConfig({ lowInventoryWarningDays: warningDays });
       setSaved(true);
     });
   };
@@ -152,6 +157,44 @@ export default function ThresholdsClient({
     <div className="pb-40">
       <Section label="Time (seconds)" rows={timeRows} updateRow={updateRow} />
       <Section label="Ratio (yield ÷ dose)" rows={ratioRows} updateRow={updateRow} />
+
+      {/* Inventory alert threshold */}
+      <div className="mb-1">
+        <div className="px-4 pt-5 pb-1">
+          <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>Inventory</p>
+        </div>
+        <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+          <div className="flex items-center px-4 py-3">
+            <div className="flex-1">
+              <p className="text-[15px]" style={{ color: "var(--text-primary)" }}>Low inventory alert</p>
+              <p className="text-[12px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                Warn when estimated days remaining drops below this threshold. Falls back to 50g when no consumption data is available.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => { setSaved(false); setWarningDays((d) => Math.max(1, d - 1)); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[20px] leading-none"
+                style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}
+              >
+                −
+              </button>
+              <span className="text-[17px] font-semibold w-14 text-center" style={{ color: "var(--text-primary)" }}>
+                {warningDays}d
+              </span>
+              <button
+                type="button"
+                onClick={() => { setSaved(false); setWarningDays((d) => Math.min(30, d + 1)); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[20px] leading-none"
+                style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {saved && (
         <p className="mx-4 mt-3 text-[15px] text-center" style={{ color: "var(--success)" }}>

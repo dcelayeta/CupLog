@@ -82,7 +82,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] All-time averages grid: rating, taste balance, dose, yield, time, ratio
 - [x] Active beans freshness card — mini 5-zone timeline bar per bag with today marker; taps to bag detail
 - [x] Equipment cleaning overdue warning — red banner when machine or grinder is past cleaning interval
-- [x] Almost empty warning — orange banner when any active bag drops below 50g estimated remaining; links to bag detail (single) or bag list (multiple)
+- [x] Almost empty warning — orange banner when estimated days remaining drops below a configurable threshold (default 7d), using per-bag daily consumption rate; falls back to 50g when no rate data is available; links to bag detail (single) or bag list (multiple); threshold adjustable in More → Thresholds
 - [x] Entering peak notification — green banner on the day a bag reaches its estimated peak start; links to bag detail or bag list
 - [x] Last shot card — roaster/bag, detected drink, stats, taste, notes
 
@@ -160,6 +160,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Inline editor for time and ratio classification ranges
 - [x] DB-driven — thresholds read at runtime, not hardcoded
 - [x] Restore defaults with confirm step
+- [x] Configurable low inventory warning days (1–30d, default 7) — saved to `app_config` table alongside threshold edits
 
 ### More → AI Coaching State
 - [x] Manual editor for AI coach rolling context (experience level, patterns, bean notes)
@@ -183,6 +184,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 | `shot_analyses` | Cached AI analysis results per shot |
 | `bag_analyses` | Cached AI dial-in analysis per bag |
 | `coffee_faqs` | Static FAQ content |
+| `app_config` | Single-row user preferences — low inventory warning threshold |
 
 ---
 

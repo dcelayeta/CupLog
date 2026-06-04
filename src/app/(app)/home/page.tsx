@@ -7,6 +7,8 @@ import { getBags } from "@/lib/bags/queries";
 import ClientDateTime from "@/components/ClientDateTime";
 import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 import { getActiveEquipmentProfile } from "@/lib/equipment/queries";
+import { getPerBagDailyDose } from "@/lib/shots/queries";
+import { getAppConfig } from "@/lib/config/queries";
 import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
 
 async function getStats() {
@@ -147,8 +149,14 @@ function formatTime(secs: number | null): string {
 
 
 export default async function HomePage() {
-  const [stats, lastShot, activeBags, equipment] = await Promise.all([
-    getStats(), getLastShot(), getBags("active"), getActiveEquipmentProfile(),
+  const [activeBags, equipment, config] = await Promise.all([
+    getBags("active"), getActiveEquipmentProfile(), getAppConfig(),
+  ]);
+  const bagIds = activeBags.map((b) => b.id);
+  const [stats, lastShot, perBagRates] = await Promise.all([
+    getStats(),
+    getLastShot(),
+    bagIds.length > 0 ? getPerBagDailyDose(bagIds) : Promise.resolve({} as Record<number, number>),
   ]);
 
   const totalShots = Number(stats?.total_shots ?? 0);
@@ -207,14 +215,24 @@ export default async function HomePage() {
 
       {/* ── Almost empty warnings ─────────────────────────────────────────── */}
       {(() => {
+        const warningDays = config.lowInventoryWarningDays ?? 7;
         const lowBags = activeBags.filter((bag) => {
           if (bag.weightG == null) return false;
           const remaining = bag.weightG - (bag.totalDoseG ?? 0) + (bag.weightCorrectionG ?? 0);
-          return remaining > 0 && remaining < 50;
+          if (remaining <= 0) return false;
+          const rate = perBagRates[bag.id];
+          if (rate != null && rate > 0) return (remaining / rate) < warningDays;
+          return remaining < 50;
         });
         if (lowBags.length === 0) return null;
         const href = lowBags.length === 1 ? `/bags/${lowBags[0].id}` : "/bags";
-        const names = lowBags.map((b) => `${b.roaster} — ${b.name}`).join(" · ");
+        const names = lowBags.map((b) => {
+          const remaining = b.weightG != null ? b.weightG - (b.totalDoseG ?? 0) + (b.weightCorrectionG ?? 0) : null;
+          const rate = perBagRates[b.id];
+          const daysLeft = remaining != null && rate != null && rate > 0 ? Math.round(remaining / rate) : null;
+          const suffix = daysLeft != null ? ` · ~${daysLeft}d left` : remaining != null ? ` · ~${Math.round(remaining)}g` : "";
+          return `${b.roaster} — ${b.name}${suffix}`;
+        }).join(" · ");
         return (
           <Link
             href={href}

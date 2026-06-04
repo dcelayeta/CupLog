@@ -244,6 +244,13 @@ export const coffeeFaqs = sqliteTable("coffee_faqs", {
     .default(sql`(datetime('now'))`),
 });
 
+// ─── app_config ──────────────────────────────────────────────────────────────
+
+export const appConfig = sqliteTable("app_config", {
+  id: integer("id").primaryKey(),
+  lowInventoryWarningDays: integer("low_inventory_warning_days").notNull().default(7),
+});
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type Bag = typeof bags.$inferSelect;
@@ -259,5 +266,6 @@ export type Drink = typeof drinks.$inferSelect;
 export type NewDrink = typeof drinks.$inferInsert;
 export type CoachingState = typeof coachingState.$inferSelect;
 export type ShotAnalysis = typeof shotAnalyses.$inferSelect;
+export type AppConfig = typeof appConfig.$inferSelect;
 export type CoffeeFaq = typeof coffeeFaqs.$inferSelect;
 export type BagAnalysis = typeof bagAnalyses.$inferSelect;

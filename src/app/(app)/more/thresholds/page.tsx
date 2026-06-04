@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { getExtractionThresholds } from "@/lib/shots/thresholds";
+import { getAppConfig } from "@/lib/config/queries";
 import ThresholdsClient from "@/components/shots/ThresholdsClient";
 
 export default async function ThresholdsPage() {
-  const thresholds = await getExtractionThresholds();
+  const [thresholds, config] = await Promise.all([
+    getExtractionThresholds(),
+    getAppConfig(),
+  ]);
 
   return (
     <div className="pt-4 pb-8">
@@ -19,9 +23,9 @@ export default async function ThresholdsPage() {
         Thresholds
       </h1>
       <p className="px-4 mb-4 text-[15px]" style={{ color: "var(--text-secondary)" }}>
-        Classification ranges for shot time, brew ratio, and bean freshness.
+        Classification ranges for shot time, brew ratio, and inventory alerts.
       </p>
-      <ThresholdsClient thresholds={thresholds} />
+      <ThresholdsClient thresholds={thresholds} lowInventoryWarningDays={config.lowInventoryWarningDays} />
     </div>
   );
 }
