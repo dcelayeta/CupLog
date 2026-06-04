@@ -137,30 +137,22 @@ function SpringWeightInput({ name, value, onChange }: {
   name: string; value: string; onChange: (v: string) => void;
 }) {
   const PRESETS = ["15", "25", "30"];
-  const [showManual, setShowManual] = useState(!PRESETS.includes(value) && value !== "");
-  const handlePreset = (p: string) => { setShowManual(false); onChange(p); };
-  const handleManual = () => { setShowManual(true); if (PRESETS.includes(value)) onChange(""); };
+  const isManual = !PRESETS.includes(value);
   return (
     <div className="flex items-center gap-1.5">
       <input type="hidden" name={name} value={value} />
       {PRESETS.map((p) => (
-        <button key={p} type="button" onPointerDown={() => handlePreset(p)}
+        <button key={p} type="button" onPointerDown={() => onChange(p)}
           className="h-7 px-2.5 rounded-full text-[13px] font-medium select-none"
           style={{ backgroundColor: value === p ? "var(--accent)" : "var(--card-secondary)", color: value === p ? "white" : "var(--text-primary)" }}>
           {p}
         </button>
       ))}
-      <button type="button" onPointerDown={handleManual}
+      <button type="button" onPointerDown={() => onChange("")}
         className="h-7 px-2.5 rounded-full text-[13px] font-medium select-none"
-        style={{ backgroundColor: showManual ? "var(--accent)" : "var(--card-secondary)", color: showManual ? "white" : "var(--text-primary)" }}>
+        style={{ backgroundColor: isManual ? "var(--accent)" : "var(--card-secondary)", color: isManual ? "white" : "var(--text-primary)" }}>
         Manual
       </button>
-      {showManual && (
-        <input type="text" inputMode="numeric" value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder="—"
-          className="text-center outline-none bg-transparent text-[17px] w-[40px]"
-          style={{ color: "var(--text-primary)" }} />
-      )}
     </div>
   );
 }
