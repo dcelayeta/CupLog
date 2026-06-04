@@ -438,7 +438,7 @@ export default function LogFormClient({
             <StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} />
           </Row>
           <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass || adjustedDoseG)}>
-            <StepperInput name="lagG" value={lagG} onChange={setLagG} step={0.1} min={0} max={20} />
+            <StepperInput name="lagG" value={lagG} onChange={setLagG} step={1} min={0} max={20} />
           </Row>
 
           {/* Live preview */}

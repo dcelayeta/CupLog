@@ -367,7 +367,7 @@ export default function ShotEditFormClient({
           <Row label="Dose (g)"><StepperInput name="doseG" value={doseG} onChange={setDoseG} step={0.1} min={0} max={30} /></Row>
           <Row label="Yield (g)"><StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} /></Row>
           <Row label="Shot Time (s)"><StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} /></Row>
-          <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass)}><StepperInput name="lagG" value={lagG} onChange={setLagG} step={0.1} min={0} max={20} /></Row>
+          <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass)}><StepperInput name="lagG" value={lagG} onChange={setLagG} step={1} min={0} max={20} /></Row>
 
           {(liveRatio || timeClass || ratioClass) && (
             <div className="px-6 py-3 flex items-center gap-2 flex-wrap" style={{ backgroundColor: "var(--card-secondary)" }}>
