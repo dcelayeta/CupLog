@@ -102,9 +102,11 @@ function Section({
 export default function ThresholdsClient({
   thresholds,
   lowInventoryWarningCups: initialWarningCups,
+  recentShotWindow: initialShotWindow,
 }: {
   thresholds: ExtractionThreshold[];
   lowInventoryWarningCups: number;
+  recentShotWindow: number;
 }) {
   const [rows, setRows] = useState<EditableThreshold[]>(
     thresholds.map((t) => ({
@@ -117,6 +119,7 @@ export default function ThresholdsClient({
     }))
   );
   const [warningCups, setWarningCups] = useState(initialWarningCups);
+  const [shotWindow, setShotWindow] = useState(initialShotWindow);
   const [isPending, startTransition] = useTransition();
   const [isRestoring, startRestore] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -139,7 +142,7 @@ export default function ThresholdsClient({
           await saveThreshold(row.id, { label: row.label.trim(), minValue, maxValue });
         }
       }
-      await saveAppConfig({ lowInventoryWarningCups: warningCups });
+      await saveAppConfig({ lowInventoryWarningCups: warningCups, recentShotWindow: shotWindow });
       setSaved(true);
     });
   };
@@ -164,11 +167,11 @@ export default function ThresholdsClient({
           <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>Inventory</p>
         </div>
         <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
-          <div className="flex items-center px-4 py-3">
+          <div className="flex items-center px-4 py-3 row-divider">
             <div className="flex-1">
               <p className="text-[15px]" style={{ color: "var(--text-primary)" }}>Low inventory alert</p>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                Warn when estimated cups remaining drops below this threshold. Uses your average dose across the last 10 shots for that bag (fallback: all-time avg, then 18g).
+                Warn when estimated cups remaining drops below this threshold.
               </p>
             </div>
             <div className="flex items-center gap-2 ml-4 flex-shrink-0">
@@ -186,6 +189,35 @@ export default function ThresholdsClient({
               <button
                 type="button"
                 onClick={() => { setSaved(false); setWarningCups((c) => Math.min(60, c + 1)); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[20px] leading-none"
+                style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center px-4 py-3">
+            <div className="flex-1">
+              <p className="text-[15px]" style={{ color: "var(--text-primary)" }}>Dose avg window</p>
+              <p className="text-[12px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                Number of recent shots used to estimate your average dose per cup. Fallback: all-time avg, then 18g.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => { setSaved(false); setShotWindow((s) => Math.max(1, s - 1)); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[20px] leading-none"
+                style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}
+              >
+                −
+              </button>
+              <span className="text-[17px] font-semibold w-20 text-center" style={{ color: "var(--text-primary)" }}>
+                {shotWindow} shots
+              </span>
+              <button
+                type="button"
+                onClick={() => { setSaved(false); setShotWindow((s) => Math.min(30, s + 1)); }}
                 className="w-8 h-8 rounded-full flex items-center justify-center text-[20px] leading-none"
                 style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}
               >

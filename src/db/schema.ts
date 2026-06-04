@@ -249,6 +249,7 @@ export const coffeeFaqs = sqliteTable("coffee_faqs", {
 export const appConfig = sqliteTable("app_config", {
   id: integer("id").primaryKey(),
   lowInventoryWarningCups: integer("low_inventory_warning_cups").notNull().default(14),
+  recentShotWindow: integer("recent_shot_window").notNull().default(10),
 });
 
 // ─── Types ───────────────────────────────────────────────────────────────────

@@ -152,7 +152,7 @@ export default async function HomePage() {
   const [activeBags, equipment, config, stats, lastShot] = await Promise.all([
     getBags("active"), getActiveEquipmentProfile(), getAppConfig(), getStats(), getLastShot(),
   ]);
-  const recentAvgDose = await getRecentAvgDosePerBag(activeBags.map((b) => b.id));
+  const recentAvgDose = await getRecentAvgDosePerBag(activeBags.map((b) => b.id), config.recentShotWindow ?? 10);
 
   const totalShots = Number(stats?.total_shots ?? 0);
   const failedShots = Number(stats?.failed_shots ?? 0);

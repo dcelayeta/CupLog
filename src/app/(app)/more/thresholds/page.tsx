@@ -25,7 +25,7 @@ export default async function ThresholdsPage() {
       <p className="px-4 mb-4 text-[15px]" style={{ color: "var(--text-secondary)" }}>
         Classification ranges for shot time, brew ratio, and inventory alerts.
       </p>
-      <ThresholdsClient thresholds={thresholds} lowInventoryWarningCups={config.lowInventoryWarningCups} />
+      <ThresholdsClient thresholds={thresholds} lowInventoryWarningCups={config.lowInventoryWarningCups} recentShotWindow={config.recentShotWindow} />
     </div>
   );
 }

@@ -160,7 +160,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Inline editor for time and ratio classification ranges
 - [x] DB-driven — thresholds read at runtime, not hardcoded
 - [x] Restore defaults with confirm step
-- [x] Configurable low inventory warning days (1–30d, default 7) — saved to `app_config` table alongside threshold edits
+- [x] Configurable low inventory warning (cups threshold 1–60, default 14) and dose avg window (shots 1–30, default 10) — both saved to `app_config` alongside threshold edits
 
 ### More → AI Coaching State
 - [x] Manual editor for AI coach rolling context (experience level, patterns, bean notes)
