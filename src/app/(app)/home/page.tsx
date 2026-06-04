@@ -228,9 +228,11 @@ export default async function HomePage() {
         const href = lowBags.length === 1 ? `/bags/${lowBags[0].id}` : "/bags";
         const names = lowBags.map((b) => {
           const remaining = b.weightG != null ? b.weightG - (b.totalDoseG ?? 0) + (b.weightCorrectionG ?? 0) : null;
-          const rate = perBagRates[b.id];
-          const daysLeft = remaining != null && rate != null && rate > 0 ? Math.round(remaining / rate) : null;
-          const suffix = daysLeft != null ? ` · ~${daysLeft}d left` : remaining != null ? ` · ~${Math.round(remaining)}g` : "";
+          const avgDose = b.shotCount != null && b.shotCount > 0 && b.totalDoseG != null
+            ? b.totalDoseG / b.shotCount
+            : 18;
+          const cupsLeft = remaining != null ? Math.round(remaining / avgDose) : null;
+          const suffix = cupsLeft != null ? ` · ~${cupsLeft} cup${cupsLeft !== 1 ? "s" : ""} left` : "";
           return `${b.roaster} — ${b.name}${suffix}`;
         }).join(" · ");
         return (
