@@ -100,7 +100,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Buy Planner — candidate bag input (roast level, process, weight); phase-based cascade run-out for caf and decaf bags independently; three-state buy decision (Buy it / Caution / Pass) with past-peak stale detection; freshness timeline with bean-type visual hierarchy (non-matching type dimmed); per-bag phase-aware rate labels; rolling consumption window slider
 
 ### Shots (Log + History)
-- [x] Log form — bag selector, dose, yield, shot time, lag (g), grind setting, pre-infusion, spring weight, WDT toggle, grinder retention
+- [x] Log form — bag selector, dose, yield, shot time, lag (g), grind setting, pre-infusion, spring weight, WDT toggle, grinder retention; shot time/lag/pre-infusion use steppers; spring weight uses preset pills (15/25/30 lbs) with Manual fallback
 - [x] Defaults from last shot per bag: dose, grind setting, lag, spring weight, WDT
 - [x] StepperInput (−/+ buttons) for dose, yield, grind, retention, milk, foam, hot water — avoids decimal keyboard on iOS
 - [x] Live ratio + classification badge preview

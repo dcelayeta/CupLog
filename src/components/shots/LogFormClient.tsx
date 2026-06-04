@@ -171,6 +171,38 @@ function StepperInput({
   );
 }
 
+function SpringWeightInput({ name, value, onChange }: {
+  name: string; value: string; onChange: (v: string) => void;
+}) {
+  const PRESETS = ["15", "25", "30"];
+  const [showManual, setShowManual] = useState(!PRESETS.includes(value) && value !== "");
+  const handlePreset = (p: string) => { setShowManual(false); onChange(p); };
+  const handleManual = () => { setShowManual(true); if (PRESETS.includes(value)) onChange(""); };
+  return (
+    <div className="flex items-center gap-1.5">
+      <input type="hidden" name={name} value={value} />
+      {PRESETS.map((p) => (
+        <button key={p} type="button" onPointerDown={() => handlePreset(p)}
+          className="h-7 px-2.5 rounded-full text-[13px] font-medium select-none"
+          style={{ backgroundColor: value === p ? "var(--accent)" : "var(--card-secondary)", color: value === p ? "white" : "var(--text-primary)" }}>
+          {p}
+        </button>
+      ))}
+      <button type="button" onPointerDown={handleManual}
+        className="h-7 px-2.5 rounded-full text-[13px] font-medium select-none"
+        style={{ backgroundColor: showManual ? "var(--accent)" : "var(--card-secondary)", color: showManual ? "white" : "var(--text-primary)" }}>
+        Manual
+      </button>
+      {showManual && (
+        <input type="text" inputMode="numeric" value={value} onChange={(e) => onChange(e.target.value)}
+          placeholder="—"
+          className="text-center outline-none bg-transparent text-[17px] w-[40px]"
+          style={{ color: "var(--text-primary)" }} />
+      )}
+    </div>
+  );
+}
+
 function SectionHeader({ title }: { title: string }) {
   return (
     <div className="px-4 pt-5 pb-1">
@@ -411,10 +443,10 @@ export default function LogFormClient({
             <StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} />
           </Row>
           <Row label="Shot Time (s)">
-            <NumberInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} placeholder={isFailed ? "—" : "28"} integer min="0" max="120" />
+            <StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} />
           </Row>
           <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass || adjustedDoseG)}>
-            <NumberInput name="lagG" value={lagG} onChange={setLagG} placeholder="—" min="0" />
+            <StepperInput name="lagG" value={lagG} onChange={setLagG} step={0.1} min={0} max={20} />
           </Row>
 
           {/* Live preview */}
@@ -447,10 +479,10 @@ export default function LogFormClient({
             <StepperInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} step={0.5} min={0} max={50} />
           </Row>
           <Row label="Pre-infusion (s)">
-            <NumberInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} placeholder="—" integer min="0" />
+            <StepperInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} step={1} min={0} max={30} />
           </Row>
           <Row label="Spring Weight (lbs)">
-            <NumberInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} placeholder="—" integer min="0" />
+            <SpringWeightInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} />
           </Row>
           <Row label="Retention (g)">
             <StepperInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} step={0.1} min={0} max={5} />
