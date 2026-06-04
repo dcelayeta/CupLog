@@ -82,6 +82,8 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] All-time averages grid: rating, taste balance, dose, yield, time, ratio
 - [x] Active beans freshness card — mini 5-zone timeline bar per bag with today marker; taps to bag detail
 - [x] Equipment cleaning overdue warning — red banner when machine or grinder is past cleaning interval
+- [x] Almost empty warning — orange banner when any active bag drops below 50g estimated remaining; links to bag detail (single) or bag list (multiple)
+- [x] Entering peak notification — green banner on the day a bag reaches its estimated peak start; links to bag detail or bag list
 - [x] Last shot card — roaster/bag, detected drink, stats, taste, notes
 
 ### Bags (Bean Inventory)

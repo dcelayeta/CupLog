@@ -205,6 +205,71 @@ export default async function HomePage() {
         );
       })()}
 
+      {/* ── Almost empty warnings ─────────────────────────────────────────── */}
+      {(() => {
+        const lowBags = activeBags.filter((bag) => {
+          if (bag.weightG == null) return false;
+          const remaining = bag.weightG - (bag.totalDoseG ?? 0) + (bag.weightCorrectionG ?? 0);
+          return remaining > 0 && remaining < 50;
+        });
+        if (lowBags.length === 0) return null;
+        const href = lowBags.length === 1 ? `/bags/${lowBags[0].id}` : "/bags";
+        const names = lowBags.map((b) => `${b.roaster} — ${b.name}`).join(" · ");
+        return (
+          <Link
+            href={href}
+            className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-4 active:opacity-70 transition-opacity"
+            style={{ backgroundColor: "#FF9500" }}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="3" width="12" height="15" rx="2" />
+              <path d="M7 7h6M7 11h4" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-white">
+                {lowBags.length === 1 ? "Almost empty" : `${lowBags.length} bags almost empty`}
+              </p>
+              <p className="text-[12px] text-white opacity-80 truncate">{names}</p>
+            </div>
+            <svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+              <path d="M1 1l6 5.5L1 12" />
+            </svg>
+          </Link>
+        );
+      })()}
+
+      {/* ── Entering peak notifications ───────────────────────────────────── */}
+      {(() => {
+        const peakBags = activeBags.filter((bag) => {
+          const days = getDaysSinceRoast(bag.roastDate);
+          const peakStart = bag.peakStartDay ?? 7;
+          return days === peakStart;
+        });
+        if (peakBags.length === 0) return null;
+        const href = peakBags.length === 1 ? `/bags/${peakBags[0].id}` : "/bags";
+        const names = peakBags.map((b) => `${b.roaster} — ${b.name}`).join(" · ");
+        return (
+          <Link
+            href={href}
+            className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-4 active:opacity-70 transition-opacity"
+            style={{ backgroundColor: "#34C759" }}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 2l2.4 5 5.6.8-4 3.9.9 5.5L10 14.5l-4.9 2.7.9-5.5L2 7.8l5.6-.8L10 2z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-white">
+                {peakBags.length === 1 ? "Entering peak today" : `${peakBags.length} bags entering peak today`}
+              </p>
+              <p className="text-[12px] text-white opacity-80 truncate">{names}</p>
+            </div>
+            <svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+              <path d="M1 1l6 5.5L1 12" />
+            </svg>
+          </Link>
+        );
+      })()}
+
       {totalShots > 0 && (
         <>
           {/* Stats grid */}
