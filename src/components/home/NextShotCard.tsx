@@ -46,7 +46,13 @@ function MiniFreshnessBar({ days, peakStart, peakEnd }: { days: number; peakStar
   );
 }
 
-export default function NextShotCard({ bags }: { bags: BagSummary[] }) {
+export default function NextShotCard({
+  bags,
+  recommendations = {},
+}: {
+  bags: BagSummary[];
+  recommendations?: Record<number, { action: string; verdict: string }>;
+}) {
   const [rec, setRec] = useState<{ bag: BagSummary; cafNote: string } | null>(null);
 
   useEffect(() => {
@@ -127,6 +133,19 @@ export default function NextShotCard({ bags }: { bags: BagSummary[] }) {
             <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{days}d since roast</span>
           )}
         </div>
+        {recommendations[rec.bag.id] && (
+          <div className="flex items-start gap-2 mt-2.5 pt-2.5" style={{ borderTop: "1px solid var(--divider)" }}>
+            <span
+              className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full mt-0.5"
+              style={{ backgroundColor: "#AF52DE22", color: "#AF52DE" }}
+            >
+              AI
+            </span>
+            <p className="text-[13px] leading-snug" style={{ color: "var(--text-primary)" }}>
+              {recommendations[rec.bag.id].action}
+            </p>
+          </div>
+        )}
       </div>
     </Link>
   );

@@ -12,6 +12,7 @@ import { getAppConfig } from "@/lib/config/queries";
 import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
 import NextShotCard from "@/components/home/NextShotCard";
 import DrinkSuggestionCard from "@/components/home/DrinkSuggestionCard";
+import { getRecommendationForBags } from "@/lib/analysis/queries";
 
 async function getStats() {
   const [row] = await db.all(sql`
@@ -154,7 +155,11 @@ export default async function HomePage() {
   const [activeBags, equipment, config, stats, lastShot] = await Promise.all([
     getBags("active"), getActiveEquipmentProfile(), getAppConfig(), getStats(), getLastShot(),
   ]);
-  const recentAvgDose = await getRecentAvgDosePerBag(activeBags.map((b) => b.id), config.recentShotWindow ?? 10);
+  const bagIds = activeBags.map((b) => b.id);
+  const [recentAvgDose, bagRecommendations] = await Promise.all([
+    getRecentAvgDosePerBag(bagIds, config.recentShotWindow ?? 10),
+    getRecommendationForBags(bagIds),
+  ]);
 
   const totalShots = Number(stats?.total_shots ?? 0);
   const failedShots = Number(stats?.failed_shots ?? 0);
@@ -426,15 +431,18 @@ export default async function HomePage() {
       {/* ── Next shot & drink recommendations ────────────────────────────── */}
       {activeBags.length > 0 && (
         <>
-          <NextShotCard bags={activeBags.map((b) => ({
-            id: b.id,
-            roaster: b.roaster,
-            name: b.name,
-            roastDate: b.roastDate,
-            peakStartDay: b.peakStartDay ?? null,
-            peakEndDay: b.peakEndDay ?? null,
-            isDecaf: b.isDecaf,
-          }))} />
+          <NextShotCard
+            bags={activeBags.map((b) => ({
+              id: b.id,
+              roaster: b.roaster,
+              name: b.name,
+              roastDate: b.roastDate,
+              peakStartDay: b.peakStartDay ?? null,
+              peakEndDay: b.peakEndDay ?? null,
+              isDecaf: b.isDecaf,
+            }))}
+            recommendations={bagRecommendations}
+          />
           <DrinkSuggestionCard />
         </>
       )}

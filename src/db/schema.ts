@@ -211,6 +211,7 @@ export const shotAnalyses = sqliteTable("shot_analyses", {
   beanContext: text("bean_context"),
   progressNote: text("progress_note"),
   overallVerdict: text("overall_verdict"),
+  isStable: integer("is_stable", { mode: "boolean" }).notNull().default(false),
   rawResponse: text("raw_response"),
   createdAt: text("created_at")
     .notNull()

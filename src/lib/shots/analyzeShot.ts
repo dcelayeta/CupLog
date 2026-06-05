@@ -158,6 +158,8 @@ Exactly ONE specific recommendation. Never multiple adjustments simultaneously.
 
 If dialing in (shots 1-7 on bag): recommendation can be more directional ("go significantly finer, try 33-34") since the range is still being established.
 
+Set is_stable: true when the recommendation is to hold all parameters unchanged — i.e., the shot is dialed in and no grind, dose, or technique change is needed. Set is_stable: false whenever any adjustment is recommended. This field is used to persist a standing recipe instruction on the home screen between analyses.
+
 ### 4. Bean Context
 Taste consistent with bean's flavor notes and profile? In peak freshness window? Any bean-specific factors explaining the result? For new beans: reference similar beans from history.
 
@@ -194,6 +196,7 @@ CRITICAL: Respond with ONLY a raw JSON object. No markdown, no code fences, no h
   "bean_context": "string",
   "progress_note": "string or null",
   "overall_verdict": "great" | "good" | "needs_work" | "problem",
+  "is_stable": boolean,
   "updated_coaching_state": {
     "experience_level": "string",
     "current_focus": "string",
@@ -447,6 +450,7 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
     bean_context?: string;
     progress_note?: string | null;
     overall_verdict?: string;
+    is_stable?: boolean;
     updated_coaching_state?: CoachingStateData | null;
   } = {};
 
@@ -471,6 +475,7 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
     beanContext: parsed.bean_context ?? null,
     progressNote: parsed.progress_note ?? null,
     overallVerdict: parsed.overall_verdict ?? null,
+    isStable: parsed.is_stable === true,
     rawResponse: rawText,
   });
 

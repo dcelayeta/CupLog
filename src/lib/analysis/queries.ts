@@ -23,6 +23,7 @@ export type StoredAnalysis = {
   beanContext: string | null;
   progressNote: string | null;
   overallVerdict: string | null;
+  isStable: boolean;
   rawResponse: string | null;
   createdAt: string;
 };
@@ -151,6 +152,7 @@ export async function saveShootAnalysis(params: {
   beanContext: string | null;
   progressNote: string | null;
   overallVerdict: string | null;
+  isStable: boolean;
   rawResponse: string;
 }): Promise<void> {
   await db.insert(shotAnalyses).values({
@@ -163,8 +165,55 @@ export async function saveShootAnalysis(params: {
     beanContext: params.beanContext,
     progressNote: params.progressNote,
     overallVerdict: params.overallVerdict,
+    isStable: params.isStable,
     rawResponse: params.rawResponse,
   });
+}
+
+export async function getRecommendationForBags(
+  bagIds: number[]
+): Promise<Record<number, { action: string; verdict: string }>> {
+  if (bagIds.length === 0) return {};
+
+  const idList = sql.join(bagIds.map((id) => sql`${id}`), sql`, `);
+
+  // Last shot analysis per bag (always show regardless of stability)
+  const lastShotRows = await db.all(sql`
+    SELECT s.bag_id, sa.recommendation_action, sa.overall_verdict
+    FROM shots s
+    JOIN shot_analyses sa ON sa.shot_id = s.id
+    WHERE s.bag_id IN (${idList})
+      AND s.id = (SELECT MAX(id) FROM shots s2 WHERE s2.bag_id = s.bag_id)
+      AND sa.recommendation_action IS NOT NULL
+  `) as { bag_id: number; recommendation_action: string; overall_verdict: string | null }[];
+
+  const result: Record<number, { action: string; verdict: string }> = {};
+  for (const row of lastShotRows) {
+    result[row.bag_id] = { action: row.recommendation_action, verdict: row.overall_verdict ?? "" };
+  }
+
+  // For bags with no last-shot analysis, fall back to most recent stable analysis
+  const missing = bagIds.filter((id) => !result[id]);
+  if (missing.length > 0) {
+    const missingList = sql.join(missing.map((id) => sql`${id}`), sql`, `);
+    const stableRows = await db.all(sql`
+      SELECT s.bag_id, sa.recommendation_action, sa.overall_verdict
+      FROM shot_analyses sa
+      JOIN shots s ON sa.shot_id = s.id
+      WHERE s.bag_id IN (${missingList})
+        AND sa.is_stable = 1
+        AND sa.recommendation_action IS NOT NULL
+      ORDER BY sa.id DESC
+    `) as { bag_id: number; recommendation_action: string; overall_verdict: string | null }[];
+
+    for (const row of stableRows) {
+      if (!result[row.bag_id]) {
+        result[row.bag_id] = { action: row.recommendation_action, verdict: row.overall_verdict ?? "" };
+      }
+    }
+  }
+
+  return result;
 }
 
 export async function getAnalysisForShot(shotId: number): Promise<StoredAnalysis | null> {
