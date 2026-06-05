@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getDrinksForList } from "@/lib/drinks/queries";
 import DrinkListClient from "@/components/drinks/DrinkListClient";
 import Link from "next/link";

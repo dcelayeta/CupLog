@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getShotsForHistory, getActiveBags } from "@/lib/shots/queries";
 import HistoryListClient from "@/components/shots/HistoryListClient";
 

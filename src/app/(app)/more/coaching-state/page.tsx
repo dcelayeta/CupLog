@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getCoachingState } from "@/lib/analysis/queries";
 import CoachingStateClient from "@/components/analysis/CoachingStateClient";
 import Link from "next/link";

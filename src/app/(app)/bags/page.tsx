@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { getBags, searchBags } from "@/lib/bags/queries";
 import BagsListClient from "@/components/bags/BagsListClient";

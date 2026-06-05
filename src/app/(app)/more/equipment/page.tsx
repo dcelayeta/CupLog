@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getEquipmentProfiles } from "@/lib/equipment/queries";
 import EquipmentProfileListClient from "@/components/equipment/EquipmentProfileListClient";
 import Link from "next/link";

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getBags } from "@/lib/bags/queries";
 import { getShotDosageHistory } from "@/lib/shots/queries";
 import PlannerClient from "@/components/bags/PlannerClient";
