@@ -7,6 +7,28 @@ import type { ShotRow, BagOption } from "@/lib/shots/queries";
 import ClassificationBadge from "./ClassificationBadge";
 import { getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 
+function getTimeBucket(pulledAt: string): string {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const shot = new Date(pulledAt);
+  const shotDay = new Date(shot.getFullYear(), shot.getMonth(), shot.getDate());
+  const diffDays = Math.round((today.getTime() - shotDay.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Today";
+  if (diffDays <= 6) return "This Week";
+  if (diffDays <= 29) return "This Month";
+  return "Older";
+}
+
+function BucketDivider({ label }: { label: string }) {
+  return (
+    <div className="pt-3 pb-1 first:pt-0">
+      <p className="text-[13px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+        {label}
+      </p>
+    </div>
+  );
+}
+
 function formatDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -99,6 +121,21 @@ export default function HistoryListClient({
 
     return result;
   }, [shots, searchText, fromDate, toDate, timeClass, ratioClass]);
+
+  type GroupedItem = { type: "divider"; label: string } | { type: "shot"; shot: ShotRow };
+  const groupedItems = useMemo<GroupedItem[]>(() => {
+    const items: GroupedItem[] = [];
+    let lastBucket: string | null = null;
+    for (const shot of filtered) {
+      const bucket = getTimeBucket(shot.pulledAt);
+      if (bucket !== lastBucket) {
+        items.push({ type: "divider", label: bucket });
+        lastBucket = bucket;
+      }
+      items.push({ type: "shot", shot });
+    }
+    return items;
+  }, [filtered]);
 
   return (
     <div>
@@ -315,7 +352,9 @@ export default function HistoryListClient({
         </div>
       ) : (
         <div className="px-4 flex flex-col gap-2">
-          {filtered.map((shot) => {
+          {groupedItems.map((item) => {
+            if (item.type === "divider") return <BucketDivider key={`div-${item.label}`} label={item.label} />;
+            const shot = item.shot;
             const brewRatio = shot.yieldG != null ? shot.yieldG / shot.doseG : null;
             const _s = new Date(shot.pulledAt);
             const shotDate = new Date(_s.getFullYear(), _s.getMonth(), _s.getDate());
