@@ -290,22 +290,6 @@ export default async function HomePage() {
         );
       })()}
 
-      {/* ── Next shot & drink recommendations ────────────────────────────── */}
-      {activeBags.length > 0 && (
-        <>
-          <NextShotCard bags={activeBags.map((b) => ({
-            id: b.id,
-            roaster: b.roaster,
-            name: b.name,
-            roastDate: b.roastDate,
-            peakStartDay: b.peakStartDay ?? null,
-            peakEndDay: b.peakEndDay ?? null,
-            isDecaf: b.isDecaf,
-          }))} />
-          <DrinkSuggestionCard />
-        </>
-      )}
-
       {totalShots > 0 && (
         <>
           {/* Stats grid */}
@@ -436,6 +420,22 @@ export default async function HomePage() {
               </div>
             </Link>
           )}
+        </>
+      )}
+
+      {/* ── Next shot & drink recommendations ────────────────────────────── */}
+      {activeBags.length > 0 && (
+        <>
+          <NextShotCard bags={activeBags.map((b) => ({
+            id: b.id,
+            roaster: b.roaster,
+            name: b.name,
+            roastDate: b.roastDate,
+            peakStartDay: b.peakStartDay ?? null,
+            peakEndDay: b.peakEndDay ?? null,
+            isDecaf: b.isDecaf,
+          }))} />
+          <DrinkSuggestionCard />
         </>
       )}
 
