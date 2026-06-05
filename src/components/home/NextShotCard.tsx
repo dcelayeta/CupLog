@@ -49,17 +49,27 @@ function MiniFreshnessBar({ days, peakStart, peakEnd }: { days: number; peakStar
 export default function NextShotCard({
   bags,
   recommendations = {},
+  todayShots = [],
 }: {
   bags: BagSummary[];
   recommendations?: Record<number, { action: string; verdict: string; shotId: number }>;
+  todayShots?: { pulledAt: string; isDecaf: boolean }[];
 }) {
   const [rec, setRec] = useState<{ bag: BagSummary; cafNote: string } | null>(null);
 
   useEffect(() => {
-    if (bags.length === 0) return;
+    if (bags.length === 0) { setRec(null); return; }
 
-    const hour = new Date().getHours();
-    const preferDecaf = hour >= 14;
+    const now = new Date();
+    const hour = now.getHours();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const pulledCafToday = todayShots.some((s) => !s.isDecaf && new Date(s.pulledAt) >= todayStart);
+    const pulledDecafToday = todayShots.some((s) => s.isDecaf && new Date(s.pulledAt) >= todayStart);
+
+    if (pulledDecafToday) { setRec(null); return; }
+    if (pulledCafToday && hour < 14) { setRec(null); return; }
+    if (hour >= 19) { setRec(null); return; }
 
     const scored = bags
       .map((bag) => {
@@ -71,7 +81,7 @@ export default function NextShotCard({
       .filter((b) => b.priority >= 0)
       .sort((a, b) => b.priority - a.priority);
 
-    if (scored.length === 0) return;
+    if (scored.length === 0) { setRec(null); return; }
 
     const decaf = scored.filter((b) => b.bag.isDecaf);
     const caf = scored.filter((b) => !b.bag.isDecaf);
@@ -79,19 +89,33 @@ export default function NextShotCard({
     let pick: typeof scored[number] | undefined;
     let cafNote: string;
 
-    if (preferDecaf && decaf.length > 0) {
+    if (pulledCafToday) {
+      // After 2pm and already had caffeine — decaf only, no fallback
+      if (decaf.length === 0) { setRec(null); return; }
       pick = decaf[0];
       cafNote = "Afternoon — lighter on caffeine";
-    } else if (!preferDecaf && caf.length > 0) {
-      pick = caf[0];
-      cafNote = hour < 12 ? "Morning — full caffeine" : "Lunchtime shot";
+    } else if (hour >= 14) {
+      // Afternoon preference for decaf, fall back to caf if none
+      if (decaf.length > 0) {
+        pick = decaf[0];
+        cafNote = "Afternoon — lighter on caffeine";
+      } else {
+        pick = caf[0];
+        cafNote = "No decaf available";
+      }
     } else {
-      pick = scored[0];
-      cafNote = preferDecaf ? "No decaf available" : "";
+      // Morning/noon, prefer caf, fall back to decaf
+      if (caf.length > 0) {
+        pick = caf[0];
+        cafNote = hour < 12 ? "Morning — full caffeine" : "Lunchtime shot";
+      } else {
+        pick = decaf[0] ?? scored[0];
+        cafNote = "";
+      }
     }
 
     if (pick) setRec({ bag: pick.bag, cafNote });
-  }, [bags]);
+  }, [bags, todayShots]);
 
   if (!rec) return null;
 
@@ -118,14 +142,16 @@ export default function NextShotCard({
         )}
       </div>
       <div className="row-divider-t px-4 pt-3 pb-3">
-        <p className="text-[17px] font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
-          {rec.bag.roaster} — {rec.bag.name}
+        <div className="flex items-start gap-2 mb-2">
+          <p className="text-[17px] font-semibold flex-1" style={{ color: "var(--text-primary)" }}>
+            {rec.bag.roaster} — {rec.bag.name}
+          </p>
           {rec.bag.isDecaf && (
-            <span className="ml-1.5 text-[12px] font-medium px-1.5 py-0.5 rounded-full align-middle" style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }}>
+            <span className="shrink-0 text-[12px] font-medium px-3 py-0.5 rounded-full mt-0.5" style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }}>
               Decaf
             </span>
           )}
-        </p>
+        </div>
         <MiniFreshnessBar days={days} peakStart={peakStart} peakEnd={peakEnd} />
         <div className="flex items-center justify-between mt-1">
           <span className="text-[12px]" style={{ color: FRESHNESS_CSS[color] }}>{label}</span>

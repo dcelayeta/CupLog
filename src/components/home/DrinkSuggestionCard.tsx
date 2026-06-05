@@ -113,14 +113,45 @@ function DrinkBar({ volumes }: { volumes: DrinkVolumes }) {
   );
 }
 
-export default function DrinkSuggestionCard() {
+export default function DrinkSuggestionCard({
+  bags = [],
+  todayShots = [],
+}: {
+  bags?: { isDecaf: boolean }[];
+  todayShots?: { pulledAt: string; isDecaf: boolean }[];
+}) {
   const [idx, setIdx] = useState(0);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (bags.length === 0) { setVisible(false); return; }
+
+    const now = new Date();
+    const hour = now.getHours();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const pulledCafToday = todayShots.some((s) => !s.isDecaf && new Date(s.pulledAt) >= todayStart);
+    const pulledDecafToday = todayShots.some((s) => s.isDecaf && new Date(s.pulledAt) >= todayStart);
+
+    if (pulledDecafToday) { setVisible(false); return; }
+    if (pulledCafToday && hour < 14) { setVisible(false); return; }
+    if (hour >= 19) { setVisible(false); return; }
+
+    if (pulledCafToday) {
+      setVisible(bags.some((b) => b.isDecaf));
+      return;
+    }
+
+    setVisible(true);
+  }, [bags, todayShots]);
 
   useEffect(() => {
     setIdx(Math.floor(Math.random() * DRINKS.length));
   }, []);
 
   const drink = DRINKS[idx];
+
+  if (!visible) return null;
 
   function shuffle() {
     let next = Math.floor(Math.random() * (DRINKS.length - 1));

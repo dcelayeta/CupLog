@@ -157,7 +157,7 @@ Summarize what happened — ratio, time, balance, and any notable observations f
 Exactly ONE specific recommendation. Never multiple adjustments simultaneously.
 - Recent shot: "Go 2 clicks finer on the grinder (from X to Y)"
 - Historical shot: "At the time, the right move would have been..."
-- Dialed in: "Keep everything identical"
+- Dialed in: Lead with the locked parameters in this format: "Lock grind [X], dose [Y]g, target [Z1]–[Z2]g yield." Fill in the actual numbers from the current shot. The yield range should be ±2g around the current yield. You may add one short follow-up sentence if there is something genuinely useful to note, but it is not required.
 
 If dialing in (shots 1-7 on bag): recommendation can be more directional ("go significantly finer, try 33-34") since the range is still being established.
 

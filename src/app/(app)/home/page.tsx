@@ -19,6 +19,7 @@ async function getStats() {
     SELECT
       COUNT(*) as total_shots,
       SUM(CASE WHEN is_failed = 1 THEN 1 ELSE 0 END) as failed_shots,
+      SUM(CASE WHEN is_failed = 0 AND DATE(pulled_at) = DATE('now') THEN 1 ELSE 0 END) as today_shots,
       ROUND(AVG(CASE WHEN is_failed = 0 THEN shot_rating END), 1) as avg_rating,
       ROUND(AVG(CASE WHEN is_failed = 0 THEN taste_balance END), 1) as avg_balance,
       ROUND(AVG(CASE WHEN is_failed = 0 THEN dose_g END), 1) as avg_dose,
@@ -27,6 +28,18 @@ async function getStats() {
     FROM shots
   `) as Record<string, number | null>[];
   return row ?? null;
+}
+
+async function getTodayShots() {
+  const rows = await db.all(sql`
+    SELECT s.pulled_at, b.is_decaf
+    FROM shots s
+    JOIN bags b ON s.bag_id = b.id
+    WHERE s.pulled_at >= datetime('now', '-36 hours')
+      AND s.is_failed = 0
+    ORDER BY s.pulled_at DESC
+  `) as { pulled_at: string; is_decaf: number }[];
+  return rows.map((r) => ({ pulledAt: r.pulled_at, isDecaf: r.is_decaf === 1 }));
 }
 
 async function getLastShot() {
@@ -152,8 +165,8 @@ function formatTime(secs: number | null): string {
 
 
 export default async function HomePage() {
-  const [activeBags, equipment, config, stats, lastShot] = await Promise.all([
-    getBags("active"), getActiveEquipmentProfile(), getAppConfig(), getStats(), getLastShot(),
+  const [activeBags, equipment, config, stats, lastShot, todayShots] = await Promise.all([
+    getBags("active"), getActiveEquipmentProfile(), getAppConfig(), getStats(), getLastShot(), getTodayShots(),
   ]);
   const bagIds = activeBags.map((b) => b.id);
   const [recentAvgDose, bagRecommendations] = await Promise.all([
@@ -163,6 +176,7 @@ export default async function HomePage() {
 
   const totalShots = Number(stats?.total_shots ?? 0);
   const failedShots = Number(stats?.failed_shots ?? 0);
+  const todayShotsCount = Number(stats?.today_shots ?? 0);
 
   return (
     <div className="pt-6 pb-24 px-4">
@@ -172,9 +186,11 @@ export default async function HomePage() {
       <p className="text-[15px] mb-6" style={{ color: "var(--text-secondary)" }}>
         {totalShots === 0
           ? "No shots logged yet."
-          : failedShots > 0
-          ? `${totalShots} shots · ${failedShots} failed`
-          : `${totalShots} shot${totalShots !== 1 ? "s" : ""} pulled`}
+          : (() => {
+              const todayPart = todayShotsCount > 0 ? ` (${todayShotsCount} today)` : "";
+              const failedPart = failedShots > 0 ? ` · ${failedShots} failed` : "";
+              return `${totalShots} shot${totalShots !== 1 ? "s" : ""}${todayPart}${failedPart}`;
+            })()}
       </p>
 
       {(() => {
@@ -429,23 +445,27 @@ export default async function HomePage() {
       )}
 
       {/* ── Next shot & drink recommendations ────────────────────────────── */}
-      {activeBags.length > 0 && (
-        <>
-          <NextShotCard
-            bags={activeBags.map((b) => ({
-              id: b.id,
-              roaster: b.roaster,
-              name: b.name,
-              roastDate: b.roastDate,
-              peakStartDay: b.peakStartDay ?? null,
-              peakEndDay: b.peakEndDay ?? null,
-              isDecaf: b.isDecaf,
-            }))}
-            recommendations={bagRecommendations}
-          />
-          <DrinkSuggestionCard />
-        </>
-      )}
+      {activeBags.length > 0 && (() => {
+        const cardBags = activeBags.map((b) => ({
+          id: b.id,
+          roaster: b.roaster,
+          name: b.name,
+          roastDate: b.roastDate,
+          peakStartDay: b.peakStartDay ?? null,
+          peakEndDay: b.peakEndDay ?? null,
+          isDecaf: b.isDecaf,
+        }));
+        return (
+          <>
+            <NextShotCard
+              bags={cardBags}
+              recommendations={bagRecommendations}
+              todayShots={todayShots}
+            />
+            <DrinkSuggestionCard bags={cardBags} todayShots={todayShots} />
+          </>
+        );
+      })()}
 
       {/* Active beans freshness */}
       {activeBags.length > 0 && (

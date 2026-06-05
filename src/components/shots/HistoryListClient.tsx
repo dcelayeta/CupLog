@@ -70,9 +70,12 @@ export default function HistoryListClient({
   const [toDate, setToDate] = useState("");
   const [timeClass, setTimeClass] = useState<string | null>(null);
   const [ratioClass, setRatioClass] = useState<string | null>(null);
+  const [aiOnly, setAiOnly] = useState(false);
+  const [lockedOnly, setLockedOnly] = useState(false);
+  const [starFilter, setStarFilter] = useState<number | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const hasActiveFilters = searchText || fromDate || toDate || timeClass || ratioClass;
+  const hasActiveFilters = searchText || fromDate || toDate || timeClass || ratioClass || aiOnly || lockedOnly || starFilter !== null;
 
   const updateBagFilter = useCallback(
     (bagId: string) => {
@@ -119,8 +122,20 @@ export default function HistoryListClient({
       result = result.filter((s) => s.ratioClassification.label === ratioClass);
     }
 
+    if (aiOnly) {
+      result = result.filter((s) => s.hasAnalysis);
+    }
+
+    if (lockedOnly) {
+      result = result.filter((s) => s.isLocked);
+    }
+
+    if (starFilter !== null) {
+      result = result.filter((s) => s.shotRating === starFilter);
+    }
+
     return result;
-  }, [shots, searchText, fromDate, toDate, timeClass, ratioClass]);
+  }, [shots, searchText, fromDate, toDate, timeClass, ratioClass, aiOnly, lockedOnly, starFilter]);
 
   type GroupedItem = { type: "divider"; label: string } | { type: "shot"; shot: ShotRow };
   const groupedItems = useMemo<GroupedItem[]>(() => {
@@ -207,6 +222,36 @@ export default function HistoryListClient({
           )}
           <button
             type="button"
+            onClick={() => setAiOnly((v) => !v)}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[14px] transition-colors"
+            style={{
+              backgroundColor: aiOnly ? "#AF52DE22" : "var(--card)",
+              color: aiOnly ? "#AF52DE" : "var(--text-secondary)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
+              fontWeight: aiOnly ? 600 : 400,
+            }}
+          >
+            AI
+          </button>
+          <button
+            type="button"
+            onClick={() => setLockedOnly((v) => !v)}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[14px] transition-colors"
+            style={{
+              backgroundColor: lockedOnly ? "#AF52DE22" : "var(--card)",
+              color: lockedOnly ? "#AF52DE" : "var(--text-secondary)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
+              fontWeight: lockedOnly ? 600 : 400,
+            }}
+          >
+            <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" className="shrink-0">
+              <rect x="1" y="5" width="8" height="7" rx="1.5" />
+              <path d="M3 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+            </svg>
+            Locked
+          </button>
+          <button
+            type="button"
             onClick={() => setFiltersOpen((v) => !v)}
             className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[14px] transition-colors"
             style={{
@@ -291,7 +336,7 @@ export default function HistoryListClient({
           </div>
 
           {/* Ratio classification chips */}
-          <div className="px-4 py-3">
+          <div className="px-4 py-3 row-divider">
             <p className="text-[13px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-secondary)" }}>Ratio</p>
             <div className="flex gap-2 flex-wrap">
               {RATIO_LABELS.map((label) => (
@@ -312,6 +357,28 @@ export default function HistoryListClient({
             </div>
           </div>
 
+          {/* Star rating chips */}
+          <div className="px-4 py-3">
+            <p className="text-[13px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-secondary)" }}>Rating</p>
+            <div className="flex gap-2 flex-wrap">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setStarFilter((v) => (v === n ? null : n))}
+                  className="px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors"
+                  style={{
+                    backgroundColor: starFilter === n ? "var(--accent)" + "18" : "var(--card-secondary)",
+                    color: starFilter === n ? "var(--accent)" : "var(--text-secondary)",
+                    fontWeight: starFilter === n ? 600 : 400,
+                  }}
+                >
+                  {"★".repeat(n)}{"☆".repeat(5 - n)}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Clear all */}
           {hasActiveFilters && (
             <div className="px-6 py-3 row-divider-t">
@@ -323,6 +390,9 @@ export default function HistoryListClient({
                   setToDate("");
                   setTimeClass(null);
                   setRatioClass(null);
+                  setAiOnly(false);
+                  setLockedOnly(false);
+                  setStarFilter(null);
                 }}
                 className="text-[15px] font-medium"
                 style={{ color: "var(--destructive)" }}
