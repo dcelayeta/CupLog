@@ -85,6 +85,8 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Almost empty warning — orange banner when estimated cups remaining drops below a configurable threshold (default 14 cups); cups calculated from rolling 10-shot avg dose per bag (fallback: all-time avg, then 18g); links to bag detail (single) or bag list (multiple); threshold adjustable in More → Thresholds
 - [x] Entering peak notification — green banner on the day a bag reaches its estimated peak start; links to bag detail or bag list
 - [x] Last shot card — roaster/bag, detected drink, stats, taste, notes
+- [x] Next shot recommendation — client-side card using browser time for timezone accuracy; after 2pm prefers decaf bags, otherwise caf; ranks by freshness priority (in peak > approaching > too fresh); skips past-peak beans; links to bag detail
+- [x] Drink suggestion card — random drink from recipe library on load; ↺ Shuffle button picks a new one; shows composition bar and proportion chips
 
 ### Bags (Bean Inventory)
 - [x] Bag list — active bags by default, toggle to show finished

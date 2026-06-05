@@ -10,6 +10,8 @@ import { getActiveEquipmentProfile } from "@/lib/equipment/queries";
 import { getRecentAvgDosePerBag } from "@/lib/shots/queries";
 import { getAppConfig } from "@/lib/config/queries";
 import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
+import NextShotCard from "@/components/home/NextShotCard";
+import DrinkSuggestionCard from "@/components/home/DrinkSuggestionCard";
 
 async function getStats() {
   const [row] = await db.all(sql`
@@ -287,6 +289,22 @@ export default async function HomePage() {
           </Link>
         );
       })()}
+
+      {/* ── Next shot & drink recommendations ────────────────────────────── */}
+      {activeBags.length > 0 && (
+        <>
+          <NextShotCard bags={activeBags.map((b) => ({
+            id: b.id,
+            roaster: b.roaster,
+            name: b.name,
+            roastDate: b.roastDate,
+            peakStartDay: b.peakStartDay ?? null,
+            peakEndDay: b.peakEndDay ?? null,
+            isDecaf: b.isDecaf,
+          }))} />
+          <DrinkSuggestionCard />
+        </>
+      )}
 
       {totalShots > 0 && (
         <>
