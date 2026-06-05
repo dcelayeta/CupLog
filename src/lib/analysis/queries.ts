@@ -172,24 +172,24 @@ export async function saveShootAnalysis(params: {
 
 export async function getRecommendationForBags(
   bagIds: number[]
-): Promise<Record<number, { action: string; verdict: string }>> {
+): Promise<Record<number, { action: string; verdict: string; shotId: number }>> {
   if (bagIds.length === 0) return {};
 
   const idList = sql.join(bagIds.map((id) => sql`${id}`), sql`, `);
 
   // Last shot analysis per bag (always show regardless of stability)
   const lastShotRows = await db.all(sql`
-    SELECT s.bag_id, sa.recommendation_action, sa.overall_verdict
+    SELECT s.bag_id, s.id as shot_id, sa.recommendation_action, sa.overall_verdict
     FROM shots s
     JOIN shot_analyses sa ON sa.shot_id = s.id
     WHERE s.bag_id IN (${idList})
       AND s.id = (SELECT MAX(id) FROM shots s2 WHERE s2.bag_id = s.bag_id)
       AND sa.recommendation_action IS NOT NULL
-  `) as { bag_id: number; recommendation_action: string; overall_verdict: string | null }[];
+  `) as { bag_id: number; shot_id: number; recommendation_action: string; overall_verdict: string | null }[];
 
-  const result: Record<number, { action: string; verdict: string }> = {};
+  const result: Record<number, { action: string; verdict: string; shotId: number }> = {};
   for (const row of lastShotRows) {
-    result[row.bag_id] = { action: row.recommendation_action, verdict: row.overall_verdict ?? "" };
+    result[row.bag_id] = { action: row.recommendation_action, verdict: row.overall_verdict ?? "", shotId: row.shot_id };
   }
 
   // For bags with no last-shot analysis, fall back to most recent stable analysis
@@ -197,18 +197,18 @@ export async function getRecommendationForBags(
   if (missing.length > 0) {
     const missingList = sql.join(missing.map((id) => sql`${id}`), sql`, `);
     const stableRows = await db.all(sql`
-      SELECT s.bag_id, sa.recommendation_action, sa.overall_verdict
+      SELECT s.bag_id, s.id as shot_id, sa.recommendation_action, sa.overall_verdict
       FROM shot_analyses sa
       JOIN shots s ON sa.shot_id = s.id
       WHERE s.bag_id IN (${missingList})
         AND sa.is_stable = 1
         AND sa.recommendation_action IS NOT NULL
       ORDER BY sa.id DESC
-    `) as { bag_id: number; recommendation_action: string; overall_verdict: string | null }[];
+    `) as { bag_id: number; shot_id: number; recommendation_action: string; overall_verdict: string | null }[];
 
     for (const row of stableRows) {
       if (!result[row.bag_id]) {
-        result[row.bag_id] = { action: row.recommendation_action, verdict: row.overall_verdict ?? "" };
+        result[row.bag_id] = { action: row.recommendation_action, verdict: row.overall_verdict ?? "", shotId: row.shot_id };
       }
     }
   }

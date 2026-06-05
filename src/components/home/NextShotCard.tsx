@@ -51,7 +51,7 @@ export default function NextShotCard({
   recommendations = {},
 }: {
   bags: BagSummary[];
-  recommendations?: Record<number, { action: string; verdict: string }>;
+  recommendations?: Record<number, { action: string; verdict: string; shotId: number }>;
 }) {
   const [rec, setRec] = useState<{ bag: BagSummary; cafNote: string } | null>(null);
 
@@ -134,16 +134,26 @@ export default function NextShotCard({
           )}
         </div>
         {recommendations[rec.bag.id] && (
-          <div className="flex items-start gap-2 mt-3 pt-3" style={{ borderTop: "1px solid var(--divider)" }}>
-            <span
-              className="shrink-0 text-[10px] font-semibold px-2 py-1 rounded-full"
-              style={{ backgroundColor: "#AF52DE22", color: "#AF52DE", lineHeight: 1 }}
+          <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--divider)" }}>
+            <div className="flex items-start gap-2 mb-1.5">
+              <span
+                className="shrink-0 text-[10px] font-semibold px-2 py-1 rounded-full"
+                style={{ backgroundColor: "#AF52DE22", color: "#AF52DE", lineHeight: 1 }}
+              >
+                AI
+              </span>
+              <p className="text-[13px] leading-snug" style={{ color: "var(--text-secondary)" }}>
+                {recommendations[rec.bag.id].action}
+              </p>
+            </div>
+            <Link
+              href={`/history/${recommendations[rec.bag.id].shotId}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[13px] font-medium"
+              style={{ color: "var(--accent)" }}
             >
-              AI
-            </span>
-            <p className="text-[13px] leading-snug" style={{ color: "var(--text-secondary)" }}>
-              {recommendations[rec.bag.id].action}
-            </p>
+              View shot details →
+            </Link>
           </div>
         )}
       </div>
