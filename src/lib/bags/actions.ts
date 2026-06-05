@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db/client";
-import { bags, bagOrigins } from "@/db/schema";
+import { bags, bagOrigins, shots } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -175,11 +175,21 @@ export async function updateBag(
 }
 
 export async function markBagFinished(id: number): Promise<void> {
+  const [bag] = await db.select({ weightG: bags.weightG }).from(bags).where(eq(bags.id, id)).limit(1);
+  const [shotRow] = await db.all(sql`
+    SELECT COALESCE(SUM(dose_g), 0) AS total_dose FROM shots WHERE bag_id = ${id}
+  `) as { total_dose: number }[];
+
+  const weightG = bag?.weightG ?? 0;
+  const totalDoseG = shotRow?.total_dose ?? 0;
+  const zeroingCorrection = totalDoseG - weightG;
+
   await db
     .update(bags)
     .set({
       status: "finished",
       finishedDate: new Date().toISOString().split("T")[0],
+      weightCorrectionG: zeroingCorrection,
       updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(bags.id, id));
