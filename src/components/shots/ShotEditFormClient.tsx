@@ -228,6 +228,7 @@ export default function ShotEditFormClient({
   const [preinfusionSeconds, setPreinfusionSeconds] = useState(shot.preinfusionSeconds?.toString() ?? "");
   const [springWeightLbs, setSpringWeightLbs] = useState(shot.springWeightLbs?.toString() ?? "");
   const [wdtUsed, setWdtUsed] = useState(shot.wdtUsed);
+  const [isLocked, setIsLocked] = useState(shot.isLocked);
   const [distributionToolUsed, setDistributionToolUsed] = useState(shot.distributionToolUsed);
   const [grinderRetentionG, setGrinderRetentionG] = useState(shot.grinderRetentionG?.toString() ?? "");
 
@@ -302,6 +303,7 @@ export default function ShotEditFormClient({
         <input type="hidden" name="bagId" value={bagId} />
         <input type="hidden" name="bagRoastDate" value={selectedBag?.roastDate ?? ""} />
         <input type="hidden" name="wdtUsed" value={wdtUsed ? "true" : "false"} />
+        <input type="hidden" name="isLocked" value={isLocked ? "true" : "false"} />
         <input type="hidden" name="distributionToolUsed" value={distributionToolUsed ? "true" : "false"} />
         <input type="hidden" name="flowCharacteristics" value={flowCharacteristics ?? ""} />
         <input type="hidden" name="includeDrink" value={(!isFailed && includeDrink) ? "true" : "false"} />
@@ -394,6 +396,15 @@ export default function ShotEditFormClient({
             <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Distribution Tool</span>
             <button type="button" onClick={() => setDistributionToolUsed(!distributionToolUsed)} className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200" style={{ backgroundColor: distributionToolUsed ? "var(--accent)" : "#E5E5EA" }}>
               <span className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transition-transform duration-200 mt-[2px]" style={{ marginLeft: distributionToolUsed ? 22 : 2 }} />
+            </button>
+          </div>
+          <div className="flex items-center px-6 min-h-[52px]">
+            <div className="flex-1">
+              <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Parameters Locked</span>
+              <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Keep these settings next shot</p>
+            </div>
+            <button type="button" onClick={() => setIsLocked(!isLocked)} className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200" style={{ backgroundColor: isLocked ? "#34C759" : "#E5E5EA" }}>
+              <span className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transition-transform duration-200 mt-[2px]" style={{ marginLeft: isLocked ? 22 : 2 }} />
             </button>
           </div>
           <div className="px-4 py-3">

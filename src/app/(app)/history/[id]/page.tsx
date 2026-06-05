@@ -360,6 +360,20 @@ export default async function ShotDetailPage({
         </>
       )}
 
+      {/* Parameters locked */}
+      {shot.isLocked && (
+        <div
+          className="mx-4 mt-4 flex items-center gap-2 px-4 py-3 rounded-2xl"
+          style={{ backgroundColor: "#34C75918" }}
+        >
+          <svg width="13" height="16" viewBox="0 0 13 16" fill="#34C759">
+            <rect x="1" y="7" width="11" height="9" rx="1.5" />
+            <path d="M3.5 7V5a3 3 0 0 1 6 0v2" stroke="#34C759" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+          </svg>
+          <p className="text-[15px] font-medium" style={{ color: "#34C759" }}>Parameters locked</p>
+        </div>
+      )}
+
       {/* AI Analysis */}
       <SectionHeader title="Analysis" />
       <ShotAnalysisClient shotId={shot.id} existingAnalysis={existingAnalysis} />

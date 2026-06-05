@@ -2,6 +2,9 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { getShotById } from "@/lib/shots/queries";
+import { shots } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { db } from "@/db/client";
 import { getDaysSinceRoast, getFreshnessLabel } from "@/lib/bags/freshness";
 import { classifyTime, classifyRatio } from "@/lib/shots/classification";
 import {
@@ -478,6 +481,11 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
     isStable: parsed.is_stable === true,
     rawResponse: rawText,
   });
+
+  // Auto-lock shot when AI marks parameters stable
+  if (parsed.is_stable === true) {
+    await db.update(shots).set({ isLocked: true }).where(eq(shots.id, shotId));
+  }
 
   // Upsert coaching_state for recent shots only — trim before saving to prevent DB bloat
   if (analysisMode === "recent" && parsed.updated_coaching_state) {

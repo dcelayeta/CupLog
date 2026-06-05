@@ -140,6 +140,7 @@ export const shots = sqliteTable("shots", {
   flowCharacteristics: text("flow_characteristics", {
     enum: ["normal", "one_spout_dominant", "both_spouts_uneven", "spraying", "dripping_restricted", "very_fast"],
   }),
+  isLocked: integer("is_locked", { mode: "boolean" }).notNull().default(false),
   isFailed: integer("is_failed", { mode: "boolean" }).notNull().default(false),
   failReason: text("fail_reason", {
     enum: ["channeling", "choking", "puck_collapse", "grind_error", "equipment_issue", "other"],

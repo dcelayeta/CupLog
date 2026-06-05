@@ -34,6 +34,7 @@ export type ShotRow = {
   bagStatus: string;
   shotRating: number | null;
   notes: string | null;
+  isLocked: boolean;
   isFailed: boolean;
   failReason: string | null;
   timeClassification: Classification;
@@ -63,6 +64,7 @@ export type ShotDetail = {
   tasteBalance: number | null;
   shotRating: number | null;
   flowCharacteristics: string | null;
+  isLocked: boolean;
   isFailed: boolean;
   failReason: string | null;
   notes: string | null;
@@ -293,6 +295,7 @@ export async function getShotsForHistory(bagId?: number): Promise<ShotRow[]> {
       bagStatus: bags.status,
       shotRating: shots.shotRating,
       notes: shots.notes,
+      isLocked: shots.isLocked,
       isFailed: shots.isFailed,
       failReason: shots.failReason,
     })
@@ -341,6 +344,7 @@ export async function getShotsForHistory(bagId?: number): Promise<ShotRow[]> {
             detectedDrinkName: d.detectedDrinkName ?? null,
           }
         : null,
+      isLocked: s.isLocked,
       hasAnalysis: analysisSet.has(s.id),
     };
   });
@@ -367,6 +371,7 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       tasteBalance: shots.tasteBalance,
       shotRating: shots.shotRating,
       flowCharacteristics: shots.flowCharacteristics,
+      isLocked: shots.isLocked,
       isFailed: shots.isFailed,
       failReason: shots.failReason,
       notes: shots.notes,
