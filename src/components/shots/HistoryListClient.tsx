@@ -443,7 +443,7 @@ export default function HistoryListClient({
                     {shot.isLocked && (
                       <span
                         className="text-[12px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1"
-                        style={{ backgroundColor: "#34C75922", color: "#34C759" }}
+                        style={{ backgroundColor: "#AF52DE22", color: "#AF52DE" }}
                       >
                         <svg width="9" height="11" viewBox="0 0 9 11" fill="currentColor">
                           <rect x="1" y="4.5" width="7" height="6" rx="1" />
