@@ -134,14 +134,14 @@ export default function NextShotCard({
           )}
         </div>
         {recommendations[rec.bag.id] && (
-          <div className="flex items-start gap-2 mt-2.5 pt-2.5" style={{ borderTop: "1px solid var(--divider)" }}>
+          <div className="flex items-start gap-2 mt-3 pt-3" style={{ borderTop: "1px solid var(--divider)" }}>
             <span
-              className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full mt-0.5"
-              style={{ backgroundColor: "#AF52DE22", color: "#AF52DE" }}
+              className="shrink-0 text-[10px] font-semibold px-2 py-1 rounded-full"
+              style={{ backgroundColor: "#AF52DE22", color: "#AF52DE", lineHeight: 1 }}
             >
               AI
             </span>
-            <p className="text-[13px] leading-snug" style={{ color: "var(--text-primary)" }}>
+            <p className="text-[13px] leading-snug" style={{ color: "var(--text-secondary)" }}>
               {recommendations[rec.bag.id].action}
             </p>
           </div>

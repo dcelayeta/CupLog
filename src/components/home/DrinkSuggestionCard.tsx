@@ -105,7 +105,7 @@ function DrinkBar({ volumes }: { volumes: DrinkVolumes }) {
     { ml: empty,            color: "#c9c9ce" },
   ].filter((s) => s.ml > 0);
   return (
-    <div className="flex overflow-hidden rounded-full mb-2.5" style={{ height: 10 }}>
+    <div className="flex overflow-hidden rounded-full" style={{ height: 10 }}>
       {segments.map((seg, i) => (
         <div key={i} style={{ width: `${(seg.ml / MAX_ML) * 100}%`, backgroundColor: seg.color, flexShrink: 0 }} />
       ))}
@@ -150,10 +150,12 @@ export default function DrinkSuggestionCard() {
         <p className="text-[17px] font-semibold mb-0.5" style={{ color: "var(--text-primary)" }}>
           {drink.name}
         </p>
-        <p className="text-[13px] mb-2.5" style={{ color: "var(--text-secondary)" }}>
+        <p className="text-[13px] mb-3" style={{ color: "var(--text-secondary)" }}>
           {drink.description}
         </p>
-        <DrinkBar volumes={drink.volumes} />
+        <div className="mb-3">
+          <DrinkBar volumes={drink.volumes} />
+        </div>
         <div className="flex flex-wrap gap-1.5">
           {drink.chips.map((chip) => (
             <span
