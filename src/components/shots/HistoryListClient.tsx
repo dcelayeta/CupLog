@@ -442,14 +442,13 @@ export default function HistoryListClient({
                     )}
                     {shot.isLocked && (
                       <span
-                        className="text-[12px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1"
+                        className="flex items-center justify-center w-[22px] h-[22px] rounded-full"
                         style={{ backgroundColor: "#AF52DE22", color: "#AF52DE" }}
                       >
                         <svg width="9" height="11" viewBox="0 0 9 11" fill="currentColor">
                           <rect x="1" y="4.5" width="7" height="6" rx="1" />
                           <path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" />
                         </svg>
-                        Locked
                       </span>
                     )}
                     {shot.hasAnalysis && (
