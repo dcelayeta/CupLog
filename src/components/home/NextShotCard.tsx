@@ -103,7 +103,7 @@ export default function NextShotCard({ bags }: { bags: BagSummary[] }) {
     >
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
         <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-          Next shot
+          Recommended next shot
         </p>
         {rec.cafNote && (
           <p className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
