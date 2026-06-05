@@ -11,17 +11,17 @@ export default async function PlanPage() {
 
   return (
     <div className="pt-4 pb-24">
-      <div className="flex items-center px-4 mb-4 gap-3">
+      <div className="flex items-center justify-between px-4 mb-4">
+        <h1 className="text-[34px] font-display leading-none" style={{ color: "var(--text-primary)" }}>
+          Planner
+        </h1>
         <Link
           href="/bags"
           className="text-[17px]"
           style={{ color: "var(--accent)" }}
         >
-          ‹ Bags
+          Bags ›
         </Link>
-        <h1 className="text-[34px] font-display leading-none" style={{ color: "var(--text-primary)" }}>
-          Planner
-        </h1>
       </div>
       <PlannerClient activeBags={activeBags} shotDosageHistory={shotDosageHistory} />
     </div>
