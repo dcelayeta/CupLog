@@ -69,7 +69,7 @@ function Badge({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function BagCard({ bag }: { bag: BagWithOrigins }) {
+export default function BagCard({ bag, avgDose }: { bag: BagWithOrigins; avgDose?: number }) {
   const countries = [...new Set(bag.origins.map((o) => o.country))].join(", ");
   const roastLabel = ROAST_LABELS[bag.roastLevel] || "";
   const processLabel = PROCESS_LABELS[bag.processingMethod] || "";
@@ -83,6 +83,13 @@ export default function BagCard({ bag }: { bag: BagWithOrigins }) {
   const remainingG = bag.weightG != null && (bag.status === "active" || bag.status === "reserve")
     ? Math.round(bag.weightG - (bag.totalDoseG ?? 0) + (bag.weightCorrectionG ?? 0))
     : null;
+
+  const cupsRemaining = (() => {
+    if (remainingG == null || remainingG <= 0) return null;
+    const dose = avgDose
+      ?? (bag.shotCount && bag.shotCount > 0 && bag.totalDoseG ? bag.totalDoseG / bag.shotCount : 18);
+    return Math.floor(remainingG / dose);
+  })();
 
   return (
     <Link href={`/bags/${bag.id}`} className="block">
@@ -170,6 +177,11 @@ export default function BagCard({ bag }: { bag: BagWithOrigins }) {
           {remainingG != null && remainingG > 0 && (
             <span className="text-[13px]" style={{ color: remainingG < 100 ? "#FF9500" : "var(--text-secondary)" }}>
               ~{remainingG}g left
+            </span>
+          )}
+          {cupsRemaining != null && cupsRemaining > 0 && (
+            <span className="text-[13px]" style={{ color: cupsRemaining < 5 ? "#FF9500" : "var(--text-secondary)" }}>
+              ~{cupsRemaining} cup{cupsRemaining !== 1 ? "s" : ""}
             </span>
           )}
         </div>

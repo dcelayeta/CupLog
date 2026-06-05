@@ -10,11 +10,13 @@ export default function BagsListClient({
   reserveBags = [],
   status,
   query,
+  avgDosePerBag = {},
 }: {
   bags: BagWithOrigins[];
   reserveBags?: BagWithOrigins[];
   status: "active" | "finished" | "all";
   query: string;
+  avgDosePerBag?: Record<number, number>;
 }) {
   const router = useRouter();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -120,7 +122,7 @@ export default function BagsListClient({
                   style={{ height: "1px", backgroundColor: "var(--divider)" }}
                 />
               )}
-              <BagCard bag={bag} />
+              <BagCard bag={bag} avgDose={avgDosePerBag[bag.id]} />
             </div>
           ))}
         </div>
@@ -141,7 +143,7 @@ export default function BagsListClient({
                 {i > 0 && (
                   <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
                 )}
-                <BagCard bag={bag} />
+                <BagCard bag={bag} avgDose={avgDosePerBag[bag.id]} />
               </div>
             ))}
           </div>
