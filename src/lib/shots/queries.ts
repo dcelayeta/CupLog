@@ -179,6 +179,7 @@ export async function getAverageRetention(limit = 10): Promise<number | null> {
 }
 
 export type ShotDosageRecord = {
+  bagId: number;
   pulledAt: string;
   doseG: number;
   isDecaf: number; // 0 | 1 from SQLite integer
@@ -187,7 +188,7 @@ export type ShotDosageRecord = {
 export async function getShotDosageHistory(days = 45): Promise<ShotDosageRecord[]> {
   const cutoff = `-${days} days`;
   return db.all(sql`
-    SELECT s.pulled_at AS pulledAt, s.dose_g AS doseG, CAST(b.is_decaf AS INTEGER) AS isDecaf
+    SELECT s.bag_id AS bagId, s.pulled_at AS pulledAt, s.dose_g AS doseG, CAST(b.is_decaf AS INTEGER) AS isDecaf
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
     WHERE s.is_failed = 0

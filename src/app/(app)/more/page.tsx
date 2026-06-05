@@ -122,7 +122,7 @@ export default async function MorePage() {
       </div>
 
       <div className="mt-8 mb-2 flex flex-col items-center gap-0.5">
-        <p className="text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.5 }}>Yield v2.0</p>
+        <p className="text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.5 }}>Yield v2.1</p>
         <p className="text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.5 }}>© {new Date().getFullYear()} Diego Celayeta. All rights reserved.</p>
       </div>
     </div>

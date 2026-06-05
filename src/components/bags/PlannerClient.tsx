@@ -228,8 +228,24 @@ export default function PlannerClient({
   const cafShots = inWindow.filter((s) => !s.isDecaf);
   const decafShots = inWindow.filter((s) => s.isDecaf);
 
-  const cafTotalDose = cafShots.reduce((sum, s) => sum + s.doseG, 0);
-  const decafTotalDose = decafShots.reduce((sum, s) => sum + s.doseG, 0);
+  // Shots in window per bag (for apportioning weight corrections)
+  const windowShotsByBag = new Map<number, number>();
+  for (const s of inWindow) windowShotsByBag.set(s.bagId, (windowShotsByBag.get(s.bagId) ?? 0) + 1);
+
+  // Apportion each bag's weightCorrectionG by fraction of its shots that fall in the window
+  let cafCorrectionInWindow = 0;
+  let decafCorrectionInWindow = 0;
+  for (const bag of activeBags) {
+    const correction = bag.weightCorrectionG ?? 0;
+    if (correction <= 0 || (bag.shotCount ?? 0) === 0) continue;
+    const fraction = (windowShotsByBag.get(bag.id) ?? 0) / bag.shotCount!;
+    const apportioned = correction * fraction;
+    if (bag.isDecaf) decafCorrectionInWindow += apportioned;
+    else cafCorrectionInWindow += apportioned;
+  }
+
+  const cafTotalDose = cafShots.reduce((sum, s) => sum + s.doseG, 0) + cafCorrectionInWindow;
+  const decafTotalDose = decafShots.reduce((sum, s) => sum + s.doseG, 0) + decafCorrectionInWindow;
 
   const cafSufficient = cafShots.length >= 3;
   const decafSufficient = decafShots.length >= 3;

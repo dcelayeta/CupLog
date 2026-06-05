@@ -48,6 +48,7 @@ const dev = createClient({ url: DEV_URL, authToken: DEV_TOKEN });
 const TABLES = [
   "equipment_profiles",
   "extraction_thresholds",
+  "app_config",
   "coffee_faqs",
   "bags",
   "bag_origins",
