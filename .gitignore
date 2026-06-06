@@ -37,6 +37,10 @@ yarn-error.log*
 # local database
 local.db
 
+# db backups and restore scripts
+backup_*.sql
+restore_*.sql
+
 # IDE
 .nova/
 
