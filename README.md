@@ -85,8 +85,10 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Almost empty warning — orange banner when estimated cups remaining drops below a configurable threshold (default 14 cups); cups calculated from rolling 10-shot avg dose per bag (fallback: all-time avg, then 18g); links to bag detail (single) or bag list (multiple); threshold adjustable in More → Thresholds
 - [x] Entering peak notification — green banner on the day a bag reaches its estimated peak start; links to bag detail or bag list
 - [x] Last shot card — roaster/bag, detected drink, stats, taste, notes
-- [x] Next shot recommendation — client-side card using browser time for timezone accuracy; after 2pm prefers decaf bags, otherwise caf; ranks by freshness priority (in peak > approaching > too fresh); skips past-peak beans; links to bag detail
-- [x] Drink suggestion card — random drink from recipe library on load; ↺ Shuffle button picks a new one; shows composition bar and proportion chips
+- [x] Shots-today counter — subtitle shows `xx shots (x today)` and failed count
+- [x] Next shot recommendation — client-side card using browser time for timezone accuracy; caffeine-aware: hides if a caf shot was pulled today (before 2pm) or a decaf shot was pulled today; shows decaf-only after 2pm if caf was already had; hides entirely after 7pm; hides if no active beans of the appropriate variety; ranks by freshness priority (in peak > approaching > too fresh); skips past-peak beans; links to bag detail
+- [x] AI recommendation on next shot card — shows last shot's AI coaching action with purple AI badge; falls back to most recent stable (`is_stable = true`) analysis if no analysis on the last shot; includes "View shot details →" link
+- [x] Drink suggestion card — random drink from recipe library on load; ↺ Shuffle button; obeys same caffeine-aware visibility rules as next shot card; hides after 7pm
 
 ### Bags (Bean Inventory)
 - [x] Bag list — active bags by default, toggle to show finished
@@ -99,6 +101,8 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] AI bag entry — paste bag label text, Claude extracts structured fields
 - [x] "New bag of same coffee" shortcut on bag detail
 - [x] Per-bag shot analysis charts — Grind vs Taste scatter, Rating Trend, Extraction Ratio bar (server-side SVG)
+- [x] Cups remaining per active bag — shown on bag card; calculated from rolling avg dose window (fallback: all-time avg, then 18g); highlights in orange below 5 cups
+- [x] Auto-zero weight correction on finish — when marking a bag finished, `weightCorrectionG` is set to account for family/non-logged consumption; re-finishing after reactivation recomputes correctly
 - [x] Buy Planner — candidate bag input (roast level, process, weight); phase-based cascade run-out for caf and decaf bags independently; three-state buy decision (Buy it / Caution / Pass) with past-peak stale detection; freshness timeline with bean-type visual hierarchy (non-matching type dimmed); per-bag phase-aware rate labels; rolling consumption window slider; daily rate includes apportioned bag weight corrections (family consumption + grinder purge)
 
 ### Shots (Log + History)
@@ -110,12 +114,17 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Taste section: sour↔bitter spectrum (1=Very Sour · 4=Balanced · 7=Very Bitter) + 5-star shot rating
 - [x] Drink section: milk type/quantity, foam (5ml steps), hot water, live drink detection badge
 - [x] Pressure and temperature stored as schema defaults (9 bar, 93°C) — not shown in UI
-- [x] Shot history — filters: bag chips, text search, date range, time/ratio classification chips
+- [x] Shot history — filters: bag chips, text search, date range, time/ratio classification chips, AI badge toggle, Locked toggle, star rating filter (1–5★)
+- [x] Time-based section dividers in history — Today / This Week / This Month / Older (rolling windows, browser-local time)
 - [x] Per-shot freshness label uses the bag's own peak window (not global defaults)
 - [x] Archived bag label (`[Archived]`) on shots from removed bags
+- [x] Lock badge on history cards — purple pill with lock icon for locked shots
 - [x] Shot detail — all fields, classifications, freshness badge, taste display, drink composition bar
+- [x] Parameters locked banner on shot detail — purple banner above shot section when `isLocked = true`
 - [x] Edit shot (including drink), delete shot (confirm step)
+- [x] Parameters locked toggle in edit form — manually lock/unlock shot parameters
 - [x] AI shot analysis — structured coaching response; verdict badge; cached in DB; never re-calls API on return visits
+- [x] `is_stable` flag on AI analysis — set by Claude when recommendation is to hold all parameters unchanged; auto-locks the shot (`isLocked = true`); stable format: "Lock grind X, dose Yg, target Z1–Z2g yield."
 
 ### More → Stats
 
@@ -180,10 +189,10 @@ npx tsx scripts/sync-prod-to-dev.ts
 | `bag_origins` | Per-bean origin data (country, region); supports blends with multiple origins |
 | `equipment_profiles` | Machine + grinder config, cleaning intervals, last-cleaned dates |
 | `extraction_thresholds` | DB-driven time/ratio classification ranges |
-| `shots` | Every espresso pull — dose, yield, time, grind, taste, rating, notes; pressure + temp stored as defaults |
+| `shots` | Every espresso pull — dose, yield, time, grind, taste, rating, notes; `is_locked` flag for dialed-in parameters; pressure + temp stored as defaults |
 | `drinks` | Drink built on a shot — milk, foam, hot water, detected name, rating |
 | `coaching_state` | Single-row AI coach context — experience level, patterns, bean notes |
-| `shot_analyses` | Cached AI analysis results per shot |
+| `shot_analyses` | Cached AI analysis results per shot; `is_stable` marks when parameters are dialed in |
 | `bag_analyses` | Cached AI dial-in analysis per bag |
 | `coffee_faqs` | Static FAQ content |
 | `app_config` | Single-row user preferences — low inventory warning threshold |
@@ -195,7 +204,8 @@ npx tsx scripts/sync-prod-to-dev.ts
 - **Server Actions over API routes** — all mutations are `"use server"` functions returning `{ success } | { error }` typed unions
 - **`useActionState` for form state** — pairs naturally with server actions; no client state management library
 - **DB-driven classification** — `classifyTime()` / `classifyRatio()` read thresholds from DB at runtime with hardcoded fallback
-- **`drizzle-kit push` for deployment** — schema applied directly to Turso; migration files are gitignored
+- **`drizzle-kit push` locally only** — safe for local dev where data loss is acceptable. On production, `drizzle-kit push` drops and recreates tables (SQLite limitation), wiping all data. For production schema changes, use `ALTER TABLE ADD COLUMN` directly for simple additions; reserve full drizzle push for major structural changes with a prior backup + restore plan
+- **Production schema change workflow** — (1) `yield-backup`, (2) `ALTER TABLE ADD COLUMN` via `yield-shell`, (3) `yield-deploy`. See shell aliases in `.zshrc`
 - **Per-bag freshness windows** — `estimatePeakWindow(roastLevel, processingMethod, isDecaf)` covers 15 roast/process combinations; stored on the bag so the user can override
 - **Hardcoded drink detection** — `detectDrink()` in `drinkDetection.ts` is a pure synchronous function; runs client-side for live preview and server-side on save
 - **`lagG` field** — Breville Bambino has no 3-way solenoid valve; 6–8g drip-through after pump stop is normal; stop before target yield and record resting weight
@@ -212,5 +222,14 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Turso database created (prod: `cuplog`, dev: `cuplog-dev`)
 - [x] `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` set in Vercel environment
 - [x] `ANTHROPIC_API_KEY` set in Vercel environment
-- [x] Schema applied via `npx drizzle-kit push`
-- [x] Deployed to Vercel
+- [x] Schema applied via `npx drizzle-kit push` (local) or `ALTER TABLE ADD COLUMN` (prod)
+- [x] Deployed to Vercel (`vercel --prod` or `yield-deploy` alias)
+
+### Shell aliases (`.zshrc`)
+
+| Alias | Command |
+|---|---|
+| `yield-backup` | Dump prod DB to timestamped `.sql` file |
+| `yield-shell` | Open Turso prod DB shell |
+| `yield-deploy` | `vercel --prod` |
+| `yield-counts` | Row counts for all main tables |
