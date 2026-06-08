@@ -147,6 +147,7 @@ export async function logShot(
         ? parseInt(formData.get("overallRating") as string)
         : null,
       notes: (formData.get("drinkNotes") as string) || null,
+      latteArtRating: ((formData.get("latteArtRating") as string) || null) as NewDrink["latteArtRating"],
     };
 
     await db
@@ -284,6 +285,7 @@ export async function updateShot(
       detectedDrinkName,
       overallRating: formData.get("overallRating") ? parseInt(formData.get("overallRating") as string) : null,
       notes: (formData.get("drinkNotes") as string) || null,
+      latteArtRating: ((formData.get("latteArtRating") as string) || null) as NewDrink["latteArtRating"],
     };
 
     if (existingDrink) {

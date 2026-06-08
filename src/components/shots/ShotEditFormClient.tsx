@@ -12,6 +12,16 @@ import PillRating from "./PillRating";
 
 const MILK_TYPES = ["Whole", "Oat", "Almond", "Skim", "Soy", "Coconut", "Half & Half"];
 
+const LATTE_ART_OPTIONS = [
+  { value: "pollock", label: "Pollock" },
+  { value: "calder", label: "Calder" },
+  { value: "picasso", label: "Picasso" },
+  { value: "monet", label: "Monet" },
+  { value: "van_gogh", label: "Van Gogh" },
+];
+
+const LATTE_ART_ELIGIBLE = new Set(["Cortado", "Flat White", "Cappuccino", "Latte", "Mocha", "Dirty Chai"]);
+
 const FAIL_REASONS: { value: string; label: string }[] = [
   { value: "channeling", label: "Channeling" },
   { value: "choking", label: "Choking" },
@@ -252,6 +262,7 @@ export default function ShotEditFormClient({
   const [showDrinkPicker, setShowDrinkPicker] = useState(false);
   const [overallRating, setOverallRating] = useState<number | null>(shot.drink?.overallRating ?? null);
   const [drinkNotes, setDrinkNotes] = useState(shot.drink?.notes ?? "");
+  const [latteArtRating, setLatteArtRating] = useState<string | null>(shot.drink?.latteArtRating ?? null);
 
   // Failed shot
   const [isFailed, setIsFailed] = useState(shot.isFailed);
@@ -636,6 +647,35 @@ export default function ShotEditFormClient({
                 </div>
                 <PillRating value={overallRating} onChange={setOverallRating} name="overallRating" />
               </div>
+
+              {liveDrink && LATTE_ART_ELIGIBLE.has(liveDrink) && (
+                <div className="px-4 py-3 row-divider-t">
+                  <input type="hidden" name="latteArtRating" value={latteArtRating ?? ""} />
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Latte Art</span>
+                    {latteArtRating !== null && (
+                      <button type="button" onClick={() => setLatteArtRating(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
+                    )}
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {LATTE_ART_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setLatteArtRating(latteArtRating === opt.value ? null : opt.value)}
+                        className="text-[13px] font-medium px-3 py-1.5 rounded-full"
+                        style={
+                          latteArtRating === opt.value
+                            ? { backgroundColor: "var(--accent)", color: "#fff" }
+                            : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                        }
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="px-6 py-3 row-divider-t">
                 <textarea name="drinkNotes" value={drinkNotes} onChange={(e) => setDrinkNotes(e.target.value)} placeholder="Drink notes…" rows={2} className="w-full bg-transparent outline-none text-[17px] resize-none placeholder:text-[var(--text-secondary)]" style={{ color: "var(--text-primary)" }} />

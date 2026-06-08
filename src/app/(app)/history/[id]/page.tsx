@@ -57,6 +57,14 @@ function DrinkCompositionBar({ espressoMl, milkMl, foamMl, hotWaterMl, hasChocol
   );
 }
 
+const LATTE_ART_LABELS: Record<string, string> = {
+  pollock: "Pollock",
+  calder: "Calder",
+  picasso: "Picasso",
+  monet: "Monet",
+  van_gogh: "Van Gogh",
+};
+
 const FLOW_LABELS: Record<string, string> = {
   normal: "Normal",
   one_spout_dominant: "One spout dominant",
@@ -363,6 +371,17 @@ export default async function ShotDetailPage({
                     ))}
                   </div>
                 </div>
+              </div>
+            )}
+            {shot.drink.latteArtRating && (
+              <div className="row-divider px-6 min-h-[52px] flex items-center justify-between">
+                <p className="text-[17px]" style={{ color: "var(--text-primary)" }}>Latte Art</p>
+                <span
+                  className="text-[13px] font-semibold px-3 py-1 rounded-full"
+                  style={{ backgroundColor: "#AF52DE22", color: "#AF52DE" }}
+                >
+                  {LATTE_ART_LABELS[shot.drink.latteArtRating] ?? shot.drink.latteArtRating}
+                </span>
               </div>
             )}
             {shot.drink.notes && (

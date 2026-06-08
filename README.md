@@ -125,6 +125,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Parameters locked toggle in edit form — manually lock/unlock shot parameters
 - [x] AI shot analysis — structured coaching response; verdict badge; cached in DB; never re-calls API on return visits
 - [x] `is_stable` flag on AI analysis — set by Claude when recommendation is to hold all parameters unchanged; auto-locks the shot (`isLocked = true`); stable format: "Lock grind X, dose Yg, target Z1–Z2g yield."
+- [x] Latte art tracking — 5-level artist scale (Pollock → Calder → Picasso → Monet → Van Gogh) on eligible drinks; picker in log/edit forms; displayed on shot detail and drink list
 
 ### More → Stats
 
@@ -162,10 +163,12 @@ npx tsx scripts/sync-prod-to-dev.ts
 ### More → Drinks
 - [x] All logged drinks newest-first; min rating filter
 - [x] Drink composition bars (dark-mode aware)
+- [x] Latte art rating badge (purple) on eligible drinks
 - [x] Links to parent shot detail
 
 ### More → Recipes (Static Reference)
 - [x] Visual espresso drink guide — 20+ drinks with composition bars and proportions
+- [x] "Latte Art" badge on eligible drinks (Cortado, Flat White, Cappuccino, Latte, Mocha, Dirty Chai)
 
 ### More → Extraction Thresholds
 - [x] Inline editor for time and ratio classification ranges
@@ -190,7 +193,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 | `equipment_profiles` | Machine + grinder config, cleaning intervals, last-cleaned dates |
 | `extraction_thresholds` | DB-driven time/ratio classification ranges |
 | `shots` | Every espresso pull — dose, yield, time, grind, taste, rating, notes; `is_locked` flag for dialed-in parameters; pressure + temp stored as defaults |
-| `drinks` | Drink built on a shot — milk, foam, hot water, detected name, rating |
+| `drinks` | Drink built on a shot — milk, foam, hot water, detected name, rating, latte art rating |
 | `coaching_state` | Single-row AI coach context — experience level, patterns, bean notes |
 | `shot_analyses` | Cached AI analysis results per shot; `is_stable` marks when parameters are dialed in |
 | `bag_analyses` | Cached AI dial-in analysis per bag |

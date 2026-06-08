@@ -18,6 +18,7 @@ const DRINKS = [
     base: "Ratio 1:1 – 1:1.5",
     milk: null, foam: null, hotWater: null, extras: null,
     description: "Short, concentrated pull. Sweeter and more syrupy.",
+    latteArt: false,
     volumes: { espresso: 18, milk: 0, foam: 0, hotWater: 0, chocolate: 0, iceCream: 0, chai: 0 },
   },
   {
@@ -25,6 +26,7 @@ const DRINKS = [
     base: "Ratio 1:1.5 – 1:3, dose ≤10g",
     milk: null, foam: null, hotWater: null, extras: null,
     description: "Classic single shot. Balanced extraction.",
+    latteArt: false,
     volumes: { espresso: 30, milk: 0, foam: 0, hotWater: 0, chocolate: 0, iceCream: 0, chai: 0 },
   },
   {
@@ -32,6 +34,7 @@ const DRINKS = [
     base: "Ratio 1:1.5 – 1:3, dose >10g",
     milk: null, foam: null, hotWater: null, extras: null,
     description: "Double shot. Same ratio as espresso, larger dose.",
+    latteArt: false,
     volumes: { espresso: 36, milk: 0, foam: 0, hotWater: 0, chocolate: 0, iceCream: 0, chai: 0 },
   },
   {
@@ -39,6 +42,7 @@ const DRINKS = [
     base: "Ratio 1:3 – 1:4",
     milk: null, foam: null, hotWater: null, extras: null,
     description: "Long pull. More bitter, less concentrated.",
+    latteArt: false,
     volumes: { espresso: 54, milk: 0, foam: 0, hotWater: 0, chocolate: 0, iceCream: 0, chai: 0 },
   },
   {
@@ -46,6 +50,7 @@ const DRINKS = [
     base: "Any",
     milk: null, foam: null, hotWater: "120ml", extras: null,
     description: "Espresso diluted with hot water.",
+    latteArt: false,
     volumes: { espresso: 36, milk: 0, foam: 0, hotWater: 120, chocolate: 0, iceCream: 0, chai: 0 },
   },
   {
@@ -53,6 +58,7 @@ const DRINKS = [
     base: "Espresso",
     milk: null, foam: "20ml", hotWater: null, extras: null,
     description: "Espresso 'stained' with a small dollop of foam.",
+    latteArt: false,
     volumes: { espresso: 30, milk: 0, foam: 20, hotWater: 0, chocolate: 0, iceCream: 0, chai: 0 },
   },
   {
@@ -60,6 +66,7 @@ const DRINKS = [
     base: "Espresso",
     milk: "30ml steamed", foam: "10ml", hotWater: null, extras: null,
     description: "Equal parts espresso and steamed milk. Minimal foam.",
+    latteArt: true,
     volumes: { espresso: 30, milk: 30, foam: 10, hotWater: 0, chocolate: 0, iceCream: 0, chai: 0 },
   },
   {
@@ -67,6 +74,7 @@ const DRINKS = [
     base: "Doppio",
     milk: "120ml steamed", foam: "10ml microfoam", hotWater: null, extras: null,
     description: "Doppio with velvety microfoam. Stronger than a latte.",
+    latteArt: true,
     volumes: { espresso: 36, milk: 120, foam: 10, hotWater: 0, chocolate: 0, iceCream: 0, chai: 0 },
   },
   {
@@ -74,6 +82,7 @@ const DRINKS = [
     base: "Any",
     milk: "60ml steamed", foam: "60ml thick foam", hotWater: null, extras: null,
     description: "Equal thirds: espresso, steamed milk, thick foam.",
+    latteArt: true,
     volumes: { espresso: 36, milk: 60, foam: 60, hotWater: 0, chocolate: 0, iceCream: 0, chai: 0 },
   },
   {
@@ -81,6 +90,7 @@ const DRINKS = [
     base: "Any",
     milk: "240ml steamed", foam: "20ml thin layer", hotWater: null, extras: null,
     description: "Mostly steamed milk with a thin layer of microfoam.",
+    latteArt: true,
     volumes: { espresso: 36, milk: 240, foam: 20, hotWater: 0, chocolate: 0, iceCream: 0, chai: 0 },
   },
   {
@@ -88,6 +98,7 @@ const DRINKS = [
     base: "Any",
     milk: "120ml steamed", foam: "20ml", hotWater: null, extras: "Chocolate sauce",
     description: "Latte-style with chocolate. Rich and sweet.",
+    latteArt: true,
     volumes: { espresso: 36, milk: 120, foam: 20, hotWater: 0, chocolate: 10, iceCream: 0, chai: 0 },
   },
   {
@@ -95,6 +106,7 @@ const DRINKS = [
     base: "Espresso",
     milk: null, foam: null, hotWater: null, extras: "Ice cream (1 scoop)",
     description: "Hot espresso poured over a scoop of vanilla ice cream.",
+    latteArt: false,
     volumes: { espresso: 30, milk: 0, foam: 0, hotWater: 0, chocolate: 0, iceCream: 60, chai: 0 },
   },
   {
@@ -102,6 +114,7 @@ const DRINKS = [
     base: "Any",
     milk: "150ml steamed", foam: null, hotWater: null, extras: "Chai concentrate",
     description: "Spiced chai with espresso and steamed milk.",
+    latteArt: true,
     volumes: { espresso: 36, milk: 150, foam: 0, hotWater: 0, chocolate: 0, iceCream: 0, chai: 30 },
   },
 ];
@@ -169,9 +182,19 @@ export default function DrinkReferencePage() {
             className={`px-6 py-4${i < DRINKS.length - 1 ? " row-divider" : ""}`}
           >
             <div className="flex items-start justify-between gap-2 mb-1">
-              <p className="text-[17px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                {drink.name}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[17px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {drink.name}
+                </p>
+                {drink.latteArt && (
+                  <span
+                    className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: "#AF52DE22", color: "#AF52DE" }}
+                  >
+                    Latte Art
+                  </span>
+                )}
+              </div>
               <span className="text-[13px] shrink-0 mt-0.5" style={{ color: "var(--text-secondary)" }}>
                 {drink.base}
               </span>

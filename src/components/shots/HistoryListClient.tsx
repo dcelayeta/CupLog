@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useCallback, useTransition, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import type { ShotRow, BagOption } from "@/lib/shots/queries";
 import ClassificationBadge from "./ClassificationBadge";
@@ -54,17 +53,10 @@ const RATIO_LABELS = ["Ristretto", "Short", "Normal", "Long", "Lungo"];
 export default function HistoryListClient({
   shots,
   bags,
-  selectedBagId,
 }: {
   shots: ShotRow[];
   bags: BagOption[];
-  selectedBagId?: number;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
-
   const [searchText, setSearchText] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -73,24 +65,25 @@ export default function HistoryListClient({
   const [aiOnly, setAiOnly] = useState(false);
   const [lockedOnly, setLockedOnly] = useState(false);
   const [starFilter, setStarFilter] = useState<number | null>(null);
+  const [beanTypeFilter, setBeanTypeFilter] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const hasActiveFilters = searchText || fromDate || toDate || timeClass || ratioClass || aiOnly || lockedOnly || starFilter !== null;
+  const hasActiveFilters = searchText || fromDate || toDate || timeClass || ratioClass || aiOnly || lockedOnly || starFilter !== null || beanTypeFilter;
 
-  const updateBagFilter = useCallback(
-    (bagId: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (bagId) {
-        params.set("bagId", bagId);
-      } else {
-        params.delete("bagId");
+  // Group bags by roaster+name — active if any bag of that type is still active
+  const beanTypes = useMemo(() => {
+    const map = new Map<string, { roaster: string; name: string; hasActive: boolean }>();
+    for (const bag of bags) {
+      const key = `${bag.roaster}|||${bag.name}`;
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, { roaster: bag.roaster, name: bag.name, hasActive: bag.status === "active" });
+      } else if (bag.status === "active") {
+        existing.hasActive = true;
       }
-      startTransition(() => {
-        router.replace(`${pathname}?${params.toString()}`);
-      });
-    },
-    [router, pathname, searchParams]
-  );
+    }
+    return Array.from(map.values());
+  }, [bags]);
 
   const filtered = useMemo(() => {
     let result = shots;
@@ -134,8 +127,13 @@ export default function HistoryListClient({
       result = result.filter((s) => s.shotRating === starFilter);
     }
 
+    if (beanTypeFilter) {
+      const [filterRoaster, filterName] = beanTypeFilter.split("|||");
+      result = result.filter((s) => s.roasterName === filterRoaster && s.bagName === filterName);
+    }
+
     return result;
-  }, [shots, searchText, fromDate, toDate, timeClass, ratioClass, aiOnly, lockedOnly, starFilter]);
+  }, [shots, searchText, fromDate, toDate, timeClass, ratioClass, aiOnly, lockedOnly, starFilter, beanTypeFilter]);
 
   type GroupedItem = { type: "divider"; label: string } | { type: "shot"; shot: ShotRow };
   const groupedItems = useMemo<GroupedItem[]>(() => {
@@ -184,42 +182,9 @@ export default function HistoryListClient({
         </div>
       </div>
 
-      {/* Bag filter chips + Filters button */}
+      {/* Quick filter chips + Filters button */}
       <div className="px-4 pb-3">
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {bags.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={() => updateBagFilter("")}
-                className="shrink-0 px-4 py-2 rounded-full text-[14px] font-medium transition-colors"
-                style={{
-                  backgroundColor: !selectedBagId ? "var(--accent)" + "18" : "var(--card)",
-                  color: !selectedBagId ? "var(--accent)" : "var(--text-secondary)",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
-                  fontWeight: !selectedBagId ? 600 : 400,
-                }}
-              >
-                All
-              </button>
-              {bags.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => updateBagFilter(b.id.toString())}
-                  className="shrink-0 px-4 py-2 rounded-full text-[14px] transition-colors"
-                  style={{
-                    backgroundColor: selectedBagId === b.id ? "var(--accent)" + "18" : "var(--card)",
-                    color: selectedBagId === b.id ? "var(--accent)" : "var(--text-secondary)",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
-                    fontWeight: selectedBagId === b.id ? 600 : 400,
-                  }}
-                >
-                  {b.roaster} · {b.name}
-                </button>
-              ))}
-            </>
-          )}
           <button
             type="button"
             onClick={() => setAiOnly((v) => !v)}
@@ -358,7 +323,7 @@ export default function HistoryListClient({
           </div>
 
           {/* Star rating chips */}
-          <div className="px-4 py-3">
+          <div className="px-4 py-3 row-divider">
             <p className="text-[13px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-secondary)" }}>Rating</p>
             <div className="flex gap-2 flex-wrap">
               {[1, 2, 3, 4, 5].map((n) => (
@@ -379,6 +344,46 @@ export default function HistoryListClient({
             </div>
           </div>
 
+          {/* Bean filter */}
+          {beanTypes.length > 0 && (
+            <div className="px-4 py-3">
+              <p className="text-[13px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-secondary)" }}>Bean</p>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setBeanTypeFilter(null)}
+                  className="px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors"
+                  style={{
+                    backgroundColor: !beanTypeFilter ? "var(--accent)" + "18" : "var(--card-secondary)",
+                    color: !beanTypeFilter ? "var(--accent)" : "var(--text-secondary)",
+                    fontWeight: !beanTypeFilter ? 600 : 400,
+                  }}
+                >
+                  All
+                </button>
+                {beanTypes.map((bt) => {
+                  const key = `${bt.roaster}|||${bt.name}`;
+                  const isSelected = beanTypeFilter === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setBeanTypeFilter(isSelected ? null : key)}
+                      className="px-3 py-1.5 rounded-full text-[13px] transition-colors"
+                      style={{
+                        backgroundColor: isSelected ? "var(--accent)" + "18" : "var(--card-secondary)",
+                        color: isSelected ? "var(--accent)" : bt.hasActive ? "var(--text-primary)" : "var(--text-secondary)",
+                        fontWeight: isSelected ? 600 : 400,
+                      }}
+                    >
+                      {bt.roaster} · {bt.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Clear all */}
           {hasActiveFilters && (
             <div className="px-6 py-3 row-divider-t">
@@ -393,6 +398,7 @@ export default function HistoryListClient({
                   setAiOnly(false);
                   setLockedOnly(false);
                   setStarFilter(null);
+                  setBeanTypeFilter(null);
                 }}
                 className="text-[15px] font-medium"
                 style={{ color: "var(--destructive)" }}

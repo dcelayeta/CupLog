@@ -5,6 +5,14 @@ import Link from "next/link";
 import type { DrinkRow } from "@/lib/drinks/queries";
 import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
 
+const LATTE_ART_LABELS: Record<string, string> = {
+  pollock: "Pollock",
+  calder: "Calder",
+  picasso: "Picasso",
+  monet: "Monet",
+  van_gogh: "Van Gogh",
+};
+
 const MAX_DRINK_ML = 300;
 
 function DrinkCompositionBar({ espressoMl, milkMl, foamMl, hotWaterMl, hasChocolate, hasIceCream, hasChai }: {
@@ -164,6 +172,14 @@ export default function DrinkListClient({
                         }}
                       >
                         {drink.detectedDrinkName}
+                      </span>
+                    )}
+                    {drink.latteArtRating && (
+                      <span
+                        className="text-[12px] font-medium px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: "#AF52DE22", color: "#AF52DE" }}
+                      >
+                        {LATTE_ART_LABELS[drink.latteArtRating] ?? drink.latteArtRating}
                       </span>
                     )}
                     {milkDesc && (

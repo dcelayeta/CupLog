@@ -17,6 +17,7 @@ export type DrinkRow = {
   overallRating: number | null;
   notes: string | null;
   detectedDrinkName: string | null;
+  latteArtRating: string | null;
 };
 
 export async function getDrinksForList(): Promise<DrinkRow[]> {
@@ -36,6 +37,7 @@ export async function getDrinksForList(): Promise<DrinkRow[]> {
       overallRating: drinks.overallRating,
       notes: drinks.notes,
       detectedDrinkName: drinks.detectedDrinkName,
+      latteArtRating: drinks.latteArtRating,
     })
     .from(drinks)
     .innerJoin(shots, eq(drinks.shotId, shots.id))
@@ -45,5 +47,6 @@ export async function getDrinksForList(): Promise<DrinkRow[]> {
   return drinkRows.map((d) => ({
     ...d,
     detectedDrinkName: d.detectedDrinkName ?? null,
+    latteArtRating: d.latteArtRating ?? null,
   }));
 }

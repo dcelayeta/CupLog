@@ -171,6 +171,9 @@ export const drinks = sqliteTable("drinks", {
   isIced: integer("is_iced", { mode: "boolean" }).notNull().default(false),
   overallRating: integer("overall_rating"),
   notes: text("notes"),
+  latteArtRating: text("latte_art_rating", {
+    enum: ["pollock", "calder", "picasso", "monet", "van_gogh"],
+  }),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),

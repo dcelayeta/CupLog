@@ -1,19 +1,12 @@
 export const dynamic = "force-dynamic";
 
-import { getShotsForHistory, getActiveBags } from "@/lib/shots/queries";
+import { getShotsForHistory, getAllBagsForHistory } from "@/lib/shots/queries";
 import HistoryListClient from "@/components/shots/HistoryListClient";
 
-export default async function HistoryPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ bagId?: string }>;
-}) {
-  const { bagId } = await searchParams;
-  const selectedBagId = bagId ? Number(bagId) : undefined;
-
+export default async function HistoryPage() {
   const [shots, bags] = await Promise.all([
-    getShotsForHistory(selectedBagId),
-    getActiveBags(),
+    getShotsForHistory(),
+    getAllBagsForHistory(),
   ]);
 
   return (
@@ -25,11 +18,7 @@ export default async function HistoryPage({
         History
       </h1>
 
-      <HistoryListClient
-        shots={shots}
-        bags={bags}
-        selectedBagId={selectedBagId}
-      />
+      <HistoryListClient shots={shots} bags={bags} />
     </div>
   );
 }

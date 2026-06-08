@@ -16,6 +16,7 @@ export type BagOption = {
   roaster: string;
   name: string;
   roastDate: string;
+  status: string;
 };
 
 export type ShotRow = {
@@ -86,6 +87,7 @@ export type ShotDetail = {
     overallRating: number | null;
     notes: string | null;
     detectedDrinkName: string | null;
+    latteArtRating: string | null;
   } | null;
 };
 
@@ -96,9 +98,24 @@ export async function getActiveBags(): Promise<BagOption[]> {
       roaster: bags.roaster,
       name: bags.name,
       roastDate: bags.roastDate,
+      status: bags.status,
     })
     .from(bags)
     .where(eq(bags.status, "active"))
+    .orderBy(desc(bags.roastDate));
+}
+
+export async function getAllBagsForHistory(): Promise<BagOption[]> {
+  return db
+    .select({
+      id: bags.id,
+      roaster: bags.roaster,
+      name: bags.name,
+      roastDate: bags.roastDate,
+      status: bags.status,
+    })
+    .from(bags)
+    .where(sql`${bags.status} != ${"removed"}`)
     .orderBy(desc(bags.roastDate));
 }
 
@@ -400,6 +417,7 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       overallRating: drinks.overallRating,
       notes: drinks.notes,
       detectedDrinkName: drinks.detectedDrinkName,
+      latteArtRating: drinks.latteArtRating,
     })
     .from(drinks)
     .where(eq(drinks.shotId, id))
@@ -423,6 +441,7 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
           overallRating: drink.overallRating ?? null,
           notes: drink.notes ?? null,
           detectedDrinkName: drink.detectedDrinkName ?? null,
+          latteArtRating: drink.latteArtRating ?? null,
         }
       : null,
   };

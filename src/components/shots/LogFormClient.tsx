@@ -27,6 +27,16 @@ type Props = {
 
 const MILK_TYPES = ["Whole", "Oat", "Almond", "Skim", "Soy", "Coconut", "Half & Half"];
 
+const LATTE_ART_OPTIONS = [
+  { value: "pollock", label: "Pollock" },
+  { value: "calder", label: "Calder" },
+  { value: "picasso", label: "Picasso" },
+  { value: "monet", label: "Monet" },
+  { value: "van_gogh", label: "Van Gogh" },
+];
+
+const LATTE_ART_ELIGIBLE = new Set(["Cortado", "Flat White", "Cappuccino", "Latte", "Mocha", "Dirty Chai"]);
+
 const FLOW_OPTIONS: { value: string; label: string }[] = [
   { value: "normal", label: "Normal" },
   { value: "one_spout_dominant", label: "One spout dominant" },
@@ -281,6 +291,7 @@ export default function LogFormClient({
   const [showDrinkPicker, setShowDrinkPicker] = useState(false);
   const [overallRating, setOverallRating] = useState<number | null>(null);
   const [drinkNotes, setDrinkNotes] = useState("");
+  const [latteArtRating, setLatteArtRating] = useState<string | null>(null);
 
   // Derived live values
   const dose = parseNum(doseG);
@@ -825,6 +836,36 @@ export default function LogFormClient({
                 </div>
                 <PillRating value={overallRating} onChange={setOverallRating} name="overallRating" />
               </div>
+
+              {/* Latte Art */}
+              {liveDrink && LATTE_ART_ELIGIBLE.has(liveDrink) && (
+                <div className="row-divider-t px-4 py-3">
+                  <input type="hidden" name="latteArtRating" value={latteArtRating ?? ""} />
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Latte Art</span>
+                    {latteArtRating !== null && (
+                      <button type="button" onClick={() => setLatteArtRating(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
+                    )}
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {LATTE_ART_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setLatteArtRating(latteArtRating === opt.value ? null : opt.value)}
+                        className="text-[13px] font-medium px-3 py-1.5 rounded-full"
+                        style={
+                          latteArtRating === opt.value
+                            ? { backgroundColor: "var(--accent)", color: "#fff" }
+                            : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                        }
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Drink Notes */}
               <div className="row-divider-t px-4 py-3">
