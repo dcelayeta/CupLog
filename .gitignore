@@ -38,7 +38,7 @@ yarn-error.log*
 local.db
 
 # db backups and restore scripts
-backup_*.sql
+backup_*
 restore_*.sql
 
 # IDE
