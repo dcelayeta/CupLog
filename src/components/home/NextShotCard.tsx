@@ -24,7 +24,7 @@ function freshnessPriority(days: number, peakStart: number, peakEnd: number): nu
 
 function MiniFreshnessBar({ days, peakStart, peakEnd }: { days: number; peakStart: number; peakEnd: number }) {
   const mid = (peakStart + peakEnd) / 2;
-  const total = peakEnd + 15;
+  const total = Math.max(peakEnd + 15, days + 5);
   const clamp = (d: number) => Math.min(Math.max(d, 0), total);
   const seg = (from: number, to: number) =>
     ((clamp(to) - clamp(from)) / total * 100).toFixed(2) + "%";

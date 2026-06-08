@@ -205,6 +205,25 @@ export default function BagFormClient({
   const [weightCorrectionG, setWeightCorrectionG] = useState(String(initialData?.weightCorrectionG ?? 0));
   const [peakStartDay, setPeakStartDay] = useState(initialData?.peakStartDay != null ? String(initialData.peakStartDay) : "");
   const [peakEndDay, setPeakEndDay] = useState(initialData?.peakEndDay != null ? String(initialData.peakEndDay) : "");
+
+  const handlePeakStartChange = (v: string) => {
+    setPeakStartDay(v);
+    const start = parseInt(v, 10);
+    const end = parseInt(peakEndDay, 10);
+    if (!isNaN(start) && !isNaN(end) && end <= start) {
+      setPeakEndDay(String(start + 7));
+    }
+  };
+
+  const handlePeakEndChange = (v: string) => {
+    const end = parseInt(v, 10);
+    const start = parseInt(peakStartDay, 10);
+    if (!isNaN(end) && !isNaN(start) && end <= start) {
+      setPeakEndDay(String(start + 7));
+    } else {
+      setPeakEndDay(v);
+    }
+  };
   const [origins, setOrigins] = useState<OriginRow[]>(
     activeData?.origins?.length
       ? activeData.origins.map((o) => ({
@@ -510,11 +529,11 @@ export default function BagFormClient({
             <SectionHeader label="Peak Freshness Window" />
             <GroupedCard>
               <FieldRow label="Peak Start (day)">
-                <StepperInput name="peakStartDay" value={peakStartDay} onChange={setPeakStartDay} step={1} min={1} max={60} />
+                <StepperInput name="peakStartDay" value={peakStartDay} onChange={handlePeakStartChange} step={1} min={1} max={60} />
               </FieldRow>
               <Divider />
               <FieldRow label="Peak End (day)">
-                <StepperInput name="peakEndDay" value={peakEndDay} onChange={setPeakEndDay} step={1} min={1} max={90} />
+                <StepperInput name="peakEndDay" value={peakEndDay} onChange={handlePeakEndChange} step={1} min={1} max={90} />
               </FieldRow>
             </GroupedCard>
             <p className="px-4 mt-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>

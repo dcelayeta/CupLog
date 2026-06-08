@@ -36,7 +36,7 @@ function MiniFreshnessBar({
   const end = peakEndDay ?? 35;
   const mid = Math.round((start + end) / 2);
   const useSoonEnd = end + 10;
-  const total = end + 14;
+  const total = Math.max(end + 14, days + 5);
   const pct = (d: number) => `${((Math.min(d, total) / total) * 100).toFixed(2)}%`;
   const todayPct = `${((Math.min(Math.max(days, 0), total) / total) * 100).toFixed(2)}%`;
 

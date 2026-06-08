@@ -60,11 +60,12 @@ export async function createBag(
   // Use user-provided peak window if present, otherwise auto-estimate
   const estimated = estimatePeakWindow(roastLevel, processingMethod, isDecaf);
   const peakStartDay = formData.get("peakStartDay")
-    ? Number(formData.get("peakStartDay"))
+    ? Math.max(1, Number(formData.get("peakStartDay")))
     : estimated.peakStartDay;
-  const peakEndDay = formData.get("peakEndDay")
-    ? Number(formData.get("peakEndDay"))
+  const rawPeakEndDay = formData.get("peakEndDay")
+    ? Math.max(1, Number(formData.get("peakEndDay")))
     : estimated.peakEndDay;
+  const peakEndDay = rawPeakEndDay <= peakStartDay ? peakStartDay + 7 : rawPeakEndDay;
 
   const status = (formData.get("status") as "active" | "reserve") === "reserve" ? "reserve" : "active";
 
@@ -124,11 +125,12 @@ export async function updateBag(
 
   const estimated = estimatePeakWindow(roastLevel, processingMethod, isDecaf);
   const peakStartDay = formData.get("peakStartDay")
-    ? Number(formData.get("peakStartDay"))
+    ? Math.max(1, Number(formData.get("peakStartDay")))
     : estimated.peakStartDay;
-  const peakEndDay = formData.get("peakEndDay")
-    ? Number(formData.get("peakEndDay"))
+  const rawPeakEndDay = formData.get("peakEndDay")
+    ? Math.max(1, Number(formData.get("peakEndDay")))
     : estimated.peakEndDay;
+  const peakEndDay = rawPeakEndDay <= peakStartDay ? peakStartDay + 7 : rawPeakEndDay;
 
   await db
     .update(bags)

@@ -16,6 +16,7 @@ export default function AIEntryPanel({
   const [isOpen, setIsOpen] = useState(false);
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isConverting, setIsConverting] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [parsedData, setParsedData] = useState<ParsedBagData | null>(null);
@@ -23,6 +24,27 @@ export default function AIEntryPanel({
   const [tip, setTip] = useState<string | null>(null);
   const [tipError, setTipError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const convertToJPEG = (file: File): Promise<File> =>
+    new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { URL.revokeObjectURL(url); reject(new Error("Canvas unavailable")); return; }
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(url);
+          if (!blob) { reject(new Error("Conversion failed")); return; }
+          resolve(new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" }));
+        }, "image/jpeg", 0.9);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not load image")); };
+      img.src = url;
+    });
 
   const handleClose = () => {
     setIsOpen(false);
@@ -82,7 +104,7 @@ export default function AIEntryPanel({
     }
   };
 
-  const canParse = (text.trim().length > 0 || imageFile !== null) && !isParsing;
+  const canParse = (text.trim().length > 0 || imageFile !== null) && !isParsing && !isConverting;
 
   if (!isOpen) {
     return (
@@ -241,17 +263,37 @@ export default function AIEntryPanel({
           </span>
           <span
             className="text-[15px] max-w-[160px] truncate"
-            style={{ color: imageFile ? "var(--accent)" : "var(--text-secondary)" }}
+            style={{ color: imageFile ? "var(--accent)" : isConverting ? "var(--text-secondary)" : "var(--text-secondary)" }}
           >
-            {imageFile ? imageFile.name : "Tap to upload"}
+            {isConverting ? "Converting…" : imageFile ? imageFile.name : "Tap to upload"}
           </span>
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
-            capture="environment"
+            accept="image/*,.heic,.heif"
             className="hidden"
-            onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+            onChange={async (e) => {
+              const file = e.target.files?.[0] ?? null;
+              if (!file) { setImageFile(null); return; }
+              const isHEIC = file.type === "image/heic" || file.type === "image/heif" ||
+                file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif");
+              if (isHEIC) {
+                setError(null);
+                setIsConverting(true);
+                try {
+                  const converted = await convertToJPEG(file);
+                  setImageFile(converted);
+                } catch {
+                  setError("Couldn't convert this photo — try taking a screenshot of it instead.");
+                  setImageFile(null);
+                } finally {
+                  setIsConverting(false);
+                }
+              } else {
+                setError(null);
+                setImageFile(file);
+              }
+            }}
           />
         </button>
 

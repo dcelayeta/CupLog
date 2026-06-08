@@ -80,7 +80,7 @@ function FreshnessTimeline({
 }) {
   const midPeak = Math.round((peakStartDay + peakEndDay) / 2);
   const useSoonEnd = peakEndDay + 10;
-  const total = peakEndDay + 14;
+  const total = Math.max(peakEndDay + 14, daysSinceRoast + 5);
   const pct = (d: number) =>
     `${((Math.min(d, total) / total) * 100).toFixed(2)}%`;
   const todayClipped = Math.min(Math.max(daysSinceRoast, 0), total);
