@@ -12,14 +12,13 @@ import { getAppConfig } from "@/lib/config/queries";
 import { DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
 import NextShotCard from "@/components/home/NextShotCard";
 import DrinkSuggestionCard from "@/components/home/DrinkSuggestionCard";
+import TodayShotsSummary from "@/components/home/TodayShotsSummary";
 import { getRecommendationForBags } from "@/lib/analysis/queries";
 
 async function getStats() {
   const [row] = await db.all(sql`
     SELECT
       COUNT(*) as total_shots,
-      SUM(CASE WHEN is_failed = 1 THEN 1 ELSE 0 END) as failed_shots,
-      SUM(CASE WHEN is_failed = 0 AND DATE(pulled_at) = DATE('now') THEN 1 ELSE 0 END) as today_shots,
       ROUND(AVG(CASE WHEN is_failed = 0 THEN shot_rating END), 1) as avg_rating,
       ROUND(AVG(CASE WHEN is_failed = 0 THEN taste_balance END), 1) as avg_balance,
       ROUND(AVG(CASE WHEN is_failed = 0 THEN dose_g END), 1) as avg_dose,
@@ -175,8 +174,6 @@ export default async function HomePage() {
   ]);
 
   const totalShots = Number(stats?.total_shots ?? 0);
-  const failedShots = Number(stats?.failed_shots ?? 0);
-  const todayShotsCount = Number(stats?.today_shots ?? 0);
 
   return (
     <div className="pt-6 pb-24 px-4">
@@ -184,13 +181,7 @@ export default async function HomePage() {
         Yield
       </h1>
       <p className="text-[15px] mb-6" style={{ color: "var(--text-secondary)" }}>
-        {totalShots === 0
-          ? "No shots logged yet."
-          : (() => {
-              const todayPart = todayShotsCount > 0 ? ` (${todayShotsCount} today)` : "";
-              const failedPart = failedShots > 0 ? ` · ${failedShots} failed` : "";
-              return `${totalShots} shot${totalShots !== 1 ? "s" : ""}${todayPart}${failedPart}`;
-            })()}
+        <TodayShotsSummary totalShots={totalShots} recentShots={todayShots} />
       </p>
 
       {(() => {
