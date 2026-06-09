@@ -25,22 +25,26 @@ export default function AIEntryPanel({
   const [tipError, setTipError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const convertToJPEG = (file: File): Promise<File> =>
+  // Resize to max 1200px and re-encode as JPEG — handles HEIC conversion and keeps payload under server action limit
+  const prepareImage = (file: File): Promise<File> =>
     new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
+        const maxDim = 1200;
+        const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
         const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
         const ctx = canvas.getContext("2d");
         if (!ctx) { URL.revokeObjectURL(url); reject(new Error("Canvas unavailable")); return; }
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         canvas.toBlob((blob) => {
           URL.revokeObjectURL(url);
-          if (!blob) { reject(new Error("Conversion failed")); return; }
-          resolve(new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" }));
-        }, "image/jpeg", 0.9);
+          if (!blob) { reject(new Error("Compression failed")); return; }
+          const name = file.name.replace(/\.(heic|heif)$/i, ".jpg");
+          resolve(new File([blob], name, { type: "image/jpeg" }));
+        }, "image/jpeg", 0.85);
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not load image")); };
       img.src = url;
@@ -263,7 +267,7 @@ export default function AIEntryPanel({
           </span>
           <span
             className="text-[15px] max-w-[160px] truncate"
-            style={{ color: imageFile ? "var(--accent)" : isConverting ? "var(--text-secondary)" : "var(--text-secondary)" }}
+            style={{ color: imageFile ? "var(--accent)" : "var(--text-secondary)" }}
           >
             {isConverting ? "Converting…" : imageFile ? imageFile.name : "Tap to upload"}
           </span>
@@ -275,23 +279,16 @@ export default function AIEntryPanel({
             onChange={async (e) => {
               const file = e.target.files?.[0] ?? null;
               if (!file) { setImageFile(null); return; }
-              const isHEIC = file.type === "image/heic" || file.type === "image/heif" ||
-                file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif");
-              if (isHEIC) {
-                setError(null);
-                setIsConverting(true);
-                try {
-                  const converted = await convertToJPEG(file);
-                  setImageFile(converted);
-                } catch {
-                  setError("Couldn't convert this photo — try taking a screenshot of it instead.");
-                  setImageFile(null);
-                } finally {
-                  setIsConverting(false);
-                }
-              } else {
-                setError(null);
-                setImageFile(file);
+              setError(null);
+              setIsConverting(true);
+              try {
+                const prepared = await prepareImage(file);
+                setImageFile(prepared);
+              } catch {
+                setError("Couldn't process this photo — try a different image.");
+                setImageFile(null);
+              } finally {
+                setIsConverting(false);
               }
             }}
           />
