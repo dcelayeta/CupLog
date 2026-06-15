@@ -107,7 +107,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 
 ### Shots (Log + History)
 - [x] Log form — bag selector, dose, yield, shot time, lag (g), grind setting, pre-infusion, spring weight, WDT toggle, grinder retention; shot time/lag/pre-infusion use steppers; spring weight uses preset pills (15/25/30 lbs) with Manual fallback
-- [x] Defaults from last shot per bag: dose, grind setting, lag, spring weight, WDT
+- [x] Defaults from last shot per bag: dose, grind setting, lag, spring weight, WDT, distribution tool
 - [x] StepperInput (−/+ buttons) for dose, yield, grind, retention, milk, foam, hot water — avoids decimal keyboard on iOS
 - [x] Live ratio + classification badge preview
 - [x] Live adjusted dose display (`dose − retention`) and "stopped at Xg" lag helper

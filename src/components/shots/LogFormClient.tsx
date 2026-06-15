@@ -257,7 +257,7 @@ export default function LogFormClient({
       : equipmentProfile?.defaultSpringWeightLbs?.toString() ?? ""
   );
   const [wdtUsed, setWdtUsed] = useState(lastShot ? lastShot.wdtUsed : true);
-  const [distributionToolUsed, setDistributionToolUsed] = useState(false);
+  const [distributionToolUsed, setDistributionToolUsed] = useState(lastShot ? lastShot.distributionToolUsed : true);
   const [grinderRetentionG, setGrinderRetentionG] = useState("0");
   const [flowCharacteristics, setFlowCharacteristics] = useState<string | null>(null);
 

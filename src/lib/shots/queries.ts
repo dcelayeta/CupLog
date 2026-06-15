@@ -137,6 +137,7 @@ export type LastShotDefaults = {
   temperatureC: number | null;
   springWeightLbs: number | null;
   wdtUsed: boolean;
+  distributionToolUsed: boolean;
 };
 
 export async function getLatestShotId(): Promise<number | null> {
@@ -158,6 +159,7 @@ export async function getLastShotDefaultsPerBag(): Promise<Record<number, LastSh
       temperatureC: shots.temperatureC,
       springWeightLbs: shots.springWeightLbs,
       wdtUsed: shots.wdtUsed,
+      distributionToolUsed: shots.distributionToolUsed,
     })
     .from(shots)
     .where(sql`${shots.id} IN (SELECT MAX(id) FROM shots GROUP BY bag_id)`);
@@ -174,6 +176,7 @@ export async function getLastShotDefaults(): Promise<LastShotDefaults | null> {
       temperatureC: shots.temperatureC,
       springWeightLbs: shots.springWeightLbs,
       wdtUsed: shots.wdtUsed,
+      distributionToolUsed: shots.distributionToolUsed,
     })
     .from(shots)
     .orderBy(desc(shots.pulledAt))
