@@ -17,6 +17,7 @@ export type BagOption = {
   name: string;
   roastDate: string;
   status: string;
+  isDecaf: boolean;
 };
 
 export type ShotRow = {
@@ -99,6 +100,7 @@ export async function getActiveBags(): Promise<BagOption[]> {
       name: bags.name,
       roastDate: bags.roastDate,
       status: bags.status,
+      isDecaf: bags.isDecaf,
     })
     .from(bags)
     .where(eq(bags.status, "active"))
@@ -113,6 +115,7 @@ export async function getAllBagsForHistory(): Promise<BagOption[]> {
       name: bags.name,
       roastDate: bags.roastDate,
       status: bags.status,
+      isDecaf: bags.isDecaf,
     })
     .from(bags)
     .where(sql`${bags.status} != ${"removed"}`)
@@ -138,6 +141,8 @@ export type LastShotDefaults = {
   springWeightLbs: number | null;
   wdtUsed: boolean;
   distributionToolUsed: boolean;
+  pulledAt: string;
+  shotRating: number | null;
 };
 
 export async function getLatestShotId(): Promise<number | null> {
@@ -160,6 +165,8 @@ export async function getLastShotDefaultsPerBag(): Promise<Record<number, LastSh
       springWeightLbs: shots.springWeightLbs,
       wdtUsed: shots.wdtUsed,
       distributionToolUsed: shots.distributionToolUsed,
+      pulledAt: shots.pulledAt,
+      shotRating: shots.shotRating,
     })
     .from(shots)
     .where(sql`${shots.id} IN (SELECT MAX(id) FROM shots GROUP BY bag_id)`);
@@ -177,6 +184,8 @@ export async function getLastShotDefaults(): Promise<LastShotDefaults | null> {
       springWeightLbs: shots.springWeightLbs,
       wdtUsed: shots.wdtUsed,
       distributionToolUsed: shots.distributionToolUsed,
+      pulledAt: shots.pulledAt,
+      shotRating: shots.shotRating,
     })
     .from(shots)
     .orderBy(desc(shots.pulledAt))

@@ -14,12 +14,31 @@ type Props = {
   thresholds: ExtractionThreshold[];
 };
 
-function daysSince(roastDate: string): number {
-  return Math.floor((Date.now() - new Date(roastDate).getTime()) / 86400000);
+function formatLastShot(pulledAt: string): string {
+  const shot = new Date(pulledAt);
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const time = shot.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+  if (shot.toDateString() === todayStr) return `Today ${time}`;
+  if (shot.toDateString() === yesterday.toDateString()) return `Yesterday ${time}`;
+
+  return shot.toLocaleDateString([], { month: "short", day: "numeric" }) + ` ${time}`;
+}
+
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <span className="text-[12px]">
+      {"★".repeat(rating)}{"☆".repeat(5 - rating)}
+    </span>
+  );
 }
 
 export default function LogFlowClient(props: Props) {
-  const { bags, lastShot } = props;
+  const { bags, lastShot, bagDefaults } = props;
 
   const lastBagId = lastShot ? (bags.find((b) => b.id === lastShot.bagId)?.id ?? null) : null;
 
@@ -31,63 +50,120 @@ export default function LogFlowClient(props: Props) {
     return <LogFormClient {...props} preselectedBagId={selectedBagId.toString()} />;
   }
 
-  const lastBag = lastBagId != null ? bags.find((b) => b.id === lastBagId) ?? null : null;
-  const otherBags = bags.filter((b) => b.id !== lastBagId);
+  // Time-of-day hint: before 14:00 → prefer caf, 14:00+ → prefer decaf
+  const hour = new Date().getHours();
+  const preferDecaf = hour >= 14;
+
+  // Sort: last-used first, then by whether the time hint matches, then as-is
+  const sorted = [...bags].sort((a, b) => {
+    if (a.id === lastBagId) return -1;
+    if (b.id === lastBagId) return 1;
+    const aMatch = preferDecaf ? a.isDecaf : !a.isDecaf;
+    const bMatch = preferDecaf ? b.isDecaf : !b.isDecaf;
+    if (aMatch && !bMatch) return -1;
+    if (!aMatch && bMatch) return 1;
+    return 0;
+  });
+
+  const hintLabel = preferDecaf ? "Good for this afternoon" : "Good for this morning";
 
   return (
     <>
-      {lastBag && (
-        <>
-          <div className="px-4 pt-1 pb-2">
-            <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-              Last Used
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSelectedBagId(lastBag.id)}
-            className="mx-4 mb-5 rounded-2xl text-left px-5 py-4"
-            style={{ backgroundColor: "var(--accent)", width: "calc(100% - 2rem)" }}
-          >
-            <p className="text-[19px] font-semibold text-white leading-snug">{lastBag.name}</p>
-            <p className="text-[14px] text-white mt-0.5" style={{ opacity: 0.75 }}>
-              {lastBag.roaster} · {daysSince(lastBag.roastDate)}d since roast
-            </p>
-          </button>
-        </>
-      )}
+      <div className="px-4 pt-1 pb-3">
+        <p className="text-[15px]" style={{ color: "var(--text-secondary)" }}>
+          Which bean are you using?
+        </p>
+      </div>
 
-      {otherBags.length > 0 && (
-        <>
-          <div className="px-4 pb-2">
-            <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-              {lastBag ? "Other Beans" : "Select Bean"}
-            </p>
-          </div>
-          <div
-            className="mx-4 rounded-2xl overflow-hidden"
-            style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
-          >
-            {otherBags.map((bag, i) => (
-              <button
-                key={bag.id}
-                type="button"
-                onClick={() => setSelectedBagId(bag.id)}
-                className="w-full flex items-center justify-between px-5 min-h-[60px] text-left"
-                style={{ borderBottom: i < otherBags.length - 1 ? "1px solid var(--separator)" : "none" }}
+      <div className="px-4 grid grid-cols-2 gap-3">
+        {sorted.map((bag) => {
+          const isLastUsed = bag.id === lastBagId;
+          const bagDefault = bagDefaults[bag.id];
+          const matchesTimeHint = preferDecaf ? bag.isDecaf : !bag.isDecaf;
+
+          return (
+            <button
+              key={bag.id}
+              type="button"
+              onClick={() => setSelectedBagId(bag.id)}
+              className="rounded-2xl text-left px-4 py-4 flex flex-col"
+              style={{
+                backgroundColor: isLastUsed ? "var(--accent)" : "var(--card)",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+                minHeight: 130,
+              }}
+            >
+              {/* Badges row */}
+              <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                {isLastUsed && (
+                  <span className="text-[11px] font-semibold text-white bg-white/20 rounded-full px-2 py-0.5">
+                    Last used
+                  </span>
+                )}
+                {bag.isDecaf && (
+                  <span
+                    className="text-[11px] font-semibold rounded-full px-2 py-0.5"
+                    style={{
+                      backgroundColor: isLastUsed ? "rgba(255,255,255,0.2)" : "var(--card-secondary)",
+                      color: isLastUsed ? "white" : "var(--text-secondary)",
+                    }}
+                  >
+                    Decaf
+                  </span>
+                )}
+                {matchesTimeHint && !isLastUsed && (
+                  <span
+                    className="text-[11px] font-semibold rounded-full px-2 py-0.5"
+                    style={{ backgroundColor: "var(--card-secondary)", color: "var(--accent)" }}
+                  >
+                    {hintLabel}
+                  </span>
+                )}
+              </div>
+
+              {/* Bean name + roaster */}
+              <p
+                className="text-[15px] font-semibold leading-snug flex-1"
+                style={{ color: isLastUsed ? "white" : "var(--text-primary)" }}
               >
-                <div>
-                  <p className="text-[17px]" style={{ color: "var(--text-primary)" }}>{bag.name}</p>
-                  <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                    {bag.roaster} · {daysSince(bag.roastDate)}d since roast
+                {bag.name}
+              </p>
+              <p
+                className="text-[12px] mt-0.5"
+                style={{ color: isLastUsed ? "rgba(255,255,255,0.75)" : "var(--text-secondary)" }}
+              >
+                {bag.roaster}
+              </p>
+
+              {/* Last shot info */}
+              {bagDefault ? (
+                <div className="mt-2 pt-2" style={{ borderTop: isLastUsed ? "1px solid rgba(255,255,255,0.2)" : "1px solid var(--separator)" }}>
+                  <p
+                    className="text-[11px]"
+                    style={{ color: isLastUsed ? "rgba(255,255,255,0.75)" : "var(--text-secondary)" }}
+                  >
+                    {formatLastShot(bagDefault.pulledAt)}
+                  </p>
+                  {bagDefault.shotRating != null && (
+                    <p style={{ color: isLastUsed ? "rgba(255,255,255,0.9)" : "#FF9500" }}>
+                      <StarRating rating={bagDefault.shotRating} />
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-2 pt-2" style={{ borderTop: isLastUsed ? "1px solid rgba(255,255,255,0.2)" : "1px solid var(--separator)" }}>
+                  <p
+                    className="text-[11px]"
+                    style={{ color: isLastUsed ? "rgba(255,255,255,0.6)" : "var(--text-secondary)" }}
+                  >
+                    No shots yet
                   </p>
                 </div>
-                <span className="text-[22px] leading-none ml-3" style={{ color: "var(--text-secondary)" }}>›</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+              )}
+            </button>
+          );
+        })}
+      </div>
     </>
   );
 }
