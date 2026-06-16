@@ -54,14 +54,14 @@ export default function LogFlowClient(props: Props) {
   const hour = new Date().getHours();
   const preferDecaf = hour >= 14;
 
-  // Sort: last-used first, then by whether the time hint matches, then as-is
+  // Sort: time-of-day match first, last-used as tiebreaker within each tier
   const sorted = [...bags].sort((a, b) => {
-    if (a.id === lastBagId) return -1;
-    if (b.id === lastBagId) return 1;
     const aMatch = preferDecaf ? a.isDecaf : !a.isDecaf;
     const bMatch = preferDecaf ? b.isDecaf : !b.isDecaf;
     if (aMatch && !bMatch) return -1;
     if (!aMatch && bMatch) return 1;
+    if (a.id === lastBagId) return -1;
+    if (b.id === lastBagId) return 1;
     return 0;
   });
 
