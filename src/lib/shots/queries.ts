@@ -18,6 +18,8 @@ export type BagOption = {
   roastDate: string;
   status: string;
   isDecaf: boolean;
+  peakStartDay: number | null;
+  peakEndDay: number | null;
 };
 
 export type ShotRow = {
@@ -101,6 +103,8 @@ export async function getActiveBags(): Promise<BagOption[]> {
       roastDate: bags.roastDate,
       status: bags.status,
       isDecaf: bags.isDecaf,
+      peakStartDay: bags.peakStartDay,
+      peakEndDay: bags.peakEndDay,
     })
     .from(bags)
     .where(eq(bags.status, "active"))
@@ -116,6 +120,8 @@ export async function getAllBagsForHistory(): Promise<BagOption[]> {
       roastDate: bags.roastDate,
       status: bags.status,
       isDecaf: bags.isDecaf,
+      peakStartDay: bags.peakStartDay,
+      peakEndDay: bags.peakEndDay,
     })
     .from(bags)
     .where(sql`${bags.status} != ${"removed"}`)

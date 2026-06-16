@@ -108,7 +108,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 ### Shots (Log + History)
 - [x] Log form — bag selector, dose, yield, shot time, lag (g), grind setting, pre-infusion, spring weight, WDT toggle, grinder retention; shot time/lag/pre-infusion use steppers; spring weight uses preset pills (15/25/30 lbs) with Manual fallback
 - [x] Defaults from last shot per bag: dose, grind setting, lag, spring weight, WDT, distribution tool
-- [x] Two-step log flow — step 1 bean picker: uniform 2-col grid cards with last-used first (accent), per-bag last shot date/time + star rating, decaf badge, time-of-day hint (caf before 14:00, decaf after); step 2 is full log form pre-selected but still editable; single-bag users skip step 1
+- [x] Two-step log flow — step 1 bean picker: uniform 2-col grid cards, sorted by Recommended (peak freshness + right caffeine for time of day) → caffeine match → last used; cards show last shot date/time, star rating, Decaf + Last used badges; step 2 is full log form pre-selected but still editable; single-bag users skip step 1
 - [x] StepperInput (−/+ buttons) for dose, yield, grind, retention, milk, foam, hot water — avoids decimal keyboard on iOS
 - [x] Live ratio + classification badge preview
 - [x] Live adjusted dose display (`dose − retention`) and "stopped at Xg" lag helper
