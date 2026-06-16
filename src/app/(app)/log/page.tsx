@@ -8,7 +8,7 @@ import {
   getLastShotDefaultsPerBag,
 } from "@/lib/shots/queries";
 import { getExtractionThresholds } from "@/lib/shots/thresholds";
-import LogFormClient from "@/components/shots/LogFormClient";
+import LogFlowClient from "@/components/shots/LogFlowClient";
 
 export default async function LogPage() {
   const [bags, equipmentProfile, averageRetention, lastShot, bagDefaults, thresholds] = await Promise.all([
@@ -39,7 +39,7 @@ export default async function LogPage() {
           </p>
         </div>
       ) : (
-        <LogFormClient
+        <LogFlowClient
           bags={bags}
           equipmentProfile={equipmentProfile}
           averageRetention={averageRetention}

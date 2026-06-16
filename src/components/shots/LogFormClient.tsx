@@ -21,6 +21,7 @@ type Props = {
   lastShot: LastShotDefaults | null;
   bagDefaults: Record<number, LastShotDefaults>;
   thresholds: ExtractionThreshold[];
+  preselectedBagId?: string;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -224,6 +225,7 @@ export default function LogFormClient({
   lastShot,
   bagDefaults,
   thresholds,
+  preselectedBagId,
 }: Props) {
   const [state, formAction, isPending] = useActionState(logShot, null);
   const router = useRouter();
@@ -234,30 +236,35 @@ export default function LogFormClient({
     }
   }, [state, router]);
 
-  // Resolve defaults: last shot takes priority over equipment profile fallbacks
-  const initialBagId = (
+  // When a bag is preselected from step 1, use that bag's last-shot defaults;
+  // fall back to the global last shot if no per-bag history exists yet.
+  const effectiveDefaults: LastShotDefaults | null = preselectedBagId != null
+    ? (bagDefaults[Number(preselectedBagId)] ?? lastShot)
+    : lastShot;
+
+  const initialBagId = preselectedBagId ?? (
     (lastShot ? bags.find((b) => b.id === lastShot.bagId)?.id : null) ?? bags[0]?.id
   )?.toString() ?? "";
 
   // Shot fields
   const [bagId, setBagId] = useState(initialBagId);
-  const [doseG, setDoseG] = useState(lastShot ? lastShot.doseG.toString() : "18");
+  const [doseG, setDoseG] = useState(effectiveDefaults ? effectiveDefaults.doseG.toString() : "18");
   const [yieldG, setYieldG] = useState("36");
   const [shotTimeSeconds, setShotTimeSeconds] = useState("28");
   const [grindSetting, setGrindSetting] = useState(
-    lastShot?.grindSetting != null ? lastShot.grindSetting.toString() : ""
+    effectiveDefaults?.grindSetting != null ? effectiveDefaults.grindSetting.toString() : ""
   );
   const [lagG, setLagG] = useState(
-    lastShot?.lagG != null ? lastShot.lagG.toString() : ""
+    effectiveDefaults?.lagG != null ? effectiveDefaults.lagG.toString() : ""
   );
   const [preinfusionSeconds, setPreinfusionSeconds] = useState("");
   const [springWeightLbs, setSpringWeightLbs] = useState(
-    lastShot?.springWeightLbs != null
-      ? lastShot.springWeightLbs.toString()
+    effectiveDefaults?.springWeightLbs != null
+      ? effectiveDefaults.springWeightLbs.toString()
       : equipmentProfile?.defaultSpringWeightLbs?.toString() ?? ""
   );
-  const [wdtUsed, setWdtUsed] = useState(lastShot ? lastShot.wdtUsed : true);
-  const [distributionToolUsed, setDistributionToolUsed] = useState(lastShot ? lastShot.distributionToolUsed : true);
+  const [wdtUsed, setWdtUsed] = useState(effectiveDefaults ? effectiveDefaults.wdtUsed : true);
+  const [distributionToolUsed, setDistributionToolUsed] = useState(effectiveDefaults ? effectiveDefaults.distributionToolUsed : true);
   const [grinderRetentionG, setGrinderRetentionG] = useState("0");
   const [flowCharacteristics, setFlowCharacteristics] = useState<string | null>(null);
 
