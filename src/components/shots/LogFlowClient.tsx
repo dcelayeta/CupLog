@@ -95,7 +95,7 @@ export default function LogFlowClient(props: Props) {
               key={bag.id}
               type="button"
               onClick={() => setSelectedBagId(bag.id)}
-              className="rounded-2xl text-left px-4 py-4 flex flex-col"
+              className="rounded-2xl text-left px-4 py-4 flex flex-col cursor-pointer active:opacity-70 transition-opacity"
               style={{
                 backgroundColor: isLastUsed ? "var(--accent)" : "var(--card)",
                 boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
