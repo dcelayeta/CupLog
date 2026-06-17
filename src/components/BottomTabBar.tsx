@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useDirtyForm } from "@/context/DirtyFormContext";
 
 const tabs = [
   {
@@ -72,6 +72,8 @@ const tabs = [
 
 export default function BottomTabBar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { requestNavigation } = useDirtyForm();
 
   return (
     <div
@@ -90,9 +92,10 @@ export default function BottomTabBar() {
             ? pathname.startsWith("/more") && !pathname.startsWith("/more/stats")
             : pathname.startsWith(tab.href);
           return (
-            <Link
+            <button
               key={tab.href}
-              href={tab.href}
+              type="button"
+              onClick={() => requestNavigation(() => router.push(tab.href))}
               className="flex flex-col items-center justify-center gap-0.5 min-w-[58px] min-h-[52px] rounded-[20px] px-2.5 transition-colors"
               style={{
                 backgroundColor: active ? "var(--tab-active-bg)" : "transparent",
@@ -101,7 +104,7 @@ export default function BottomTabBar() {
             >
               {tab.icon(active)}
               <span className="text-[10px] font-medium leading-none">{tab.label}</span>
-            </Link>
+            </button>
           );
         })}
       </nav>

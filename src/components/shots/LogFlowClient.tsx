@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import LogFormClient from "./LogFormClient";
 import type { BagOption, LastShotDefaults } from "@/lib/shots/queries";
 import type { EquipmentProfile, ExtractionThreshold } from "@/db/schema";
+import { useDirtyForm } from "@/context/DirtyFormContext";
 
 type Props = {
   bags: BagOption[];
@@ -41,6 +42,7 @@ function StarRating({ rating }: { rating: number }) {
 
 export default function LogFlowClient(props: Props) {
   const { bags, lastShot, bagDefaults } = props;
+  const { setDirty } = useDirtyForm();
 
   const lastBagId = lastShot ? (bags.find((b) => b.id === lastShot.bagId)?.id ?? null) : null;
 
@@ -48,8 +50,22 @@ export default function LogFlowClient(props: Props) {
     bags.length === 1 ? bags[0].id : null
   );
 
+  // Mark dirty whenever the log form is open (step 2 or single-bag auto-proceed)
+  useEffect(() => {
+    if (selectedBagId !== null) {
+      setDirty(true);
+    }
+    return () => setDirty(false);
+  }, [selectedBagId, setDirty]);
+
   if (selectedBagId !== null) {
-    return <LogFormClient {...props} preselectedBagId={selectedBagId.toString()} />;
+    return (
+      <LogFormClient
+        {...props}
+        preselectedBagId={selectedBagId.toString()}
+        onSubmit={() => setDirty(false)}
+      />
+    );
   }
 
   // Before 14:00 prefer caf, 14:00+ prefer decaf

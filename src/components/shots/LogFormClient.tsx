@@ -22,6 +22,7 @@ type Props = {
   bagDefaults: Record<number, LastShotDefaults>;
   thresholds: ExtractionThreshold[];
   preselectedBagId?: string;
+  onSubmit?: () => void;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -226,6 +227,7 @@ export default function LogFormClient({
   bagDefaults,
   thresholds,
   preselectedBagId,
+  onSubmit,
 }: Props) {
   const [state, formAction, isPending] = useActionState(logShot, null);
   const router = useRouter();
@@ -341,7 +343,7 @@ export default function LogFormClient({
 
   return (
     <>
-      <form action={formAction} className="pb-32">
+      <form action={formAction} className="pb-32" onSubmit={() => onSubmit?.()}>
         {/* Hidden fields */}
         <input type="hidden" name="bagId" value={bagId} />
         <input type="hidden" name="bagRoastDate" value={selectedBag?.roastDate ?? ""} />
