@@ -316,3 +316,27 @@ export async function searchBags(
 
   return result;
 }
+
+export type LockedShot = {
+  shotId: number;
+  grindSetting: number | null;
+  doseG: number;
+  yieldG: number | null;
+  grinderRetentionG: number | null;
+};
+
+export async function getLockedShotForBag(bagId: number): Promise<LockedShot | null> {
+  const [row] = await db
+    .select({
+      shotId: shots.id,
+      grindSetting: shots.grindSetting,
+      doseG: shots.doseG,
+      yieldG: shots.yieldG,
+      grinderRetentionG: shots.grinderRetentionG,
+    })
+    .from(shots)
+    .where(and(eq(shots.bagId, bagId), eq(shots.isLocked, true)))
+    .orderBy(desc(shots.pulledAt))
+    .limit(1);
+  return row ?? null;
+}

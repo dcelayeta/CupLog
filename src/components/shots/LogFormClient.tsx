@@ -406,14 +406,37 @@ export default function LogFormClient({
           const showLocked = d.isLocked;
           const showAI = !!d.aiRecommendationAction;
           if (!showLocked && !showAI) return null;
+          const adjDose = d.grinderRetentionG != null ? d.doseG - d.grinderRetentionG : d.doseG;
+          const yieldLow = d.yieldG != null ? (d.yieldG - 2).toFixed(0) : null;
+          const yieldHigh = d.yieldG != null ? (d.yieldG + 2).toFixed(0) : null;
           return (
             <div className="mx-4 mt-3 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
               {showLocked && (
-                <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: showAI ? "1px solid var(--separator)" : "none" }}>
-                  <span className="text-[12px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#AF52DE20", color: "#AF52DE" }}>
-                    Locked
-                  </span>
-                  <span className="text-[14px]" style={{ color: "var(--text-secondary)" }}>Parameters dialed in</span>
+                <div className="px-4 py-3" style={{ borderBottom: showAI ? "1px solid var(--separator)" : "none" }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[12px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#AF52DE20", color: "#AF52DE" }}>
+                      Locked
+                    </span>
+                    <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Parameters dialed in</span>
+                  </div>
+                  <div className="flex gap-4 flex-wrap">
+                    {d.grindSetting != null && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide font-medium" style={{ color: "var(--text-secondary)" }}>Grind</p>
+                        <p className="text-[18px] font-semibold" style={{ color: "var(--text-primary)" }}>{d.grindSetting}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide font-medium" style={{ color: "var(--text-secondary)" }}>Dose</p>
+                      <p className="text-[18px] font-semibold" style={{ color: "var(--text-primary)" }}>{adjDose.toFixed(1)}g</p>
+                    </div>
+                    {yieldLow && yieldHigh && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide font-medium" style={{ color: "var(--text-secondary)" }}>Target Yield</p>
+                        <p className="text-[18px] font-semibold" style={{ color: "var(--text-primary)" }}>{yieldLow}–{yieldHigh}g</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               {showAI && (

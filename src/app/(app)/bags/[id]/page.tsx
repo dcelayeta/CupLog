@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getBagById, getBagShotChartData } from "@/lib/bags/queries";
+import { getBagById, getBagShotChartData, getLockedShotForBag } from "@/lib/bags/queries";
 import { getBagAnalysis } from "@/lib/bags/bagAnalysis";
 import FreshnessIndicator from "@/components/bags/FreshnessIndicator";
 import BagActions from "@/components/bags/BagActions";
@@ -314,10 +314,11 @@ export default async function BagDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [bag, existingAnalysis, shotChartData] = await Promise.all([
+  const [bag, existingAnalysis, shotChartData, lockedShot] = await Promise.all([
     getBagById(Number(id)),
     getBagAnalysis(Number(id)),
     getBagShotChartData(Number(id)),
+    getLockedShotForBag(Number(id)),
   ]);
   if (!bag) notFound();
 
@@ -547,6 +548,66 @@ export default async function BagDetailPage({
             </div>
           </div>
         )}
+
+        {/* Dialed In Recipe */}
+        {lockedShot && (() => {
+          const { shotId, grindSetting, doseG, yieldG, grinderRetentionG } = lockedShot;
+          const adjDose = grinderRetentionG != null ? doseG - grinderRetentionG : doseG;
+          const yieldLow = yieldG != null ? (yieldG - 2).toFixed(0) : null;
+          const yieldHigh = yieldG != null ? (yieldG + 2).toFixed(0) : null;
+          return (
+            <div>
+              <SectionHeader label="Dialed In Recipe" />
+              <div
+                className="mx-4 rounded-2xl overflow-hidden"
+                style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+              >
+                <div className="px-5 py-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-[12px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#AF52DE20", color: "#AF52DE" }}>
+                      Locked
+                    </span>
+                    <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Parameters dialed in</span>
+                  </div>
+                  <div className="flex gap-4 flex-wrap">
+                    {grindSetting != null && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide font-medium mb-0.5" style={{ color: "var(--text-secondary)" }}>Grind</p>
+                        <p className="text-[22px] font-semibold" style={{ color: "var(--text-primary)" }}>{grindSetting}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide font-medium mb-0.5" style={{ color: "var(--text-secondary)" }}>Dose</p>
+                      <p className="text-[22px] font-semibold" style={{ color: "var(--text-primary)" }}>{adjDose.toFixed(1)}g</p>
+                    </div>
+                    {yieldLow && yieldHigh && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide font-medium mb-0.5" style={{ color: "var(--text-secondary)" }}>Target Yield</p>
+                        <p className="text-[22px] font-semibold" style={{ color: "var(--text-primary)" }}>{yieldLow}–{yieldHigh}g</p>
+                      </div>
+                    )}
+                    {grinderRetentionG != null && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide font-medium mb-0.5" style={{ color: "var(--text-secondary)" }}>Retention</p>
+                        <p className="text-[22px] font-semibold" style={{ color: "var(--text-secondary)" }}>{grinderRetentionG}g</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
+                <Link
+                  href={`/history/${shotId}/edit`}
+                  className="flex items-center justify-between px-5 min-h-[48px] active:opacity-70 transition-opacity"
+                >
+                  <span className="text-[15px]" style={{ color: "var(--accent)" }}>Edit locked shot</span>
+                  <svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-secondary)" }}>
+                    <path d="M1 1l6 5.5L1 12" />
+                  </svg>
+                </Link>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Shot count */}
         <div>

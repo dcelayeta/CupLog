@@ -148,6 +148,8 @@ export type LastShotDefaults = {
   wdtUsed: boolean;
   distributionToolUsed: boolean;
   preinfusionSeconds: number | null;
+  yieldG: number | null;
+  grinderRetentionG: number | null;
   isLocked: boolean;
   aiRecommendationAction: string | null;
   pulledAt: string;
@@ -175,6 +177,8 @@ export async function getLastShotDefaultsPerBag(): Promise<Record<number, LastSh
       wdtUsed: shots.wdtUsed,
       distributionToolUsed: shots.distributionToolUsed,
       preinfusionSeconds: shots.preinfusionSeconds,
+      yieldG: shots.yieldG,
+      grinderRetentionG: shots.grinderRetentionG,
       isLocked: shots.isLocked,
       aiRecommendationAction: shotAnalyses.recommendationAction,
       pulledAt: shots.pulledAt,
@@ -198,6 +202,8 @@ export async function getLastShotDefaults(): Promise<LastShotDefaults | null> {
       wdtUsed: shots.wdtUsed,
       distributionToolUsed: shots.distributionToolUsed,
       preinfusionSeconds: shots.preinfusionSeconds,
+      yieldG: shots.yieldG,
+      grinderRetentionG: shots.grinderRetentionG,
       isLocked: shots.isLocked,
       aiRecommendationAction: shotAnalyses.recommendationAction,
       pulledAt: shots.pulledAt,
