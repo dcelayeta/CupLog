@@ -148,6 +148,8 @@ export type LastShotDefaults = {
   wdtUsed: boolean;
   distributionToolUsed: boolean;
   preinfusionSeconds: number | null;
+  isLocked: boolean;
+  aiRecommendationAction: string | null;
   pulledAt: string;
   shotRating: number | null;
 };
@@ -173,10 +175,13 @@ export async function getLastShotDefaultsPerBag(): Promise<Record<number, LastSh
       wdtUsed: shots.wdtUsed,
       distributionToolUsed: shots.distributionToolUsed,
       preinfusionSeconds: shots.preinfusionSeconds,
+      isLocked: shots.isLocked,
+      aiRecommendationAction: shotAnalyses.recommendationAction,
       pulledAt: shots.pulledAt,
       shotRating: shots.shotRating,
     })
     .from(shots)
+    .leftJoin(shotAnalyses, eq(shotAnalyses.shotId, shots.id))
     .where(sql`${shots.id} IN (SELECT MAX(id) FROM shots GROUP BY bag_id)`);
   return Object.fromEntries(rows.map(r => [r.bagId, r]));
 }
@@ -193,10 +198,13 @@ export async function getLastShotDefaults(): Promise<LastShotDefaults | null> {
       wdtUsed: shots.wdtUsed,
       distributionToolUsed: shots.distributionToolUsed,
       preinfusionSeconds: shots.preinfusionSeconds,
+      isLocked: shots.isLocked,
+      aiRecommendationAction: shotAnalyses.recommendationAction,
       pulledAt: shots.pulledAt,
       shotRating: shots.shotRating,
     })
     .from(shots)
+    .leftJoin(shotAnalyses, eq(shotAnalyses.shotId, shots.id))
     .orderBy(desc(shots.pulledAt))
     .limit(1);
   return row ?? null;

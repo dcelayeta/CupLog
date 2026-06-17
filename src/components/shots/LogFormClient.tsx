@@ -399,6 +399,35 @@ export default function LogFormClient({
           </div>
         </div>
 
+        {/* ── Locked / AI recommendation banner ── */}
+        {(() => {
+          const d = bagDefaults[Number(bagId)];
+          if (!d) return null;
+          const showLocked = d.isLocked;
+          const showAI = !!d.aiRecommendationAction;
+          if (!showLocked && !showAI) return null;
+          return (
+            <div className="mx-4 mt-3 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+              {showLocked && (
+                <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: showAI ? "1px solid var(--separator)" : "none" }}>
+                  <span className="text-[12px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#AF52DE20", color: "#AF52DE" }}>
+                    Locked
+                  </span>
+                  <span className="text-[14px]" style={{ color: "var(--text-secondary)" }}>Parameters dialed in</span>
+                </div>
+              )}
+              {showAI && (
+                <div className="flex items-start gap-2 px-4 py-3">
+                  <span className="text-[12px] font-semibold px-2 py-0.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: "#AF52DE20", color: "#AF52DE" }}>
+                    AI
+                  </span>
+                  <span className="text-[14px]" style={{ color: "var(--text-primary)" }}>{d.aiRecommendationAction}</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ── Shot Parameters ── */}
         <SectionHeader title="Shot" />
         <div
@@ -465,9 +494,6 @@ export default function LogFormClient({
           <Row label="Pre-infusion (s)">
             <StepperInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} step={1} min={0} max={30} />
           </Row>
-          <Row label="Shot Time (s)">
-            <StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} />
-          </Row>
           <div className="px-4 py-3" style={{ borderTop: "1px solid var(--separator)" }}>
             <div className="flex justify-between items-center mb-2">
               <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Flow</span>
@@ -493,6 +519,9 @@ export default function LogFormClient({
               ))}
             </div>
           </div>
+          <Row label="Shot Time (s)">
+            <StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} />
+          </Row>
           <Row label="Yield (g)">
             <StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} />
           </Row>
