@@ -405,52 +405,6 @@ export default function LogFormClient({
           className="mx-4 rounded-2xl overflow-hidden"
           style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
         >
-          {/* Failed shot toggle */}
-          <div className="flex items-center px-6 min-h-[52px]">
-            <span className="text-[17px] flex-1" style={{ color: isFailed ? "#FF3B30" : "var(--text-primary)" }}>
-              Failed Shot
-            </span>
-            <button
-              type="button"
-              onClick={() => { setIsFailed(!isFailed); setFailReason(""); }}
-              className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200"
-              style={{ backgroundColor: isFailed ? "#FF3B30" : "#E5E5EA" }}
-            >
-              <span
-                className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transform transition-transform duration-200 mt-[2px]"
-                style={{ marginLeft: isFailed ? 22 : 2 }}
-              />
-            </button>
-          </div>
-          {isFailed && (
-            <div className="row-divider px-4 py-2">
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: "channeling", label: "Channeling" },
-                  { value: "choking", label: "Choking" },
-                  { value: "puck_collapse", label: "Puck Collapse" },
-                  { value: "grind_error", label: "Grind Error" },
-                  { value: "equipment_issue", label: "Equipment" },
-                  { value: "other", label: "Other" },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setFailReason(failReason === opt.value ? "" : opt.value)}
-                    className="text-[13px] font-medium px-3 py-1.5 rounded-full"
-                    style={
-                      failReason === opt.value
-                        ? { backgroundColor: "#FF3B30", color: "#fff" }
-                        : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
-                    }
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* ── Grind → Dose → Retention ── */}
           <Row label="Grind Setting">
             <StepperInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} step={0.5} min={0} max={50} />
@@ -564,6 +518,52 @@ export default function LogFormClient({
               )}
               {timeClass && timeClass.label !== "Normal" && <ClassificationBadge classification={timeClass} size="sm" />}
               {ratioClass && ratioClass.label !== "Normal" && <ClassificationBadge classification={ratioClass} size="sm" />}
+            </div>
+          )}
+
+          {/* ── Failed Shot ── */}
+          <div className="flex items-center px-6 min-h-[52px]" style={{ borderTop: "1px solid var(--separator)" }}>
+            <span className="text-[17px] flex-1" style={{ color: isFailed ? "#FF3B30" : "var(--text-primary)" }}>
+              Failed Shot
+            </span>
+            <button
+              type="button"
+              onClick={() => { setIsFailed(!isFailed); setFailReason(""); }}
+              className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200"
+              style={{ backgroundColor: isFailed ? "#FF3B30" : "#E5E5EA" }}
+            >
+              <span
+                className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transform transition-transform duration-200 mt-[2px]"
+                style={{ marginLeft: isFailed ? 22 : 2 }}
+              />
+            </button>
+          </div>
+          {isFailed && (
+            <div className="px-4 py-2" style={{ borderTop: "1px solid var(--separator)" }}>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: "channeling", label: "Channeling" },
+                  { value: "choking", label: "Choking" },
+                  { value: "puck_collapse", label: "Puck Collapse" },
+                  { value: "grind_error", label: "Grind Error" },
+                  { value: "equipment_issue", label: "Equipment" },
+                  { value: "other", label: "Other" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFailReason(failReason === opt.value ? "" : opt.value)}
+                    className="text-[13px] font-medium px-3 py-1.5 rounded-full"
+                    style={
+                      failReason === opt.value
+                        ? { backgroundColor: "#FF3B30", color: "#fff" }
+                        : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
