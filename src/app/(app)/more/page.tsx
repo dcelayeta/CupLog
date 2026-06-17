@@ -88,6 +88,7 @@ export default async function MorePage() {
       >
         <NavRow href="/more/drinks" label="Drink History" description="Browse all logged drinks" />
         <NavRow href="/more/recipes" label="Drink Reference" description="Espresso drink guide and proportions" />
+        <NavRow href="/more/yield-calculator" label="Yield Calculator" description="Yields for standard ratios given a dose" />
       </div>
 
       <SectionHeader title="Appearance" />
@@ -122,7 +123,7 @@ export default async function MorePage() {
       </div>
 
       <div className="mt-8 mb-2 flex flex-col items-center gap-0.5">
-        <p className="text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.5 }}>Yield v2.8</p>
+        <p className="text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.5 }}>Yield v2.9</p>
         <p className="text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.5 }}>© {new Date().getFullYear()} Diego Celayeta. All rights reserved.</p>
       </div>
     </div>

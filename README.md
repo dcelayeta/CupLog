@@ -60,6 +60,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 | `/more/equipment` | Equipment profile + cleaning tracking |
 | `/more/thresholds` | Extraction time/ratio classification ranges |
 | `/more/coaching-state` | AI coach rolling context editor |
+| `/more/yield-calculator` | Dose → yield table for standard ratios (1:1–1:4) |
 | `/api/export` | Download all data as JSON backup |
 
 ---
@@ -181,6 +182,12 @@ npx tsx scripts/sync-prod-to-dev.ts
 
 ### More → AI Coaching State
 - [x] Manual editor for AI coach rolling context (experience level, patterns, bean notes)
+
+### More → Yield Calculator
+- [x] Dose stepper (0.1g steps, 1–30g range) with ±/+ buttons
+- [x] Yields table for 6 standard ratios: Turbo Ristretto (1:1) · Ristretto (1:1.5) · Espresso (1:2) · Normale (1:2.5) · Long Pull (1:3) · Lungo (1:4)
+- [x] Standard espresso range (1:1.5–1:2.5) highlighted with accent color and accent pill badge
+- [x] Ratio label, yield in grams, and style description per row
 
 ### More → Data
 - [x] Export Backup — `GET /api/export` downloads all user data as a timestamped JSON file
