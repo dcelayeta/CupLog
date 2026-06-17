@@ -147,6 +147,7 @@ export type LastShotDefaults = {
   springWeightLbs: number | null;
   wdtUsed: boolean;
   distributionToolUsed: boolean;
+  preinfusionSeconds: number | null;
   pulledAt: string;
   shotRating: number | null;
 };
@@ -171,6 +172,7 @@ export async function getLastShotDefaultsPerBag(): Promise<Record<number, LastSh
       springWeightLbs: shots.springWeightLbs,
       wdtUsed: shots.wdtUsed,
       distributionToolUsed: shots.distributionToolUsed,
+      preinfusionSeconds: shots.preinfusionSeconds,
       pulledAt: shots.pulledAt,
       shotRating: shots.shotRating,
     })
@@ -190,6 +192,7 @@ export async function getLastShotDefaults(): Promise<LastShotDefaults | null> {
       springWeightLbs: shots.springWeightLbs,
       wdtUsed: shots.wdtUsed,
       distributionToolUsed: shots.distributionToolUsed,
+      preinfusionSeconds: shots.preinfusionSeconds,
       pulledAt: shots.pulledAt,
       shotRating: shots.shotRating,
     })

@@ -257,7 +257,9 @@ export default function LogFormClient({
   const [lagG, setLagG] = useState(
     effectiveDefaults?.lagG != null ? effectiveDefaults.lagG.toString() : ""
   );
-  const [preinfusionSeconds, setPreinfusionSeconds] = useState("");
+  const [preinfusionSeconds, setPreinfusionSeconds] = useState(
+    effectiveDefaults?.preinfusionSeconds != null ? effectiveDefaults.preinfusionSeconds.toString() : ""
+  );
   const [springWeightLbs, setSpringWeightLbs] = useState(
     effectiveDefaults?.springWeightLbs != null
       ? effectiveDefaults.springWeightLbs.toString()
@@ -375,6 +377,8 @@ export default function LogFormClient({
                   setLagG(d.lagG?.toString() ?? "");
                   setSpringWeightLbs(d.springWeightLbs?.toString() ?? "");
                   setWdtUsed(d.wdtUsed);
+                  setDistributionToolUsed(d.distributionToolUsed);
+                  setPreinfusionSeconds(d.preinfusionSeconds?.toString() ?? "");
                 }
               }}
               className="text-right outline-none bg-transparent text-[17px] max-w-[200px] truncate"
@@ -446,60 +450,32 @@ export default function LogFormClient({
               </div>
             </div>
           )}
-          <Row label="Dose (g)">
-            <StepperInput name="doseG" value={doseG} onChange={setDoseG} step={0.1} min={0} max={30} />
-          </Row>
-          <Row label="Yield (g)">
-            <StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} />
-          </Row>
-          <Row label="Shot Time (s)">
-            <StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} />
-          </Row>
-          <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass || adjustedDoseG)}>
-            <StepperInput name="lagG" value={lagG} onChange={setLagG} step={1} min={0} max={20} />
-          </Row>
 
-          {/* Live preview */}
-          {(liveRatio || timeClass || ratioClass || adjustedDoseG) && (
-            <div
-              className="px-6 py-3 flex items-center gap-2 flex-wrap"
-              style={{ backgroundColor: "var(--card-secondary)" }}
-            >
-              {liveRatio && (
-                <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                  Ratio 1:{liveRatio}
-                </span>
-              )}
-              {stoppedAtG !== null && stoppedAtG > 0 && (
-                <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                  stopped at {stoppedAtG.toFixed(1)}g
-                </span>
-              )}
-              {adjustedDoseG !== null && (
-                <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                  adjusted dose {adjustedDoseG}g
-                </span>
-              )}
-              {timeClass && timeClass.label !== "Normal" && <ClassificationBadge classification={timeClass} size="sm" />}
-              {ratioClass && ratioClass.label !== "Normal" && <ClassificationBadge classification={ratioClass} size="sm" />}
-            </div>
-          )}
-
+          {/* ── Grind → Dose → Retention ── */}
           <Row label="Grind Setting">
             <StepperInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} step={0.5} min={0} max={50} />
           </Row>
-          <Row label="Pre-infusion (s)">
-            <StepperInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} step={1} min={0} max={30} />
+          <Row label="Dose (g)">
+            <StepperInput name="doseG" value={doseG} onChange={setDoseG} step={0.1} min={0} max={30} />
           </Row>
-          <Row label="Spring Weight (lbs)">
-            <SpringWeightInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} />
-          </Row>
-          <Row label="Retention (g)">
+          <Row label="Retention (g)" noDivider={!!adjustedDoseG}>
             <StepperInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} step={0.1} min={0} max={5} />
           </Row>
-          <div
-            className="flex items-center px-6 min-h-[52px]"
-          >
+
+          {/* Adjusted dose inline info */}
+          {adjustedDoseG !== null && (
+            <div
+              className="px-6 py-2 flex items-center gap-2"
+              style={{ backgroundColor: "var(--card-secondary)" }}
+            >
+              <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                adjusted dose {adjustedDoseG}g
+              </span>
+            </div>
+          )}
+
+          {/* ── Prep tools ── */}
+          <div className="flex items-center px-6 min-h-[52px]" style={{ borderTop: "1px solid var(--separator)" }}>
             <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>WDT Used</span>
             <button
               type="button"
@@ -513,7 +489,7 @@ export default function LogFormClient({
               />
             </button>
           </div>
-          <div className="flex items-center px-6 min-h-[52px]">
+          <div className="flex items-center px-6 min-h-[52px]" style={{ borderTop: "1px solid var(--separator)" }}>
             <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Distribution Tool</span>
             <button
               type="button"
@@ -527,7 +503,18 @@ export default function LogFormClient({
               />
             </button>
           </div>
-          <div className="px-4 py-3">
+          <Row label="Spring Weight (lbs)">
+            <SpringWeightInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} />
+          </Row>
+
+          {/* ── Pull ── */}
+          <Row label="Pre-infusion (s)">
+            <StepperInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} step={1} min={0} max={30} />
+          </Row>
+          <Row label="Shot Time (s)">
+            <StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} />
+          </Row>
+          <div className="px-4 py-3" style={{ borderTop: "1px solid var(--separator)" }}>
             <div className="flex justify-between items-center mb-2">
               <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Flow</span>
               {flowCharacteristics !== null && (
@@ -552,6 +539,34 @@ export default function LogFormClient({
               ))}
             </div>
           </div>
+          <Row label="Yield (g)">
+            <StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} />
+          </Row>
+          <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass)}>
+            <StepperInput name="lagG" value={lagG} onChange={setLagG} step={1} min={0} max={20} />
+          </Row>
+
+          {/* Live ratio + classification preview */}
+          {(liveRatio || timeClass || ratioClass) && (
+            <div
+              className="px-6 py-3 flex items-center gap-2 flex-wrap"
+              style={{ backgroundColor: "var(--card-secondary)" }}
+            >
+              {liveRatio && (
+                <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                  Ratio 1:{liveRatio}
+                </span>
+              )}
+              {stoppedAtG !== null && stoppedAtG > 0 && (
+                <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                  stopped at {stoppedAtG.toFixed(1)}g
+                </span>
+              )}
+              {timeClass && timeClass.label !== "Normal" && <ClassificationBadge classification={timeClass} size="sm" />}
+              {ratioClass && ratioClass.label !== "Normal" && <ClassificationBadge classification={ratioClass} size="sm" />}
+            </div>
+          )}
+
           <Row label="Date & Time">
             <input
               type="datetime-local"

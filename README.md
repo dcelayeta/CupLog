@@ -106,8 +106,8 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Buy Planner — candidate bag input (roast level, process, weight); phase-based cascade run-out for caf and decaf bags independently; three-state buy decision (Buy it / Caution / Pass) with past-peak stale detection; freshness timeline with bean-type visual hierarchy (non-matching type dimmed); per-bag phase-aware rate labels; rolling consumption window slider; daily rate includes apportioned bag weight corrections (family consumption + grinder purge)
 
 ### Shots (Log + History)
-- [x] Log form — bag selector, dose, yield, shot time, lag (g), grind setting, pre-infusion, spring weight, WDT toggle, grinder retention; shot time/lag/pre-infusion use steppers; spring weight uses preset pills (15/25/30 lbs) with Manual fallback
-- [x] Defaults from last shot per bag: dose, grind setting, lag, spring weight, WDT, distribution tool
+- [x] Log form — fields ordered by workflow: grind → dose → retention (adjusted dose inline) → WDT → distribution tool → spring weight → pre-infusion → shot time → flow → yield → lag (ratio + classification inline) → date & time; pre-infusion defaults from last shot of that bag
+- [x] Defaults from last shot per bag: dose, grind setting, lag, spring weight, WDT, distribution tool, pre-infusion
 - [x] Two-step log flow — step 1 bean picker: uniform 2-col grid cards, sorted by Recommended (peak freshness + right caffeine for time of day) → caffeine match → last used; cards show last shot date/time, star rating, Decaf + Last used badges; step 2 is full log form pre-selected but still editable; single-bag users skip step 1
 - [x] StepperInput (−/+ buttons) for dose, yield, grind, retention, milk, foam, hot water — avoids decimal keyboard on iOS
 - [x] Live ratio + classification badge preview
