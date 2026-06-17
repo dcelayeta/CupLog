@@ -178,6 +178,14 @@ Meaningful pattern or improvement vs recent history. 1-2 sentences maximum. null
 - Never repeat data already visible in the UI — add interpretation only
 - When a shot is good, say so clearly and recommend stopping the chase
 
+## Adjusted Dose
+
+When adjusted_dose_g is present in current_shot or a context shot, use it as the effective dose for all brewing calculations — brew ratio, extraction comparisons, and dose recommendations. The dose_g field is the raw ground amount before grinder retention; adjusted_dose_g = dose_g − grinder_retention_g is what actually ends up in the basket. Always reference adjusted dose in your analysis when it exists; mention the retention figure if it is notably high (≥1g).
+
+## Bean Scoping
+
+current_bean.bean_stats and context_shots are scoped **exclusively to the current bean**. Failed shots in context_shots are marked with is_failed: true and include a fail_reason when available. bean_stats.failed_shots_on_bag is the count of failed shots on this bean only — never infer or mention a failed shot count from any other source. forever_stats covers all beans and all time; do not attribute its aggregate counts (total shots, failed shots, etc.) to the current bean.
+
 ## Bean Context Size Limits
 
 bean_contexts is your persistent memory — keep it tight or it will overflow. Rules:
@@ -258,7 +266,8 @@ async function assembleUserMessage(shotId: number) {
   const shot = await getShotById(shotId);
   if (!shot) throw new Error("Shot not found");
 
-  const brewRatio = shot.yieldG != null ? shot.yieldG / shot.doseG : null;
+  const effectiveDose = shot.grinderRetentionG != null ? shot.doseG - shot.grinderRetentionG : shot.doseG;
+  const brewRatio = shot.yieldG != null ? shot.yieldG / effectiveDose : null;
   const daysSinceRoast = getDaysSinceRoast(shot.bagRoastDate);
   const freshnessLabel = getFreshnessLabel(daysSinceRoast);
 
@@ -357,6 +366,7 @@ async function assembleUserMessage(shotId: number) {
       freshness_status: freshnessLabel,
       bean_stats: {
         total_shots_on_bag: Number(bs.total_shots ?? 0),
+        failed_shots_on_bag: Number(bs.failed_shots ?? 0),
         average_brew_ratio: Number(bs.avg_ratio ?? 0),
         average_shot_time_seconds: Number(bs.avg_time ?? 0),
         average_shot_quality: Number(bs.avg_shot_quality ?? 0),
@@ -364,24 +374,35 @@ async function assembleUserMessage(shotId: number) {
       },
     },
 
-    context_shots: contextShots
-      .filter((s) => s.yieldG != null && s.shotTimeSeconds != null)
-      .map((s) => {
-        const r = s.yieldG! / s.doseG;
+    context_shots: contextShots.map((s) => {
+      if (s.isFailed) {
         return {
           pulled_at: s.pulledAt,
+          is_failed: true,
+          fail_reason: s.failReason ?? null,
           grind_setting: s.grindSetting,
           dose_g: s.doseG,
-          yield_g: s.yieldG,
-          brew_ratio: Math.round(r * 100) / 100,
-          shot_time_seconds: s.shotTimeSeconds,
-          time_classification: classifyTime(s.shotTimeSeconds!).label,
-          ratio_classification: classifyRatio(r).label,
-          balance: s.tasteBalance,
-          shot_quality: s.shotRating,
-          notes: s.notes,
+          notes: s.notes ?? null,
         };
-      }),
+      }
+      const adjDose = s.grinderRetentionG != null ? s.doseG - s.grinderRetentionG : s.doseG;
+      const r = s.yieldG != null ? s.yieldG / adjDose : null;
+      return {
+        pulled_at: s.pulledAt,
+        is_failed: false,
+        grind_setting: s.grindSetting,
+        dose_g: s.doseG,
+        adjusted_dose_g: s.grinderRetentionG != null ? Math.round(adjDose * 10) / 10 : null,
+        yield_g: s.yieldG,
+        brew_ratio: r != null ? Math.round(r * 100) / 100 : null,
+        shot_time_seconds: s.shotTimeSeconds,
+        time_classification: s.shotTimeSeconds != null ? classifyTime(s.shotTimeSeconds).label : null,
+        ratio_classification: r != null ? classifyRatio(r).label : null,
+        balance: s.tasteBalance,
+        shot_quality: s.shotRating,
+        notes: s.notes,
+      };
+    }),
 
     current_shot: {
       id: shot.id,

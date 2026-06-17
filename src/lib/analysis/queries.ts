@@ -276,36 +276,30 @@ export async function getContextShots(
   pulledAt: string,
   mode: "recent" | "historical"
 ) {
+  const fields = {
+    pulledAt: shots.pulledAt,
+    grindSetting: shots.grindSetting,
+    doseG: shots.doseG,
+    grinderRetentionG: shots.grinderRetentionG,
+    yieldG: shots.yieldG,
+    shotTimeSeconds: shots.shotTimeSeconds,
+    tasteBalance: shots.tasteBalance,
+    shotRating: shots.shotRating,
+    notes: shots.notes,
+    isFailed: shots.isFailed,
+    failReason: shots.failReason,
+  };
+
   if (mode === "recent") {
-    // Last 5 shots on this bean (excluding current shot)
     return db
-      .select({
-        pulledAt: shots.pulledAt,
-        grindSetting: shots.grindSetting,
-        doseG: shots.doseG,
-        yieldG: shots.yieldG,
-        shotTimeSeconds: shots.shotTimeSeconds,
-        tasteBalance: shots.tasteBalance,
-        shotRating: shots.shotRating,
-        notes: shots.notes,
-      })
+      .select(fields)
       .from(shots)
       .where(and(eq(shots.bagId, bagId), not(eq(shots.id, shotId))))
       .orderBy(desc(shots.pulledAt))
       .limit(5);
   } else {
-    // 5 shots immediately before this one on this bag
     return db
-      .select({
-        pulledAt: shots.pulledAt,
-        grindSetting: shots.grindSetting,
-        doseG: shots.doseG,
-        yieldG: shots.yieldG,
-        shotTimeSeconds: shots.shotTimeSeconds,
-        tasteBalance: shots.tasteBalance,
-        shotRating: shots.shotRating,
-        notes: shots.notes,
-      })
+      .select(fields)
       .from(shots)
       .where(and(eq(shots.bagId, bagId), lt(shots.pulledAt, pulledAt)))
       .orderBy(desc(shots.pulledAt))
@@ -334,10 +328,12 @@ export async function getBeanStats(bagId: number) {
   const [stats] = await db.all(sql`
     SELECT
       COUNT(*) as total_shots,
-      ROUND(AVG(CAST(yield_g AS REAL) / CAST(dose_g AS REAL)), 2) as avg_ratio,
-      ROUND(AVG(shot_time_seconds), 0) as avg_time,
-      ROUND(AVG(shot_rating), 1) as avg_shot_quality,
-      ROUND(AVG(taste_balance), 1) as avg_balance
+      SUM(CASE WHEN is_failed = 1 THEN 1 ELSE 0 END) as failed_shots,
+      ROUND(AVG(CASE WHEN (is_failed = 0 OR is_failed IS NULL) AND yield_g IS NOT NULL
+        THEN CAST(yield_g AS REAL) / CAST(dose_g AS REAL) END), 2) as avg_ratio,
+      ROUND(AVG(CASE WHEN is_failed = 0 OR is_failed IS NULL THEN shot_time_seconds END), 0) as avg_time,
+      ROUND(AVG(CASE WHEN is_failed = 0 OR is_failed IS NULL THEN shot_rating END), 1) as avg_shot_quality,
+      ROUND(AVG(CASE WHEN is_failed = 0 OR is_failed IS NULL THEN taste_balance END), 1) as avg_balance
     FROM shots
     WHERE bag_id = ${bagId}
   `) as Record<string, unknown>[];
