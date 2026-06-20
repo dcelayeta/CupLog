@@ -467,117 +467,123 @@ export default function LogFormClient({
             const yesterday = new Date(now);
             yesterday.setDate(yesterday.getDate() - 1);
             if (d.toDateString() === now.toDateString()) return "Today";
-            if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-            return d.toLocaleDateString([], { month: "short", day: "numeric" });
+            if (d.toDateString() === yesterday.toDateString()) return "Yest.";
+            return `${d.getMonth() + 1}/${d.getDate()}`;
           };
 
-          const pill = (label: string, color: string) => ({ label, color });
+          const em = "—";
+          const RATING_COLORS: Record<number, string> = {
+            1: "#FF3B30", 2: "#FF9500", 3: "#FFD60A", 4: "#34C759", 5: "#30D158",
+          };
+          const th: React.CSSProperties = {
+            fontSize: 10, fontWeight: 600, textTransform: "uppercase",
+            letterSpacing: "0.04em", color: "var(--text-secondary)",
+            paddingBottom: 6, textAlign: "right" as const,
+          };
+          const td: React.CSSProperties = {
+            fontSize: 12, textAlign: "right" as const,
+            paddingTop: 5, paddingBottom: 5,
+            borderTop: "1px solid var(--separator)",
+          };
+
+          const failedCount = recentShots.filter(s => s.isFailed).length;
 
           return (
-            <div className="mx-4 mt-3">
-              {/* Toggle row */}
+            <div className="mx-4 mt-3 rounded-2xl overflow-hidden"
+              style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+
+              {/* Toggle */}
               <button
                 type="button"
                 onClick={() => setShowRecentShots((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl active:opacity-70 transition-opacity"
-                style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+                className="w-full flex items-center justify-between px-4 py-3 active:opacity-70 transition-opacity"
               >
                 <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
-                  Last {recentShots.length} shot{recentShots.length !== 1 ? "s" : ""} on this bean
+                  {recentShots.length} shot{recentShots.length !== 1 ? "s" : ""} on this bean
+                  {failedCount > 0 && (
+                    <span style={{ color: "#FF3B30", marginLeft: 4 }}>
+                      · {failedCount} failed
+                    </span>
+                  )}
                 </span>
-                <svg
-                  width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" strokeWidth="2"
+                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" strokeWidth="2"
                   strokeLinecap="round" strokeLinejoin="round"
-                  style={{
-                    color: "var(--text-secondary)",
-                    transform: showRecentShots ? "rotate(180deg)" : "none",
-                    transition: "transform 0.2s",
-                  }}
-                >
+                  style={{ color: "var(--text-secondary)", transform: showRecentShots ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
                   <path d="M1 1l5 5 5-5" />
                 </svg>
               </button>
 
-              {/* Expanded shots list */}
+              {/* Table — same card, separated by a hairline */}
               {showRecentShots && (
-                <div
-                  className="mt-1.5 rounded-2xl overflow-hidden"
-                  style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
-                >
-                  {recentShots.map((shot, i) => {
-                    const adjDose = shot.grinderRetentionG != null
-                      ? shot.doseG - shot.grinderRetentionG
-                      : shot.doseG;
-                    const ratio = shot.yieldG != null ? shot.yieldG / adjDose : null;
-                    const tc = shot.shotTimeSeconds != null ? classifyTime(shot.shotTimeSeconds, thresholds) : null;
-                    const rc = ratio != null ? classifyRatio(ratio, thresholds) : null;
+                <div className="px-4 pb-3" style={{ borderTop: "1px solid var(--separator)" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "auto" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...th, textAlign: "left", paddingTop: 8 }}></th>
+                        <th style={{ ...th, paddingTop: 8 }}>Grind</th>
+                        <th style={{ ...th, paddingTop: 8 }}>Dose</th>
+                        <th style={{ ...th, paddingTop: 8 }}>Yield</th>
+                        <th style={{ ...th, paddingTop: 8 }}>Time</th>
+                        <th style={{ ...th, paddingTop: 8 }}>Ratio</th>
+                        <th style={{ ...th, paddingTop: 8 }}>Flow</th>
+                        <th style={{ ...th, paddingTop: 8 }}>★</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentShots.map((shot) => {
+                        const adjDose = shot.grinderRetentionG != null
+                          ? shot.doseG - shot.grinderRetentionG
+                          : shot.doseG;
+                        const ratio = shot.yieldG != null ? shot.yieldG / adjDose : null;
+                        const tc = shot.shotTimeSeconds != null
+                          ? classifyTime(shot.shotTimeSeconds, thresholds) : null;
+                        const rc = ratio != null ? classifyRatio(ratio, thresholds) : null;
+                        const flowColor = shot.flowCharacteristics === "normal" ? "#34C759"
+                          : shot.flowCharacteristics ? "#FF9500" : undefined;
+                        const flowLabel = shot.flowCharacteristics === "normal" ? "Even"
+                          : shot.flowCharacteristics ? "Uneven" : em;
 
-                    const pills = [
-                      shot.doseG ? pill(`${adjDose.toFixed(1)}g`, "var(--text-secondary)") : null,
-                      tc ? pill(`${Math.round(shot.shotTimeSeconds!)}s`, tc.color) : null,
-                      ratio != null && rc ? pill(`1:${ratio.toFixed(1)}`, rc.color) : null,
-                      shot.flowCharacteristics === "normal"
-                        ? pill("Even", "#34C759")
-                        : shot.flowCharacteristics
-                        ? pill("Uneven", "#FF9500")
-                        : null,
-                    ].filter(Boolean) as { label: string; color: string }[];
+                        const FAIL = "#FF3B30";
+                        const c = (normal: string) => shot.isFailed ? FAIL : normal;
 
-                    return (
-                      <div
-                        key={shot.id}
-                        className="px-4 py-2.5 flex items-center gap-1.5"
-                        style={{ borderTop: i > 0 ? "1px solid var(--separator)" : "none" }}
-                      >
-                        {/* Date */}
-                        <span className="text-[11px] shrink-0 w-[52px]" style={{ color: "var(--text-secondary)" }}>
-                          {formatShortDate(shot.pulledAt)}
-                        </span>
-
-                        {/* Grind */}
-                        {shot.grindSetting != null ? (
-                          <span className="text-[12px] font-semibold shrink-0" style={{ color: "var(--text-primary)" }}>
-                            Grind {shot.grindSetting}
-                          </span>
-                        ) : (
-                          <span className="text-[12px] shrink-0" style={{ color: "var(--text-secondary)" }}>—</span>
-                        )}
-
-                        {/* Pills */}
-                        <div className="flex items-center gap-1 flex-wrap flex-1">
-                          {pills.map((p) => (
-                            <span
-                              key={p.label}
-                              className="text-[11px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
-                              style={{
-                                backgroundColor: p.color === "var(--text-secondary)"
-                                  ? "var(--card-secondary)"
-                                  : p.color + "22",
-                                color: p.color,
-                              }}
-                            >
-                              {p.label}
-                            </span>
-                          ))}
-                        </div>
-
-                        {/* Rating + lock — right-aligned */}
-                        <div className="flex items-center gap-1 shrink-0 ml-auto">
-                          {shot.isLocked && (
-                            <svg width="9" height="11" viewBox="0 0 10 12" fill="#AF52DE">
-                              <rect x="1" y="5" width="8" height="7" rx="1.5" />
-                              <path d="M3 5V3.5a2 2 0 0 1 4 0V5" stroke="#AF52DE" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-                            </svg>
-                          )}
-                          {shot.shotRating != null && (
-                            <span className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                              {shot.shotRating}★
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                        return (
+                          <tr key={shot.id}>
+                            <td style={{ ...td, textAlign: "left", color: c("var(--text-secondary)"), fontSize: 11 }}>
+                              {formatShortDate(shot.pulledAt)}
+                              {shot.isLocked && !shot.isFailed && (
+                                <svg width="7" height="9" viewBox="0 0 10 12" fill="#AF52DE" style={{ display: "inline", marginLeft: 2, verticalAlign: "middle" }}>
+                                  <rect x="1" y="5" width="8" height="7" rx="1.5" />
+                                  <path d="M3 5V3.5a2 2 0 0 1 4 0V5" stroke="#AF52DE" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                                </svg>
+                              )}
+                            </td>
+                            <td style={{ ...td, color: c("var(--text-primary)"), fontWeight: 600 }}>
+                              {shot.grindSetting ?? em}
+                            </td>
+                            <td style={{ ...td, color: c("var(--text-secondary)") }}>
+                              {adjDose.toFixed(1)}g
+                            </td>
+                            <td style={{ ...td, color: c("var(--text-secondary)") }}>
+                              {shot.yieldG != null ? `${shot.yieldG.toFixed(0)}g` : em}
+                            </td>
+                            <td style={{ ...td, color: c(tc?.color ?? "var(--text-secondary)") }}>
+                              {shot.shotTimeSeconds != null ? `${Math.round(shot.shotTimeSeconds)}s` : em}
+                            </td>
+                            <td style={{ ...td, color: c(rc?.color ?? "var(--text-secondary)") }}>
+                              {ratio != null ? `1:${ratio.toFixed(1)}` : em}
+                            </td>
+                            <td style={{ ...td, color: c(flowColor ?? "var(--text-secondary)") }}>
+                              {flowLabel}
+                            </td>
+                            <td style={{ ...td, fontWeight: 700,
+                              color: shot.isFailed ? FAIL : (shot.shotRating != null ? (RATING_COLORS[shot.shotRating] ?? "var(--text-primary)") : "var(--text-secondary)") }}>
+                              {shot.isFailed ? "F" : shot.shotRating != null ? `${shot.shotRating}★` : em}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

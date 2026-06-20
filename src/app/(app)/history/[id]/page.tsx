@@ -14,9 +14,7 @@ import ShotAnalysisClient from "@/components/shots/ShotAnalysisClient";
 function DetailRow({ label, value, noDivider }: { label: string; value: React.ReactNode; noDivider?: boolean }) {
   if (value === null || value === undefined || value === "") return null;
   return (
-    <div
-      className={`${noDivider ? "" : "row-divider "}flex items-center px-6 min-h-[52px]`}
-    >
+    <div className={`${noDivider ? "" : "row-divider "}flex items-center px-6 min-h-[52px]`}>
       <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>
         {label}
       </span>
@@ -24,6 +22,23 @@ function DetailRow({ label, value, noDivider }: { label: string; value: React.Re
         {value}
       </span>
     </div>
+  );
+}
+
+function CalcBand({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="px-6 py-2.5 flex items-center gap-3 flex-wrap"
+      style={{ backgroundColor: "var(--card-secondary)", borderBottom: "1px solid var(--separator)" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function CalcText({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{children}</span>
   );
 }
 
@@ -97,11 +112,16 @@ export default async function ShotDetailPage({
   ]);
   if (!shot) notFound();
   const { shotNumber } = await getShotPositionInHistory(Number(id), shot.pulledAt);
-  const brewRatio = shot.yieldG != null ? shot.yieldG / shot.doseG : null;
+  const adjDose = shot.grinderRetentionG != null ? shot.doseG - shot.grinderRetentionG : null;
+  const brewRatio = shot.yieldG != null
+    ? shot.yieldG / (adjDose ?? shot.doseG)
+    : null;
   const espressoBase = shot.yieldG != null ? detectEspressoBase(shot.doseG, shot.yieldG) : null;
   const flowRate = shot.yieldG != null && shot.shotTimeSeconds != null && shot.shotTimeSeconds > 0
     ? (shot.yieldG / shot.shotTimeSeconds).toFixed(2)
     : null;
+  const hasMetrics = brewRatio !== null || flowRate !== null
+    || !!shot.timeClassification || !!shot.ratioClassification;
   const shotLocalDate = new Date(shot.pulledAt).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const shotDate = new Date(shotLocalDate + "T00:00:00");
   const roastDate = new Date(shot.bagRoastDate + "T00:00:00");
@@ -224,42 +244,60 @@ export default async function ShotDetailPage({
         className="mx-4 rounded-2xl overflow-hidden"
         style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
       >
+        {/* Grind → Dose → Retention */}
+        {shot.grindSetting !== null && (
+          <DetailRow label="Grind Setting" value={shot.grindSetting} />
+        )}
         <DetailRow label="Dose" value={`${shot.doseG}g`} />
-        <DetailRow label="Yield" value={shot.yieldG != null ? `${shot.yieldG}g` : "—"} />
-        <DetailRow label="Brew Ratio" value={brewRatio != null ? `1:${brewRatio.toFixed(2)}` : "—"} />
-        <DetailRow label="Shot Time" value={shot.shotTimeSeconds != null ? `${shot.shotTimeSeconds}s` : "—"} />
-        {flowRate !== null && (
-          <DetailRow label="Flow Rate" value={`${flowRate} g/s`} />
+        {shot.grinderRetentionG !== null && (
+          <>
+            <DetailRow label="Grinder Retention" value={`${shot.grinderRetentionG}g`} noDivider />
+            <CalcBand>
+              <CalcText>Adjusted dose {adjDose!.toFixed(1)}g</CalcText>
+            </CalcBand>
+          </>
+        )}
+
+        {/* Prep */}
+        <DetailRow label="WDT Used" value={shot.wdtUsed ? "Yes" : "No"} />
+        <DetailRow label="Distribution Tool" value={shot.distributionToolUsed ? "Yes" : "No"} />
+        {shot.springWeightLbs !== null && (
+          <DetailRow label="Spring Weight" value={`${shot.springWeightLbs} lbs`} />
+        )}
+
+        {/* Pull */}
+        {shot.preinfusionSeconds !== null && (
+          <DetailRow label="Pre-infusion" value={`${shot.preinfusionSeconds}s`} />
         )}
         {shot.flowCharacteristics != null && (
           <DetailRow label="Flow" value={FLOW_LABELS[shot.flowCharacteristics] ?? shot.flowCharacteristics} />
         )}
-        {shot.lagG !== null && shot.yieldG != null && (
+        <DetailRow label="Shot Time" value={shot.shotTimeSeconds != null ? `${shot.shotTimeSeconds}s` : "—"} />
+        {shot.lagG !== null && shot.yieldG !== null && (
           <DetailRow
             label="Stopped at"
             value={`${(shot.yieldG - shot.lagG).toFixed(1)}g (+${shot.lagG}g drip)`}
           />
         )}
-        {shot.grindSetting !== null && (
-          <DetailRow label="Grind Setting" value={shot.grindSetting} />
+
+        {/* Yield → calculated metrics */}
+        <DetailRow
+          label="Yield"
+          value={shot.yieldG != null ? `${shot.yieldG}g` : "—"}
+          noDivider={hasMetrics}
+        />
+        {hasMetrics && (
+          <CalcBand>
+            {brewRatio !== null && (
+              <CalcText>Ratio 1:{brewRatio.toFixed(2)}</CalcText>
+            )}
+            {flowRate !== null && (
+              <CalcText>{flowRate} g/s</CalcText>
+            )}
+            <ClassificationBadge classification={shot.timeClassification} size="sm" />
+            <ClassificationBadge classification={shot.ratioClassification} size="sm" />
+          </CalcBand>
         )}
-        {shot.preinfusionSeconds !== null && (
-          <DetailRow label="Pre-infusion" value={`${shot.preinfusionSeconds}s`} />
-        )}
-        {shot.springWeightLbs !== null && (
-          <DetailRow label="Spring Weight" value={`${shot.springWeightLbs} lbs`} />
-        )}
-        {shot.grinderRetentionG !== null && (
-          <DetailRow label="Grinder Retention" value={`${shot.grinderRetentionG}g`} />
-        )}
-        <div
-          className="flex items-center px-6 min-h-[52px]"
-        >
-          <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>WDT Used</span>
-          <span className="text-[17px]" style={{ color: "var(--text-secondary)" }}>
-            {shot.wdtUsed ? "Yes" : "No"}
-          </span>
-        </div>
       </div>
 
       {/* Taste */}

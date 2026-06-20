@@ -497,11 +497,11 @@ export type RecentShotSummary = {
   flowCharacteristics: string | null;
   tasteBalance: number | null;
   isLocked: boolean;
+  isFailed: boolean;
 };
 
 export async function getRecentShotsForAllBags(
-  bagIds: number[],
-  limit = 5
+  bagIds: number[]
 ): Promise<Record<number, RecentShotSummary[]>> {
   if (bagIds.length === 0) return {};
 
@@ -510,21 +510,16 @@ export async function getRecentShotsForAllBags(
   const rows = await db.all(sql`
     SELECT id, bag_id, pulled_at, grind_setting, dose_g, grinder_retention_g,
            yield_g, shot_time_seconds, shot_rating, flow_characteristics,
-           taste_balance, is_locked
-    FROM (
-      SELECT *,
-             ROW_NUMBER() OVER (PARTITION BY bag_id ORDER BY pulled_at DESC) AS rn
-      FROM shots
-      WHERE bag_id IN (${idList})
-        AND (is_failed IS NULL OR is_failed = 0)
-    )
-    WHERE rn <= ${limit}
+           taste_balance, is_locked, is_failed
+    FROM shots
+    WHERE bag_id IN (${idList})
     ORDER BY bag_id, pulled_at DESC
   `) as {
     id: number; bag_id: number; pulled_at: string; grind_setting: number | null;
     dose_g: number; grinder_retention_g: number | null; yield_g: number | null;
     shot_time_seconds: number | null; shot_rating: number | null;
-    flow_characteristics: string | null; taste_balance: number | null; is_locked: number;
+    flow_characteristics: string | null; taste_balance: number | null;
+    is_locked: number; is_failed: number | null;
   }[];
 
   const result: Record<number, RecentShotSummary[]> = {};
@@ -544,6 +539,7 @@ export async function getRecentShotsForAllBags(
       flowCharacteristics: row.flow_characteristics ? String(row.flow_characteristics) : null,
       tasteBalance: row.taste_balance != null ? Number(row.taste_balance) : null,
       isLocked: Boolean(row.is_locked),
+      isFailed: Boolean(row.is_failed),
     });
   }
   return result;
