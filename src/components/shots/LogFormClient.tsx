@@ -471,17 +471,7 @@ export default function LogFormClient({
             return d.toLocaleDateString([], { month: "short", day: "numeric" });
           };
 
-          const speedPill = (seconds: number | null) => {
-            if (seconds == null) return null;
-            const c = classifyTime(seconds, thresholds);
-            return { label: `${Math.round(seconds)}s`, color: c.color };
-          };
-
-          const flowPill = (fc: string | null) => {
-            if (!fc) return null;
-            if (fc === "normal") return { label: "Even", color: "#34C759" };
-            return { label: "Uneven", color: "#FF9500" };
-          };
+          const pill = (label: string, color: string) => ({ label, color });
 
           return (
             <div className="mx-4 mt-3">
@@ -515,60 +505,73 @@ export default function LogFormClient({
                   style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
                 >
                   {recentShots.map((shot, i) => {
-                    const sp = speedPill(shot.shotTimeSeconds);
-                    const fp = flowPill(shot.flowCharacteristics);
-                    const yield_ = shot.yieldG != null ? `${shot.yieldG.toFixed(0)}g` : null;
+                    const adjDose = shot.grinderRetentionG != null
+                      ? shot.doseG - shot.grinderRetentionG
+                      : shot.doseG;
+                    const ratio = shot.yieldG != null ? shot.yieldG / adjDose : null;
+                    const tc = shot.shotTimeSeconds != null ? classifyTime(shot.shotTimeSeconds, thresholds) : null;
+                    const rc = ratio != null ? classifyRatio(ratio, thresholds) : null;
+
+                    const pills = [
+                      shot.doseG ? pill(`${adjDose.toFixed(1)}g`, "var(--text-secondary)") : null,
+                      tc ? pill(`${Math.round(shot.shotTimeSeconds!)}s`, tc.color) : null,
+                      ratio != null && rc ? pill(`1:${ratio.toFixed(1)}`, rc.color) : null,
+                      shot.flowCharacteristics === "normal"
+                        ? pill("Even", "#34C759")
+                        : shot.flowCharacteristics
+                        ? pill("Uneven", "#FF9500")
+                        : null,
+                    ].filter(Boolean) as { label: string; color: string }[];
 
                     return (
                       <div
                         key={shot.id}
-                        className="px-4 py-2.5"
+                        className="px-4 py-2.5 flex items-center gap-1.5"
                         style={{ borderTop: i > 0 ? "1px solid var(--separator)" : "none" }}
                       >
-                        {/* Top row: date + rating */}
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
-                            {formatShortDate(shot.pulledAt)}
-                            {shot.isLocked && (
-                              <span className="ml-1.5 text-[10px] font-semibold" style={{ color: "#AF52DE" }}>🔒</span>
-                            )}
+                        {/* Date */}
+                        <span className="text-[11px] shrink-0 w-[52px]" style={{ color: "var(--text-secondary)" }}>
+                          {formatShortDate(shot.pulledAt)}
+                        </span>
+
+                        {/* Grind */}
+                        {shot.grindSetting != null ? (
+                          <span className="text-[12px] font-semibold shrink-0" style={{ color: "var(--text-primary)" }}>
+                            Grind {shot.grindSetting}
                           </span>
+                        ) : (
+                          <span className="text-[12px] shrink-0" style={{ color: "var(--text-secondary)" }}>—</span>
+                        )}
+
+                        {/* Pills */}
+                        <div className="flex items-center gap-1 flex-wrap flex-1">
+                          {pills.map((p) => (
+                            <span
+                              key={p.label}
+                              className="text-[11px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
+                              style={{
+                                backgroundColor: p.color === "var(--text-secondary)"
+                                  ? "var(--card-secondary)"
+                                  : p.color + "22",
+                                color: p.color,
+                              }}
+                            >
+                              {p.label}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Rating + lock — right-aligned */}
+                        <div className="flex items-center gap-1 shrink-0 ml-auto">
+                          {shot.isLocked && (
+                            <svg width="9" height="11" viewBox="0 0 10 12" fill="#AF52DE">
+                              <rect x="1" y="5" width="8" height="7" rx="1.5" />
+                              <path d="M3 5V3.5a2 2 0 0 1 4 0V5" stroke="#AF52DE" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                            </svg>
+                          )}
                           {shot.shotRating != null && (
                             <span className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
                               {shot.shotRating}★
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Bottom row: grind + pills */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {shot.grindSetting != null && (
-                            <span className="text-[13px] font-semibold mr-1" style={{ color: "var(--text-primary)" }}>
-                              {shot.grindSetting}
-                            </span>
-                          )}
-                          {sp && (
-                            <span
-                              className="text-[11px] font-medium px-2 py-0.5 rounded-full"
-                              style={{ backgroundColor: sp.color + "22", color: sp.color }}
-                            >
-                              {sp.label}
-                            </span>
-                          )}
-                          {yield_ && (
-                            <span
-                              className="text-[11px] font-medium px-2 py-0.5 rounded-full"
-                              style={{ backgroundColor: "var(--accent)22", color: "var(--accent)" }}
-                            >
-                              {yield_}
-                            </span>
-                          )}
-                          {fp && (
-                            <span
-                              className="text-[11px] font-medium px-2 py-0.5 rounded-full"
-                              style={{ backgroundColor: fp.color + "22", color: fp.color }}
-                            >
-                              {fp.label}
                             </span>
                           )}
                         </div>
