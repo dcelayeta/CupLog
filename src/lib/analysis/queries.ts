@@ -232,7 +232,7 @@ export async function getAnalysisForShot(shotId: number): Promise<StoredAnalysis
 export async function getForeverStats() {
   const [stats] = await db.all(sql`
     SELECT
-      COUNT(*) as total_shots,
+      SUM(CASE WHEN is_failed IS NULL OR is_failed = 0 THEN 1 ELSE 0 END) as total_shots,
       COUNT(DISTINCT DATE(pulled_at)) as sessions,
       ROUND(1.0 * COUNT(*) / MAX(1, COUNT(DISTINCT DATE(pulled_at))), 1) as avg_shots_per_session,
       CAST((julianday('now') - julianday(MIN(pulled_at))) AS INTEGER) as days_pulling,
@@ -258,10 +258,11 @@ export async function getShotPositionInHistory(
   shotId: number,
   pulledAt: string
 ): Promise<{ shotNumber: number; totalShots: number }> {
+  // Count only non-failed shots so the number matches what the user sees in the UI
   const [pos] = await db.all(sql`
     SELECT
-      (SELECT COUNT(*) FROM shots WHERE pulled_at <= ${pulledAt}) as shot_number,
-      (SELECT COUNT(*) FROM shots) as total_shots
+      (SELECT COUNT(*) FROM shots WHERE pulled_at <= ${pulledAt} AND (is_failed IS NULL OR is_failed = 0)) as shot_number,
+      (SELECT COUNT(*) FROM shots WHERE is_failed IS NULL OR is_failed = 0) as total_shots
   `) as Record<string, number>[];
 
   return {
