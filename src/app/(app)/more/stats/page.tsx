@@ -292,6 +292,49 @@ async function getShotVsDrinkRatings(): Promise<{ shotRating: number; drinkRatin
   return rows.map(r => ({ shotRating: Number(r.shotRating), drinkRating: Number(r.drinkRating), count: Number(r.count) }));
 }
 
+const FLOW_CHAR_LABELS: Record<string, string> = {
+  normal: "Normal",
+  one_spout_dominant: "One spout dominant",
+  both_spouts_uneven: "Both spouts uneven",
+  spraying: "Spraying",
+  dripping_restricted: "Dripping / restricted",
+  very_fast: "Very fast",
+};
+
+// Sort order: normal first, then by severity
+const FLOW_CHAR_ORDER = ["normal", "one_spout_dominant", "both_spouts_uneven", "dripping_restricted", "very_fast", "spraying"];
+
+async function getFlowCharacteristicsStats(): Promise<RatingBreakdownRow[]> {
+  const rows = await db.all(sql`
+    SELECT
+      flow_characteristics as key,
+      COUNT(*) as total,
+      SUM(CASE WHEN shot_rating = 1 THEN 1 ELSE 0 END) as r1,
+      SUM(CASE WHEN shot_rating = 2 THEN 1 ELSE 0 END) as r2,
+      SUM(CASE WHEN shot_rating = 3 THEN 1 ELSE 0 END) as r3,
+      SUM(CASE WHEN shot_rating = 4 THEN 1 ELSE 0 END) as r4,
+      SUM(CASE WHEN shot_rating = 5 THEN 1 ELSE 0 END) as r5,
+      SUM(CASE WHEN shot_rating IS NULL THEN 1 ELSE 0 END) as unrated
+    FROM shots
+    WHERE flow_characteristics IS NOT NULL
+      AND (is_failed IS NULL OR is_failed = 0)
+    GROUP BY flow_characteristics
+  `) as { key: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number }[];
+
+  const rowMap = new Map(rows.map(r => [String(r.key), r]));
+  return FLOW_CHAR_ORDER
+    .filter(k => rowMap.has(k))
+    .map(k => {
+      const r = rowMap.get(k)!;
+      return {
+        label: FLOW_CHAR_LABELS[k] ?? k,
+        total: Number(r.total),
+        r1: Number(r.r1), r2: Number(r.r2), r3: Number(r.r3), r4: Number(r.r4), r5: Number(r.r5),
+        unrated: Number(r.unrated),
+      };
+    });
+}
+
 async function getRetentionTrend(): Promise<number[]> {
   const rows = await db.all(sql`
     SELECT grinder_retention_g
@@ -772,7 +815,7 @@ export default async function StatsPage() {
     ratingTrend, freshnessPoints, retentionValues, flowRateDist,
     roastTypeDist, shotsPerCoffee, processMethodDist, originRatingDist, blendDist,
     drinkTypeDist, drinkRatingTrend, shotVsDrinkRatings,
-    failedStats,
+    failedStats, flowCharStats,
   ] = await Promise.all([
     getRatingDistribution(),
     getTasteDistribution(),
@@ -790,6 +833,7 @@ export default async function StatsPage() {
     getDrinkRatingTrend(),
     getShotVsDrinkRatings(),
     getFailedShotStats(),
+    getFlowCharacteristicsStats(),
   ]);
 
   const ratingBars: BarSpec[] = [
@@ -1044,6 +1088,13 @@ export default async function StatsPage() {
           connectLine
           stat={avgRetention != null ? `${avgRetention.toFixed(2)}g avg` : undefined}
         />
+        {flowCharStats.length > 0 && (
+          <RatingStackedHorizontalBarChart
+            rows={flowCharStats}
+            title="Flow characteristics"
+            subtitle={`${flowCharStats.reduce((a, r) => a + r.total, 0)} logged`}
+          />
+        )}
         <SectionLabel title="Beans" />
         {roastTotal > 0 && (
           <BarChart
