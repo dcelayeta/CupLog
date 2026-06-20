@@ -374,7 +374,6 @@ async function getLatteArtStats(): Promise<{
 
   return {
     distribution: LATTE_ART_ORDER
-      .filter(k => countMap.has(k))
       .map(k => ({
         label: LATTE_ART_LABELS[k],
         count: countMap.get(k) ?? 0,
@@ -1183,7 +1182,7 @@ export default async function StatsPage() {
           xTicks={freshnessTicks}
           xFormat={v => `${v}d`}
         />
-        {(drinkTypeRows.length > 0 || drinkRatingTrend.length > 0 || shotVsDrinkRatings.length > 0 || latteArtStats.distribution.length > 0) && (
+        {(drinkTypeRows.length > 0 || drinkRatingTrend.length > 0 || shotVsDrinkRatings.length > 0 || latteArtStats.trend.length > 0) && (
           <SectionLabel title="Drinks" />
         )}
         {drinkTypeRows.length > 0 && (
@@ -1213,7 +1212,7 @@ export default async function StatsPage() {
             subtitle={`${shotVsDrinkRatings.reduce((a, r) => a + r.count, 0)} logged`}
           />
         )}
-        {latteArtStats.distribution.length > 0 && (
+        {latteArtStats.trend.length > 0 && (
           <>
             <BarChart
               bars={latteArtStats.distribution}
