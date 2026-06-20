@@ -6,6 +6,7 @@ import {
   getAverageRetention,
   getLastShotDefaults,
   getLastShotDefaultsPerBag,
+  getRecentShotsForAllBags,
 } from "@/lib/shots/queries";
 import { getExtractionThresholds } from "@/lib/shots/thresholds";
 import LogFlowClient from "@/components/shots/LogFlowClient";
@@ -19,6 +20,8 @@ export default async function LogPage() {
     getLastShotDefaultsPerBag(),
     getExtractionThresholds(),
   ]);
+
+  const recentShotsByBag = await getRecentShotsForAllBags(bags.map((b) => b.id));
 
   return (
     <div className="pt-4 pb-4">
@@ -46,6 +49,7 @@ export default async function LogPage() {
           lastShot={lastShot}
           bagDefaults={bagDefaults}
           thresholds={thresholds}
+          recentShotsByBag={recentShotsByBag}
         />
       )}
     </div>

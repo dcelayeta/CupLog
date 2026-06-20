@@ -5,6 +5,7 @@ import LogFormClient from "./LogFormClient";
 import type { BagOption, LastShotDefaults } from "@/lib/shots/queries";
 import type { EquipmentProfile, ExtractionThreshold } from "@/db/schema";
 import { useDirtyForm } from "@/context/DirtyFormContext";
+import type { RecentShotSummary } from "@/lib/shots/queries";
 
 type Props = {
   bags: BagOption[];
@@ -13,6 +14,7 @@ type Props = {
   lastShot: LastShotDefaults | null;
   bagDefaults: Record<number, LastShotDefaults>;
   thresholds: ExtractionThreshold[];
+  recentShotsByBag: Record<number, RecentShotSummary[]>;
 };
 
 function formatLastShot(pulledAt: string): string {
@@ -41,7 +43,7 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export default function LogFlowClient(props: Props) {
-  const { bags, lastShot, bagDefaults } = props;
+  const { bags, lastShot, bagDefaults, recentShotsByBag } = props;
   const { setDirty } = useDirtyForm();
 
   const lastBagId = lastShot ? (bags.find((b) => b.id === lastShot.bagId)?.id ?? null) : null;
@@ -63,6 +65,7 @@ export default function LogFlowClient(props: Props) {
       <LogFormClient
         {...props}
         preselectedBagId={selectedBagId.toString()}
+        recentShotsByBag={recentShotsByBag}
         onSubmit={() => setDirty(false)}
       />
     );

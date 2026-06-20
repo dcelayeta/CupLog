@@ -3,7 +3,7 @@
 import { useActionState, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { logShot } from "@/lib/shots/actions";
-import type { BagOption, LastShotDefaults } from "@/lib/shots/queries";
+import type { BagOption, LastShotDefaults, RecentShotSummary } from "@/lib/shots/queries";
 import type { EquipmentProfile, ExtractionThreshold } from "@/db/schema";
 import { classifyTime, classifyRatio } from "@/lib/shots/classification";
 import { detectDrink, detectEspressoBase, ALL_DRINK_NAMES, DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
@@ -22,6 +22,7 @@ type Props = {
   bagDefaults: Record<number, LastShotDefaults>;
   thresholds: ExtractionThreshold[];
   preselectedBagId?: string;
+  recentShotsByBag?: Record<number, RecentShotSummary[]>;
   onSubmit?: () => void;
 };
 
@@ -227,6 +228,7 @@ export default function LogFormClient({
   bagDefaults,
   thresholds,
   preselectedBagId,
+  recentShotsByBag,
   onSubmit,
 }: Props) {
   const [state, formAction, isPending] = useActionState(logShot, null);
@@ -271,6 +273,7 @@ export default function LogFormClient({
   const [distributionToolUsed, setDistributionToolUsed] = useState(effectiveDefaults ? effectiveDefaults.distributionToolUsed : true);
   const [grinderRetentionG, setGrinderRetentionG] = useState("0");
   const [flowCharacteristics, setFlowCharacteristics] = useState<string | null>(null);
+  const [showRecentShots, setShowRecentShots] = useState(false);
 
   // Failed shot
   const [isFailed, setIsFailed] = useState(false);
@@ -447,6 +450,131 @@ export default function LogFormClient({
                     AI
                   </span>
                   <span className="text-[14px]" style={{ color: "var(--text-primary)" }}>{d.aiRecommendationAction}</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ── Recent shots on this bean ── */}
+        {(() => {
+          const recentShots = recentShotsByBag?.[Number(bagId)] ?? [];
+          if (recentShots.length === 0) return null;
+
+          const formatShortDate = (iso: string) => {
+            const d = new Date(iso);
+            const now = new Date();
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (d.toDateString() === now.toDateString()) return "Today";
+            if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+            return d.toLocaleDateString([], { month: "short", day: "numeric" });
+          };
+
+          const speedPill = (seconds: number | null) => {
+            if (seconds == null) return null;
+            const c = classifyTime(seconds, thresholds);
+            return { label: `${Math.round(seconds)}s`, color: c.color };
+          };
+
+          const flowPill = (fc: string | null) => {
+            if (!fc) return null;
+            if (fc === "normal") return { label: "Even", color: "#34C759" };
+            return { label: "Uneven", color: "#FF9500" };
+          };
+
+          return (
+            <div className="mx-4 mt-3">
+              {/* Toggle row */}
+              <button
+                type="button"
+                onClick={() => setShowRecentShots((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl active:opacity-70 transition-opacity"
+                style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+              >
+                <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
+                  Last {recentShots.length} shot{recentShots.length !== 1 ? "s" : ""} on this bean
+                </span>
+                <svg
+                  width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round"
+                  style={{
+                    color: "var(--text-secondary)",
+                    transform: showRecentShots ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s",
+                  }}
+                >
+                  <path d="M1 1l5 5 5-5" />
+                </svg>
+              </button>
+
+              {/* Expanded shots list */}
+              {showRecentShots && (
+                <div
+                  className="mt-1.5 rounded-2xl overflow-hidden"
+                  style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+                >
+                  {recentShots.map((shot, i) => {
+                    const sp = speedPill(shot.shotTimeSeconds);
+                    const fp = flowPill(shot.flowCharacteristics);
+                    const yield_ = shot.yieldG != null ? `${shot.yieldG.toFixed(0)}g` : null;
+
+                    return (
+                      <div
+                        key={shot.id}
+                        className="px-4 py-2.5"
+                        style={{ borderTop: i > 0 ? "1px solid var(--separator)" : "none" }}
+                      >
+                        {/* Top row: date + rating */}
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                            {formatShortDate(shot.pulledAt)}
+                            {shot.isLocked && (
+                              <span className="ml-1.5 text-[10px] font-semibold" style={{ color: "#AF52DE" }}>🔒</span>
+                            )}
+                          </span>
+                          {shot.shotRating != null && (
+                            <span className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                              {shot.shotRating}★
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Bottom row: grind + pills */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {shot.grindSetting != null && (
+                            <span className="text-[13px] font-semibold mr-1" style={{ color: "var(--text-primary)" }}>
+                              {shot.grindSetting}
+                            </span>
+                          )}
+                          {sp && (
+                            <span
+                              className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                              style={{ backgroundColor: sp.color + "22", color: sp.color }}
+                            >
+                              {sp.label}
+                            </span>
+                          )}
+                          {yield_ && (
+                            <span
+                              className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                              style={{ backgroundColor: "var(--accent)22", color: "var(--accent)" }}
+                            >
+                              {yield_}
+                            </span>
+                          )}
+                          {fp && (
+                            <span
+                              className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                              style={{ backgroundColor: fp.color + "22", color: fp.color }}
+                            >
+                              {fp.label}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

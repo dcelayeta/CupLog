@@ -481,3 +481,70 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       : null,
   };
 }
+
+// ─── Recent shots for log form ────────────────────────────────────────────────
+
+export type RecentShotSummary = {
+  id: number;
+  bagId: number;
+  pulledAt: string;
+  grindSetting: number | null;
+  doseG: number;
+  grinderRetentionG: number | null;
+  yieldG: number | null;
+  shotTimeSeconds: number | null;
+  shotRating: number | null;
+  flowCharacteristics: string | null;
+  tasteBalance: number | null;
+  isLocked: boolean;
+};
+
+export async function getRecentShotsForAllBags(
+  bagIds: number[],
+  limit = 5
+): Promise<Record<number, RecentShotSummary[]>> {
+  if (bagIds.length === 0) return {};
+
+  const idList = sql.join(bagIds.map((id) => sql`${id}`), sql`, `);
+
+  const rows = await db.all(sql`
+    SELECT id, bag_id, pulled_at, grind_setting, dose_g, grinder_retention_g,
+           yield_g, shot_time_seconds, shot_rating, flow_characteristics,
+           taste_balance, is_locked
+    FROM (
+      SELECT *,
+             ROW_NUMBER() OVER (PARTITION BY bag_id ORDER BY pulled_at DESC) AS rn
+      FROM shots
+      WHERE bag_id IN (${idList})
+        AND (is_failed IS NULL OR is_failed = 0)
+    )
+    WHERE rn <= ${limit}
+    ORDER BY bag_id, pulled_at DESC
+  `) as {
+    id: number; bag_id: number; pulled_at: string; grind_setting: number | null;
+    dose_g: number; grinder_retention_g: number | null; yield_g: number | null;
+    shot_time_seconds: number | null; shot_rating: number | null;
+    flow_characteristics: string | null; taste_balance: number | null; is_locked: number;
+  }[];
+
+  const result: Record<number, RecentShotSummary[]> = {};
+  for (const row of rows) {
+    const bagId = Number(row.bag_id);
+    if (!result[bagId]) result[bagId] = [];
+    result[bagId].push({
+      id: Number(row.id),
+      bagId,
+      pulledAt: String(row.pulled_at),
+      grindSetting: row.grind_setting != null ? Number(row.grind_setting) : null,
+      doseG: Number(row.dose_g),
+      grinderRetentionG: row.grinder_retention_g != null ? Number(row.grinder_retention_g) : null,
+      yieldG: row.yield_g != null ? Number(row.yield_g) : null,
+      shotTimeSeconds: row.shot_time_seconds != null ? Number(row.shot_time_seconds) : null,
+      shotRating: row.shot_rating != null ? Number(row.shot_rating) : null,
+      flowCharacteristics: row.flow_characteristics ? String(row.flow_characteristics) : null,
+      tasteBalance: row.taste_balance != null ? Number(row.taste_balance) : null,
+      isLocked: Boolean(row.is_locked),
+    });
+  }
+  return result;
+}
