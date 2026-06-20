@@ -278,7 +278,10 @@ export default function ShotEditFormClient({
   // Live preview
   const dose = parseNum(doseG);
   const yield_ = parseNum(yieldG);
-  const liveRatioDerived = dose && yield_ ? yield_ / dose : null;
+  const retention = parseNum(grinderRetentionG);
+  const adjDose = dose !== null && retention !== null ? dose - retention : null;
+  const effectiveDose = adjDose ?? dose;
+  const liveRatioDerived = effectiveDose && yield_ ? yield_ / effectiveDose : null;
   const liveRatio = liveRatioDerived ? liveRatioDerived.toFixed(2) : null;
   const liveTime = parseIntVal(shotTimeSeconds);
   const liveLagG = parseNum(lagG);
@@ -334,8 +337,91 @@ export default function ShotEditFormClient({
         {/* Shot */}
         <SectionHeader title="Shot" />
         <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
-          {/* Failed Shot toggle */}
-          <div className="flex items-center px-6 min-h-[52px]">
+
+          {/* Date */}
+          <Row label="Date & Time">
+            <input
+              type="datetime-local"
+              value={pulledAt}
+              onChange={(e) => setPulledAt(e.target.value)}
+              className="text-right outline-none bg-transparent text-[17px]"
+              style={{ color: "var(--accent)" }}
+            />
+            <input type="hidden" name="pulledAt" value={pulledAt ? new Date(pulledAt).toISOString() : ""} />
+          </Row>
+
+          {/* Grind → Dose → Retention → [gray: adj dose] */}
+          <Row label="Grind Setting"><StepperInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} step={0.5} min={0} max={50} /></Row>
+          <Row label="Dose (g)"><StepperInput name="doseG" value={doseG} onChange={setDoseG} step={0.1} min={0} max={30} /></Row>
+          <Row label="Retention (g)" noDivider={adjDose !== null}>
+            <StepperInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} step={0.1} min={0} max={5} />
+          </Row>
+          {adjDose !== null && (
+            <div className="px-6 py-2 flex items-center gap-2" style={{ backgroundColor: "var(--card-secondary)" }}>
+              <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Adjusted dose {adjDose.toFixed(1)}g</span>
+            </div>
+          )}
+
+          {/* Puck prep */}
+          <div className="flex items-center px-6 min-h-[52px]" style={{ borderTop: "1px solid var(--separator)" }}>
+            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>WDT Used</span>
+            <button type="button" onClick={() => setWdtUsed(!wdtUsed)} className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200" style={{ backgroundColor: wdtUsed ? "var(--accent)" : "#E5E5EA" }}>
+              <span className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transition-transform duration-200 mt-[2px]" style={{ marginLeft: wdtUsed ? 22 : 2 }} />
+            </button>
+          </div>
+          <div className="flex items-center px-6 min-h-[52px]" style={{ borderTop: "1px solid var(--separator)" }}>
+            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Distribution Tool</span>
+            <button type="button" onClick={() => setDistributionToolUsed(!distributionToolUsed)} className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200" style={{ backgroundColor: distributionToolUsed ? "var(--accent)" : "#E5E5EA" }}>
+              <span className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transition-transform duration-200 mt-[2px]" style={{ marginLeft: distributionToolUsed ? 22 : 2 }} />
+            </button>
+          </div>
+          <Row label="Spring Weight (lbs)"><SpringWeightInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} /></Row>
+
+          {/* Pull */}
+          <Row label="Pre-infusion (s)"><StepperInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} step={1} min={0} max={30} /></Row>
+          <div className="px-4 py-3" style={{ borderTop: "1px solid var(--separator)" }}>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Flow</span>
+              {flowCharacteristics !== null && (
+                <button type="button" onClick={() => setFlowCharacteristics(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
+              )}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {FLOW_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setFlowCharacteristics(flowCharacteristics === opt.value ? null : opt.value)}
+                  className="text-[13px] font-medium px-3 py-1.5 rounded-full"
+                  style={
+                    flowCharacteristics === opt.value
+                      ? { backgroundColor: "var(--accent)", color: "#fff" }
+                      : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                  }
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Row label="Shot Time (s)"><StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} /></Row>
+          <Row label="Yield (g)"><StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} /></Row>
+          <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass)}>
+            <StepperInput name="lagG" value={lagG} onChange={setLagG} step={1} min={0} max={20} />
+          </Row>
+          {(liveRatio || timeClass || ratioClass) && (
+            <div className="px-6 py-3 flex items-center gap-2 flex-wrap" style={{ backgroundColor: "var(--card-secondary)" }}>
+              {liveRatio && <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Ratio 1:{liveRatio}</span>}
+              {stoppedAtG !== null && liveLagG !== null && liveLagG > 0 && (
+                <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>stopped at {stoppedAtG.toFixed(1)}g</span>
+              )}
+              {timeClass && timeClass.label !== "Normal" && <ClassificationBadge classification={timeClass} size="sm" />}
+              {ratioClass && ratioClass.label !== "Normal" && <ClassificationBadge classification={ratioClass} size="sm" />}
+            </div>
+          )}
+
+          {/* Failed Shot */}
+          <div className="flex items-center px-6 min-h-[52px]" style={{ borderTop: "1px solid var(--separator)" }}>
             <span className="text-[17px] flex-1" style={{ color: isFailed ? "#FF3B30" : "var(--text-primary)" }}>Failed Shot</span>
             <button
               type="button"
@@ -367,49 +453,9 @@ export default function ShotEditFormClient({
               </div>
             </div>
           )}
-          <Row label="Date & Time">
-            <input
-              type="datetime-local"
-              value={pulledAt}
-              onChange={(e) => setPulledAt(e.target.value)}
-              className="text-right outline-none bg-transparent text-[17px]"
-              style={{ color: "var(--accent)" }}
-            />
-            <input type="hidden" name="pulledAt" value={pulledAt ? new Date(pulledAt).toISOString() : ""} />
-          </Row>
-          <Row label="Dose (g)"><StepperInput name="doseG" value={doseG} onChange={setDoseG} step={0.1} min={0} max={30} /></Row>
-          <Row label="Yield (g)"><StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} /></Row>
-          <Row label="Shot Time (s)"><StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} /></Row>
-          <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass)}><StepperInput name="lagG" value={lagG} onChange={setLagG} step={1} min={0} max={20} /></Row>
 
-          {(liveRatio || timeClass || ratioClass) && (
-            <div className="px-6 py-3 flex items-center gap-2 flex-wrap" style={{ backgroundColor: "var(--card-secondary)" }}>
-              {liveRatio && <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Ratio 1:{liveRatio}</span>}
-              {stoppedAtG !== null && liveLagG !== null && liveLagG > 0 && (
-                <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>stopped at {stoppedAtG.toFixed(1)}g</span>
-              )}
-              {timeClass && timeClass.label !== "Normal" && <ClassificationBadge classification={timeClass} size="sm" />}
-              {ratioClass && ratioClass.label !== "Normal" && <ClassificationBadge classification={ratioClass} size="sm" />}
-            </div>
-          )}
-
-          <Row label="Grind Setting"><StepperInput name="grindSetting" value={grindSetting} onChange={setGrindSetting} step={0.5} min={0} max={50} /></Row>
-          <Row label="Pre-infusion (s)"><StepperInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} step={1} min={0} max={30} /></Row>
-          <Row label="Spring Weight (lbs)"><SpringWeightInput name="springWeightLbs" value={springWeightLbs} onChange={setSpringWeightLbs} /></Row>
-          <Row label="Retention (g)"><StepperInput name="grinderRetentionG" value={grinderRetentionG} onChange={setGrinderRetentionG} step={0.1} min={0} max={5} /></Row>
-          <div className="flex items-center px-6 min-h-[52px]">
-            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>WDT Used</span>
-            <button type="button" onClick={() => setWdtUsed(!wdtUsed)} className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200" style={{ backgroundColor: wdtUsed ? "var(--accent)" : "#E5E5EA" }}>
-              <span className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transition-transform duration-200 mt-[2px]" style={{ marginLeft: wdtUsed ? 22 : 2 }} />
-            </button>
-          </div>
-          <div className="flex items-center px-6 min-h-[52px]">
-            <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Distribution Tool</span>
-            <button type="button" onClick={() => setDistributionToolUsed(!distributionToolUsed)} className="relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200" style={{ backgroundColor: distributionToolUsed ? "var(--accent)" : "#E5E5EA" }}>
-              <span className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transition-transform duration-200 mt-[2px]" style={{ marginLeft: distributionToolUsed ? 22 : 2 }} />
-            </button>
-          </div>
-          <div className="flex items-center px-6 min-h-[52px]">
+          {/* Parameters Locked */}
+          <div className="flex items-center px-6 min-h-[52px]" style={{ borderTop: "1px solid var(--separator)" }}>
             <div className="flex-1">
               <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Parameters Locked</span>
               <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Keep these settings next shot</p>
@@ -418,31 +464,7 @@ export default function ShotEditFormClient({
               <span className="pointer-events-none inline-block h-[27px] w-[27px] rounded-full bg-white shadow-md transition-transform duration-200 mt-[2px]" style={{ marginLeft: isLocked ? 22 : 2 }} />
             </button>
           </div>
-          <div className="px-4 py-3">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Flow</span>
-              {flowCharacteristics !== null && (
-                <button type="button" onClick={() => setFlowCharacteristics(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
-              )}
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {FLOW_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setFlowCharacteristics(flowCharacteristics === opt.value ? null : opt.value)}
-                  className="text-[13px] font-medium px-3 py-1.5 rounded-full"
-                  style={
-                    flowCharacteristics === opt.value
-                      ? { backgroundColor: "var(--accent)", color: "#fff" }
-                      : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
-                  }
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
+
         </div>
 
         {/* Taste */}
