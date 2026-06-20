@@ -304,6 +304,12 @@ const FLOW_CHAR_LABELS: Record<string, string> = {
 // Sort order: normal first, then by severity
 const FLOW_CHAR_ORDER = ["normal", "one_spout_dominant", "both_spouts_uneven", "dripping_restricted", "very_fast", "spraying"];
 
+const LATTE_ART_ORDER = ["pollock", "calder", "picasso", "monet", "van_gogh"] as const;
+const LATTE_ART_LABELS: Record<string, string> = {
+  pollock: "Pollock", calder: "Calder", picasso: "Picasso", monet: "Monet", van_gogh: "Van Gogh",
+};
+const LATTE_ART_COLORS = ["#D4A5FF", "#C07EF5", "#AF52DE", "#8B35C0", "#6B1A9A"];
+
 async function getFlowCharacteristicsStats(): Promise<RatingBreakdownRow[]> {
   const rows = await db.all(sql`
     SELECT
@@ -343,6 +349,44 @@ async function getRetentionTrend(): Promise<number[]> {
     ORDER BY pulled_at ASC
   `) as { grinder_retention_g: number }[];
   return rows.map(r => Number(r.grinder_retention_g));
+}
+
+async function getLatteArtStats(): Promise<{
+  distribution: { label: string; count: number; color: string }[];
+  trend: { y: number; color: string }[];
+}> {
+  const distRows = await db.all(sql`
+    SELECT latte_art_rating as key, COUNT(*) as cnt
+    FROM drinks
+    WHERE latte_art_rating IS NOT NULL
+    GROUP BY latte_art_rating
+  `) as { key: string; cnt: number }[];
+
+  const trendRows = await db.all(sql`
+    SELECT d.latte_art_rating as key
+    FROM drinks d
+    JOIN shots s ON d.shot_id = s.id
+    WHERE d.latte_art_rating IS NOT NULL
+    ORDER BY s.pulled_at ASC
+  `) as { key: string }[];
+
+  const countMap = new Map(distRows.map(r => [String(r.key), Number(r.cnt)]));
+
+  return {
+    distribution: LATTE_ART_ORDER
+      .filter(k => countMap.has(k))
+      .map(k => ({
+        label: LATTE_ART_LABELS[k],
+        count: countMap.get(k) ?? 0,
+        color: LATTE_ART_COLORS[LATTE_ART_ORDER.indexOf(k)],
+      })),
+    trend: trendRows
+      .map(r => {
+        const idx = LATTE_ART_ORDER.indexOf(r.key as typeof LATTE_ART_ORDER[number]);
+        return idx !== -1 ? { y: idx + 1, color: LATTE_ART_COLORS[idx] } : null;
+      })
+      .filter((p): p is { y: number; color: string } => p !== null),
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -815,7 +859,7 @@ export default async function StatsPage() {
     ratingTrend, freshnessPoints, retentionValues, flowRateDist,
     roastTypeDist, shotsPerCoffee, processMethodDist, originRatingDist, blendDist,
     drinkTypeDist, drinkRatingTrend, shotVsDrinkRatings,
-    failedStats, flowCharStats,
+    failedStats, flowCharStats, latteArtStats,
   ] = await Promise.all([
     getRatingDistribution(),
     getTasteDistribution(),
@@ -834,6 +878,7 @@ export default async function StatsPage() {
     getShotVsDrinkRatings(),
     getFailedShotStats(),
     getFlowCharacteristicsStats(),
+    getLatteArtStats(),
   ]);
 
   const ratingBars: BarSpec[] = [
@@ -1000,6 +1045,11 @@ export default async function StatsPage() {
     color: RATING_COLORS[r.rating] ?? "#8E8E93",
   }));
 
+  const latteArtWindow = Math.max(3, Math.round(latteArtStats.trend.length / 8));
+  const latestLatteArtLabel = latteArtStats.trend.length > 0
+    ? (LATTE_ART_LABELS[LATTE_ART_ORDER[latteArtStats.trend[latteArtStats.trend.length - 1].y - 1]] ?? null)
+    : null;
+
   const tasteLegend = (
     <div className="flex items-center gap-2 flex-wrap">
       {["V.Sour", "Sour", "Sl.Sour", "Balanced", "Sl.Bitter", "Bitter", "V.Bitter"].map((label, i) => (
@@ -1133,7 +1183,7 @@ export default async function StatsPage() {
           xTicks={freshnessTicks}
           xFormat={v => `${v}d`}
         />
-        {(drinkTypeRows.length > 0 || drinkRatingTrend.length > 0 || shotVsDrinkRatings.length > 0) && (
+        {(drinkTypeRows.length > 0 || drinkRatingTrend.length > 0 || shotVsDrinkRatings.length > 0 || latteArtStats.distribution.length > 0) && (
           <SectionLabel title="Drinks" />
         )}
         {drinkTypeRows.length > 0 && (
@@ -1162,6 +1212,29 @@ export default async function StatsPage() {
             title="Shot vs drink rating"
             subtitle={`${shotVsDrinkRatings.reduce((a, r) => a + r.count, 0)} logged`}
           />
+        )}
+        {latteArtStats.distribution.length > 0 && (
+          <>
+            <BarChart
+              bars={latteArtStats.distribution}
+              title="Latte art"
+              subtitle={`${latteArtStats.trend.length} logged`}
+              labelFontSize={7}
+              stat={latestLatteArtLabel ?? undefined}
+              statColor="#AF52DE"
+            />
+            <TrendChart
+              points={latteArtStats.trend}
+              title="Latte art progress"
+              subtitle={`${latteArtStats.trend.length} pours`}
+              yMin={0.5} yMax={5.5}
+              yTicks={[1, 2, 3, 4, 5]}
+              yFormat={v => ["Pk", "Cd", "Pi", "Mn", "VG"][v - 1] ?? ""}
+              rollingWindow={latteArtWindow}
+              stat={latestLatteArtLabel ?? undefined}
+              statColor="#AF52DE"
+            />
+          </>
         )}
       </div>
     </div>

@@ -10,18 +10,6 @@ const tabs = [
     icon: (active: boolean) => (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
-        <path d="M9 21V12h6v9" />
-      </svg>
-    ),
-  },
-  {
-    href: "/log",
-    label: "Log",
-    icon: (active: boolean) => (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 7h12l-1.5 9H7.5L6 7z" />
-        <path d="M16 10h2a2 2 0 0 1 0 4h-2" />
-        <path d="M4 20h16" />
       </svg>
     ),
   },
@@ -30,9 +18,23 @@ const tabs = [
     label: "Bags",
     icon: (active: boolean) => (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 2h12l2 6H4L6 2z" />
-        <rect x="3" y="8" width="18" height="13" rx="2" />
-        <path d="M9 12h6" />
+        {/* bag body — rounded bottom corners only */}
+        <path d="M4 9h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9z" />
+        {/* sealed/crimped top — matches home icon width x=3–21 */}
+        <path d="M3 5h18l-1 4H4L3 5z" />
+        {/* degassing valve */}
+        <circle cx="12" cy="15" r="2.5" />
+        <circle cx="12" cy="15" r="0.8" fill="currentColor" stroke="none" />
+      </svg>
+    ),
+  },
+  {
+    href: "/log",
+    label: "Log",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4.5 5h15l-3 15H7.5L4.5 5z" />
+        <path d="M18 9h1.5a2.5 2.5 0 0 1 0 5h-1.5" />
       </svg>
     ),
   },
@@ -51,9 +53,12 @@ const tabs = [
     label: "Stats",
     icon: (active: boolean) => (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="12" width="4" height="9" rx="1" />
-        <rect x="10" y="7" width="4" height="14" rx="1" />
-        <rect x="17" y="3" width="4" height="18" rx="1" />
+        <path d="M3 4v16h18" />
+        <polyline points="6 16 10 11 14 13 19 6" />
+        <circle cx="6" cy="16" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="10" cy="11" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="14" cy="13" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="19" cy="6" r="1.5" fill="currentColor" stroke="none" />
       </svg>
     ),
   },
