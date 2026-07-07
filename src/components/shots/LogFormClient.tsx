@@ -8,6 +8,7 @@ import type { EquipmentProfile, ExtractionThreshold } from "@/db/schema";
 import { classifyTime, classifyRatio } from "@/lib/shots/classification";
 import { detectDrink, detectEspressoBase, ALL_DRINK_NAMES, DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
 import ClassificationBadge from "./ClassificationBadge";
+import FlowIllustration from "./FlowIllustration";
 import PillRating from "./PillRating";
 import TasteBalanceControl from "./TasteBalanceControl";
 import ShotStarRating from "./ShotStarRating";
@@ -48,6 +49,7 @@ const FLOW_OPTIONS: { value: string; label: string }[] = [
   { value: "dripping_restricted", label: "Dripping / Restricted" },
   { value: "very_fast", label: "Very fast" },
 ];
+
 
 const MAX_DRINK_ML = 300;
 
@@ -679,6 +681,9 @@ export default function LogFormClient({
                   {opt.label}
                 </button>
               ))}
+            </div>
+            <div className="mt-3">
+              <FlowIllustration flow={flowCharacteristics} />
             </div>
           </div>
           <Row label="Shot Time (s)">

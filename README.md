@@ -109,7 +109,8 @@ npx tsx scripts/sync-prod-to-dev.ts
 ### Shots (Log + History)
 - [x] Log form — fields ordered by workflow: grind → dose → retention (adjusted dose inline) → WDT → distribution tool → spring weight → pre-infusion → shot time → flow → yield → lag (ratio + classification inline) → date & time; pre-infusion defaults from last shot of that bag
 - [x] Defaults from last shot per bag: dose, grind setting, lag, spring weight, WDT, distribution tool, pre-infusion
-- [x] Two-step log flow — step 1 bean picker: uniform 2-col grid cards, sorted by Recommended (peak freshness + right caffeine for time of day) → caffeine match → last used; cards show last shot date/time, star rating, Decaf + Last used badges; step 2 is full log form pre-selected but still editable; single-bag users skip step 1
+- [x] Two-step log flow — step 1 bean picker: uniform 2-col grid cards, sorted by Recommended (peak freshness + right caffeine for time of day) → caffeine match → last used; cards show last shot date/time, star rating, Decaf + Last used badges; recommended card highlighted with light blue tint; freshness label + days-since-roast shown per card; "Use soon" badge (orange) on beans with ≤7 days left in their peak window; step 2 is full log form pre-selected but still editable; single-bag users skip step 1
+- [x] Flow illustration — inline SVG in log form that updates live as the Flow pill changes (Normal / Very Fast / Restricted / Both Spouts Uneven / One Spout Dominant / Spraying); dark-mode aware via `currentColor` outlines and `var(--card)` fills; no separate image files
 - [x] StepperInput (−/+ buttons) for dose, yield, grind, retention, milk, foam, hot water — avoids decimal keyboard on iOS
 - [x] Live ratio + classification badge preview
 - [x] Live adjusted dose display (`dose − retention`) and "stopped at Xg" lag helper

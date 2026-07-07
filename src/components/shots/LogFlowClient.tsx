@@ -6,6 +6,7 @@ import type { BagOption, LastShotDefaults } from "@/lib/shots/queries";
 import type { EquipmentProfile, ExtractionThreshold } from "@/db/schema";
 import { useDirtyForm } from "@/context/DirtyFormContext";
 import type { RecentShotSummary } from "@/lib/shots/queries";
+import { getDaysSinceRoast, getFreshnessColor, getFreshnessLabel, FRESHNESS_CSS } from "@/lib/bags/freshness";
 
 type Props = {
   bags: BagOption[];
@@ -109,6 +110,14 @@ export default function LogFlowClient(props: Props) {
           const recommended = isRecommended(bag);
           const bagDefault = bagDefaults[bag.id];
 
+          const days = getDaysSinceRoast(bag.roastDate);
+          const peakStart = bag.peakStartDay ?? 7;
+          const peakEnd = bag.peakEndDay ?? 35;
+          const freshColor = getFreshnessColor(days, peakStart, peakEnd);
+          const freshLabel = getFreshnessLabel(days, peakStart, peakEnd);
+          const freshCss = FRESHNESS_CSS[freshColor];
+          const useSoon = days >= peakStart && days <= peakEnd && (peakEnd - days) <= 7;
+
           // Blue background goes to recommended; last-used gets a blue pill instead
           const isActive = recommended;
 
@@ -119,8 +128,8 @@ export default function LogFlowClient(props: Props) {
               onClick={() => setSelectedBagId(bag.id)}
               className="rounded-2xl text-left px-4 py-4 flex flex-col cursor-pointer active:opacity-70 transition-opacity"
               style={{
-                backgroundColor: isActive ? "var(--accent)" : "var(--card)",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+                backgroundColor: isActive ? "rgba(0, 122, 255, 0.1)" : "var(--card)",
+                boxShadow: isActive ? "0 1px 4px rgba(0,122,255,0.12)" : "0 1px 4px rgba(0,0,0,0.07)",
                 minHeight: 130,
               }}
             >
@@ -130,7 +139,7 @@ export default function LogFlowClient(props: Props) {
                   <span
                     className="text-[11px] font-semibold rounded-full px-2 py-0.5"
                     style={{
-                      backgroundColor: "rgba(255,255,255,0.25)",
+                      backgroundColor: "var(--accent)",
                       color: "white",
                     }}
                   >
@@ -141,7 +150,7 @@ export default function LogFlowClient(props: Props) {
                   <span
                     className="text-[11px] font-semibold rounded-full px-2 py-0.5"
                     style={{
-                      backgroundColor: isActive ? "rgba(255,255,255,0.2)" : "var(--accent)",
+                      backgroundColor: "var(--accent)",
                       color: "white",
                     }}
                   >
@@ -152,11 +161,22 @@ export default function LogFlowClient(props: Props) {
                   <span
                     className="text-[11px] font-semibold rounded-full px-2 py-0.5"
                     style={{
-                      backgroundColor: isActive ? "rgba(255,255,255,0.2)" : "rgba(255, 180, 0, 0.2)",
-                      color: isActive ? "white" : "#B07800",
+                      backgroundColor: "rgba(255, 180, 0, 0.2)",
+                      color: "#B07800",
                     }}
                   >
                     Decaf
+                  </span>
+                )}
+                {useSoon && (
+                  <span
+                    className="text-[11px] font-semibold rounded-full px-2 py-0.5"
+                    style={{
+                      backgroundColor: "rgba(255, 149, 0, 0.15)",
+                      color: "#C97000",
+                    }}
+                  >
+                    Use soon
                   </span>
                 )}
               </div>
@@ -164,32 +184,38 @@ export default function LogFlowClient(props: Props) {
               {/* Bean name + roaster */}
               <p
                 className="text-[15px] font-semibold leading-snug flex-1"
-                style={{ color: isActive ? "white" : "var(--text-primary)" }}
+                style={{ color: "var(--text-primary)" }}
               >
                 {bag.name}
               </p>
               <p
                 className="text-[12px] mt-0.5"
-                style={{ color: isActive ? "rgba(255,255,255,0.75)" : "var(--text-secondary)" }}
+                style={{ color: "var(--text-secondary)" }}
               >
                 {bag.roaster}
+              </p>
+              <p
+                className="text-[11px] mt-1 font-medium"
+                style={{ color: freshCss }}
+              >
+                {freshLabel} · {days}d
               </p>
 
               {/* Last shot info */}
               <div
                 className="mt-2 pt-2"
-                style={{ borderTop: isActive ? "1px solid rgba(255,255,255,0.2)" : "1px solid var(--separator)" }}
+                style={{ borderTop: "1px solid var(--separator)" }}
               >
                 {bagDefault ? (
                   <>
                     <p
                       className="text-[11px]"
-                      style={{ color: isActive ? "rgba(255,255,255,0.75)" : "var(--text-secondary)" }}
+                      style={{ color: "var(--text-secondary)" }}
                     >
                       {formatLastShot(bagDefault.pulledAt)}
                     </p>
                     {bagDefault.shotRating != null && (
-                      <p style={{ color: isActive ? "rgba(255,255,255,0.9)" : "#FF9500" }}>
+                      <p style={{ color: "#FF9500" }}>
                         <StarRating rating={bagDefault.shotRating} />
                       </p>
                     )}
@@ -197,7 +223,7 @@ export default function LogFlowClient(props: Props) {
                 ) : (
                   <p
                     className="text-[11px]"
-                    style={{ color: isActive ? "rgba(255,255,255,0.6)" : "var(--text-secondary)" }}
+                    style={{ color: "var(--text-secondary)" }}
                   >
                     No shots yet
                   </p>
