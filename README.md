@@ -122,7 +122,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Per-shot freshness label uses the bag's own peak window (not global defaults)
 - [x] Archived bag label (`[Archived]`) on shots from removed bags
 - [x] Lock badge on history cards — purple pill with lock icon for locked shots
-- [x] Shot detail — all fields, classifications, freshness badge, taste display, drink composition bar
+- [x] Shot detail — all fields, classifications, freshness badge, taste display, drink composition bar; flow illustration shown inline when flow was logged
 - [x] Dialed In Recipe card on bag detail — shows grind, adjusted dose, target yield range (±2g) from most recent locked shot; "Edit locked shot" link
 - [x] Log form shows locked parameters (grind, adjusted dose, target yield) and AI recommendation inline between Bean and Shot sections
 - [x] Parameters locked banner on shot detail — purple banner above shot section when `isLocked = true`

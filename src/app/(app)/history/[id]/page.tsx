@@ -9,6 +9,7 @@ import ClientDateTime from "@/components/ClientDateTime";
 import { getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
 import TasteBalanceDisplay from "@/components/shots/TasteBalanceDisplay";
 import ShotAnalysisClient from "@/components/shots/ShotAnalysisClient";
+import FlowIllustration from "@/components/shots/FlowIllustration";
 
 
 function DetailRow({ label, value, noDivider }: { label: string; value: React.ReactNode; noDivider?: boolean }) {
@@ -270,7 +271,12 @@ export default async function ShotDetailPage({
           <DetailRow label="Pre-infusion" value={`${shot.preinfusionSeconds}s`} />
         )}
         {shot.flowCharacteristics != null && (
-          <DetailRow label="Flow" value={FLOW_LABELS[shot.flowCharacteristics] ?? shot.flowCharacteristics} />
+          <>
+            <DetailRow label="Flow" value={FLOW_LABELS[shot.flowCharacteristics] ?? shot.flowCharacteristics} />
+            <div className="py-2">
+              <FlowIllustration flow={shot.flowCharacteristics} />
+            </div>
+          </>
         )}
         <DetailRow label="Shot Time" value={shot.shotTimeSeconds != null ? `${shot.shotTimeSeconds}s` : "—"} />
         {shot.lagG !== null && shot.yieldG !== null && (
