@@ -66,8 +66,8 @@ export async function createBag(
   _prev: unknown,
   formData: FormData
 ): Promise<CreateBagResult> {
-  const roaster = (formData.get("roaster") as string).trim();
-  const name = (formData.get("name") as string).trim();
+  let roaster = (formData.get("roaster") as string).trim();
+  let name = (formData.get("name") as string).trim();
   const force = formData.get("force") === "true";
   const replaceId = formData.get("replaceId")
     ? Number(formData.get("replaceId"))
@@ -116,11 +116,14 @@ export async function createBag(
   // If user confirmed a fuzzy or exact match, backfill any unspecified fields from prior bag
   if (priorBagId) {
     const [prior] = await db
-      .select({ roastLevel: bags.roastLevel, processingMethod: bags.processingMethod, isBlend: bags.isBlend, isDecaf: bags.isDecaf })
+      .select({ roaster: bags.roaster, name: bags.name, roastLevel: bags.roastLevel, processingMethod: bags.processingMethod, isBlend: bags.isBlend, isDecaf: bags.isDecaf })
       .from(bags)
       .where(eq(bags.id, priorBagId))
       .limit(1);
     if (prior) {
+      // Always correct to the canonical roaster + name so the bag counter groups correctly
+      roaster = prior.roaster;
+      name = prior.name;
       if (roastLevel === "unspecified" && prior.roastLevel) roastLevel = prior.roastLevel as RoastLevel;
       if (processingMethod === "unspecified" && prior.processingMethod) processingMethod = prior.processingMethod as ProcessingMethod;
       if (!isBlend) isBlend = prior.isBlend ?? false;
