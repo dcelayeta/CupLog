@@ -99,7 +99,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Add / edit bag — all fields, multi-origin support, peak freshness override
 - [x] Mark as finished / remove (soft delete)
 - [x] Duplicate bag detection — Replace / Add as new / Cancel modal
-- [x] AI bag entry — paste bag label text, Claude extracts structured fields
+- [x] AI bag entry — paste bag label text or URL (page content fetched server-side), upload bag photo, or both; Claude extracts structured fields; combines image + text sources when both provided; strict anti-hallucination prompt — never infers region/farm/variety from training knowledge, only from explicit input
 - [x] "New bag of same coffee" shortcut on bag detail
 - [x] Per-bag shot analysis charts — Grind vs Taste scatter, Rating Trend, Extraction Ratio bar (server-side SVG)
 - [x] Cups remaining per active bag — shown on bag card; calculated from rolling avg dose window (fallback: all-time avg, then 18g); highlights in orange below 5 cups

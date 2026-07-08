@@ -34,7 +34,11 @@ type ParseResult =
 
 const SYSTEM_PROMPT = `You are a coffee bag data extractor. Extract structured data from coffee bag descriptions, photos, or any text about a coffee bag.
 
-Return ONLY a valid JSON object with these fields (omit fields you cannot confidently determine):
+CRITICAL: Only include values that are EXPLICITLY stated in the provided text or image. Never use your training knowledge to fill in, infer, or "correct" any field — not for region, farm, variety, roaster sourcing patterns, or anything else. If the text says Nariño, output Nariño. If the text does not mention a region, omit the region field entirely. A missing field is always better than a guessed one.
+
+When both an image and text/URL content are provided, combine information from both sources.
+
+Return ONLY a valid JSON object with these fields (omit any field not explicitly found in the input):
 {
   "roaster": string,           // roaster/company name
   "name": string,              // coffee name/blend name
@@ -51,9 +55,9 @@ Return ONLY a valid JSON object with these fields (omit fields you cannot confid
   "origins": [                 // one entry per origin country
     {
       "country": string,
-      "region": string,        // growing region if known
-      "farm": string,          // farm name if known
-      "variety": string,       // cultivar/variety e.g. Pink Bourbon, Geisha, Typica
+      "region": string,        // ONLY if the growing region is explicitly named in the input — never infer from country or training knowledge
+      "farm": string,          // ONLY if the farm name is explicitly stated
+      "variety": string,       // ONLY if the cultivar/variety is explicitly stated (e.g. Pink Bourbon, Geisha, Castillo)
       "blendPercentage": number // 0-100, only if explicitly stated
     }
   ]
@@ -61,9 +65,8 @@ Return ONLY a valid JSON object with these fields (omit fields you cannot confid
 
 For roastLevel, map common terms: "light roast" → light, "medium roast" → medium, "dark roast" → dark, etc.
 For processingMethod: "washed"/"fully washed" → washed, "natural"/"dry process" → natural, "honey" → honey, "EA"/"sugarcane" decaf → ea_washed, "Swiss Water" decaf → swiss_water.
-If the coffee is clearly from one country/region, set isBlend to false and include one origin.
-If multiple countries are mentioned, set isBlend to true and include one origin per country.
-Do not guess — only include fields you can reasonably extract from the input.`;
+If the coffee is clearly from one country, set isBlend to false and include one origin.
+If multiple countries are mentioned, set isBlend to true and include one origin per country.`;
 
 function isUrl(text: string): boolean {
   const t = text.trim();
@@ -96,7 +99,7 @@ async function fetchPageText(url: string): Promise<string> {
     .replace(/&nbsp;/g, " ");
 
   // Collapse whitespace and trim
-  return decoded.replace(/\s+/g, " ").trim().slice(0, 8000); // cap at 8k chars
+  return decoded.replace(/\s+/g, " ").trim().slice(0, 12000); // cap at 12k chars
 }
 
 export async function parseBagWithAI(input: {
@@ -143,12 +146,17 @@ export async function parseBagWithAI(input: {
       });
     }
 
-    if (resolvedText) {
+    if (resolvedText && input.imageBase64) {
+      content.push({
+        type: "text",
+        text: `Extract the coffee bag data from the image above AND the following text/page content. Combine information from both sources — use ALL details explicitly found in either.\n\n${resolvedText}`,
+      });
+    } else if (resolvedText) {
       content.push({ type: "text", text: resolvedText });
     } else {
       content.push({
         type: "text",
-        text: "Extract the coffee bag data from this image.",
+        text: "Extract the coffee bag data from this image. Only include values explicitly visible in the image.",
       });
     }
 
