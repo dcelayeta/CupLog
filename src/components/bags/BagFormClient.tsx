@@ -258,6 +258,8 @@ export default function BagFormClient({
   const [duplicateBag, setDuplicateBag] = useState<Bag | null>(null);
   const [potentialMatchBag, setPotentialMatchBag] = useState<{ id: number; name: string } | null>(null);
   const [isModalPending, startModalTransition] = useTransition();
+  // Saved because React resets form fields after action completes — re-submissions need original data
+  const savedFormDataRef = useRef<FormData | null>(null);
 
   useEffect(() => {
     if (potentialMatchBag) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -274,11 +276,13 @@ export default function BagFormClient({
       const result = await action(_prev, formData);
 
       if (result && "duplicate" in result) {
+        savedFormDataRef.current = formData;
         setDuplicateBag(result.duplicate);
         return result;
       }
 
       if (result && "potentialMatch" in result) {
+        savedFormDataRef.current = formData;
         setPotentialMatchBag(result.potentialMatch);
         return result;
       }
@@ -292,19 +296,22 @@ export default function BagFormClient({
     null
   );
 
-  const buildFormData = (overrides: Record<string, string> = {}) => {
-    const formData = formRef.current ? new FormData(formRef.current) : new FormData();
-    formData.set("origins", JSON.stringify(origins));
-    formData.set("isBlend", isBlend ? "true" : "false");
-    formData.set("isDecaf", isDecaf ? "true" : "false");
+  // Build FormData for re-submissions from saved ref (form is reset by React after first action)
+  const buildResubmitFormData = (overrides: Record<string, string> = {}) => {
+    const formData = new FormData();
+    const saved = savedFormDataRef.current;
+    if (saved) {
+      for (const [key, value] of saved.entries()) formData.set(key, value as string);
+    }
     for (const [k, v] of Object.entries(overrides)) formData.set(k, v);
     return formData;
   };
 
   const handleReplace = () => {
     if (!duplicateBag) return;
-    const formData = buildFormData({ force: "true", replaceId: String(duplicateBag.id) });
+    const formData = buildResubmitFormData({ force: "true", replaceId: String(duplicateBag.id) });
     setDuplicateBag(null);
+    savedFormDataRef.current = null;
     startModalTransition(async () => {
       const result = await createAction(null, formData);
       if (result && "success" in result) router.push(`/bags/${result.id}`);
@@ -312,8 +319,9 @@ export default function BagFormClient({
   };
 
   const handleAddNew = () => {
-    const formData = buildFormData({ force: "true" });
+    const formData = buildResubmitFormData({ force: "true" });
     setDuplicateBag(null);
+    savedFormDataRef.current = null;
     startModalTransition(async () => {
       const result = await createAction(null, formData);
       if (result && "success" in result) router.push(`/bags/${result.id}`);
@@ -322,8 +330,9 @@ export default function BagFormClient({
 
   const handleConfirmFuzzyMatch = () => {
     if (!potentialMatchBag) return;
-    const formData = buildFormData({ force: "true", priorBagId: String(potentialMatchBag.id) });
+    const formData = buildResubmitFormData({ force: "true", priorBagId: String(potentialMatchBag.id) });
     setPotentialMatchBag(null);
+    savedFormDataRef.current = null;
     startModalTransition(async () => {
       const result = await createAction(null, formData);
       if (result && "success" in result) router.push(`/bags/${result.id}`);
@@ -331,8 +340,9 @@ export default function BagFormClient({
   };
 
   const handleDismissFuzzyMatch = () => {
-    const formData = buildFormData({ force: "true" });
+    const formData = buildResubmitFormData({ force: "true" });
     setPotentialMatchBag(null);
+    savedFormDataRef.current = null;
     startModalTransition(async () => {
       const result = await createAction(null, formData);
       if (result && "success" in result) router.push(`/bags/${result.id}`);
