@@ -34,11 +34,13 @@ type ParseResult =
 
 const SYSTEM_PROMPT = `You are a coffee bag data extractor. Extract structured data from coffee bag descriptions, photos, or any text about a coffee bag.
 
-CRITICAL: Only include values that are EXPLICITLY stated in the provided text or image. Never use your training knowledge to fill in, infer, or "correct" any field — not for region, farm, variety, roaster sourcing patterns, or anything else. If the text says Nariño, output Nariño. If the text does not mention a region, omit the region field entirely. A missing field is always better than a guessed one.
+TWO RULES that must both be satisfied:
+1. EXTRACT everything written in the provided text or image — do not skip values that are clearly present. If the text says "Sidama", "Honey", or "Light roast", include those values.
+2. NEVER add values absent from the input using training knowledge — do not fill in a region, farm, variety, or any other detail that is not stated, even if you could make a plausible guess.
 
-When both an image and text/URL content are provided, combine information from both sources.
+The distinction: written in the input → extract it. Not written → leave it out. When both an image and text/URL content are provided, combine information from both sources.
 
-Return ONLY a valid JSON object with these fields (omit any field not explicitly found in the input):
+Return ONLY a valid JSON object with these fields (omit fields not found in the input):
 {
   "roaster": string,           // roaster/company name
   "name": string,              // coffee name/blend name
@@ -55,9 +57,9 @@ Return ONLY a valid JSON object with these fields (omit any field not explicitly
   "origins": [                 // one entry per origin country
     {
       "country": string,
-      "region": string,        // ONLY if the growing region is explicitly named in the input — never infer from country or training knowledge
-      "farm": string,          // ONLY if the farm name is explicitly stated
-      "variety": string,       // ONLY if the cultivar/variety is explicitly stated (e.g. Pink Bourbon, Geisha, Castillo)
+      "region": string,        // extract if named in the input (e.g. "Sidama" or "Nariño"); never guess a region not written
+      "farm": string,          // extract if named in the input; never guess
+      "variety": string,       // extract if named in the input (e.g. Castillo, Caturra, Geisha); never guess
       "blendPercentage": number // 0-100, only if explicitly stated
     }
   ]
@@ -160,7 +162,7 @@ export async function parseBagWithAI(input: {
       });
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
     const message = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
