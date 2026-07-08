@@ -76,15 +76,47 @@ export async function createBag(
       .where(eq(bags.id, replaceId));
   }
 
-  const origins: OriginInput[] = JSON.parse(
-    (formData.get("origins") as string) || "[]"
-  );
+  // Parse as mutable so prior-bag backfill can override unspecified values
+  let origins: OriginInput[] = JSON.parse((formData.get("origins") as string) || "[]");
+  let isBlend = formData.get("isBlend") === "true";
+  let isDecaf = formData.get("isDecaf") === "true";
+  let roastLevel = ((formData.get("roastLevel") as string) || "unspecified") as RoastLevel;
+  let processingMethod = ((formData.get("processingMethod") as string) || "unspecified") as ProcessingMethod;
 
-  const isDecaf = formData.get("isDecaf") === "true";
-  const roastLevel = (((formData.get("roastLevel") as string) || "unspecified") as RoastLevel);
-  const processingMethod = (((formData.get("processingMethod") as string) || "unspecified") as ProcessingMethod);
+  const priorBagId = formData.get("priorBagId") ? Number(formData.get("priorBagId")) : undefined;
 
-  // Use user-provided peak window if present, otherwise auto-estimate
+  // If user confirmed a fuzzy or exact match, backfill any unspecified fields from prior bag
+  if (priorBagId) {
+    const [prior] = await db
+      .select({ roastLevel: bags.roastLevel, processingMethod: bags.processingMethod, isBlend: bags.isBlend, isDecaf: bags.isDecaf })
+      .from(bags)
+      .where(eq(bags.id, priorBagId))
+      .limit(1);
+    if (prior) {
+      if (roastLevel === "unspecified" && prior.roastLevel) roastLevel = prior.roastLevel as RoastLevel;
+      if (processingMethod === "unspecified" && prior.processingMethod) processingMethod = prior.processingMethod as ProcessingMethod;
+      if (!isBlend) isBlend = prior.isBlend ?? false;
+      if (!isDecaf) isDecaf = prior.isDecaf ?? false;
+
+      const hasOrigins = origins.some((o) => o.country?.trim());
+      if (!hasOrigins) {
+        const priorOrigins = await db
+          .select({ country: bagOrigins.country, region: bagOrigins.region, farm: bagOrigins.farm, variety: bagOrigins.variety })
+          .from(bagOrigins)
+          .where(eq(bagOrigins.bagId, priorBagId));
+        if (priorOrigins.length) {
+          origins = priorOrigins.map((o) => ({
+            country: o.country,
+            region: o.region ?? undefined,
+            farm: o.farm ?? undefined,
+            variety: o.variety ?? undefined,
+          }));
+        }
+      }
+    }
+  }
+
+  // Use user-provided peak window if present, otherwise auto-estimate from (backfilled) values
   const estimated = estimatePeakWindow(roastLevel, processingMethod, isDecaf);
   const peakStartDay = formData.get("peakStartDay")
     ? Math.max(1, Number(formData.get("peakStartDay")))
@@ -96,9 +128,7 @@ export async function createBag(
 
   const status = (formData.get("status") as "active" | "reserve") === "reserve" ? "reserve" : "active";
 
-  const priorBagId = formData.get("priorBagId") ? Number(formData.get("priorBagId")) : undefined;
-
-  // If user confirmed a fuzzy match and no AI tip was provided, generate one now
+  // Generate dial-in tip if user confirmed prior bag and no AI tip already provided
   let dialInTip: string | null = (formData.get("dialInTip") as string) || null;
   if (priorBagId && !dialInTip) {
     const parsedData: ParsedBagData = {
@@ -118,7 +148,7 @@ export async function createBag(
   const bagData: NewBag = {
     roaster,
     name,
-    isBlend: formData.get("isBlend") === "true",
+    isBlend,
     isDecaf,
     roastLevel,
     processingMethod,

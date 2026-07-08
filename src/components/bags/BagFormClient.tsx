@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import DuplicateModal from "./DuplicateModal";
 import AIEntryPanel from "./AIEntryPanel";
@@ -258,6 +258,10 @@ export default function BagFormClient({
   const [duplicateBag, setDuplicateBag] = useState<Bag | null>(null);
   const [potentialMatchBag, setPotentialMatchBag] = useState<{ id: number; name: string } | null>(null);
   const [isModalPending, startModalTransition] = useTransition();
+
+  useEffect(() => {
+    if (potentialMatchBag) window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [potentialMatchBag]);
 
   const action = mode === "edit" && updateAction ? updateAction : createAction;
 
