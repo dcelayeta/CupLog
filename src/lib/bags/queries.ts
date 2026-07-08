@@ -114,6 +114,16 @@ export async function getBags(
   return result;
 }
 
+export async function getBagCounts(): Promise<{ active: number; finished: number; all: number }> {
+  const rows = await db.all(sql`
+    SELECT status, COUNT(*) as count FROM bags WHERE status != 'removed' GROUP BY status
+  `) as { status: string; count: number }[];
+  const map = Object.fromEntries(rows.map((r) => [r.status, r.count]));
+  const active = (map["active"] ?? 0) + (map["reserve"] ?? 0);
+  const finished = map["finished"] ?? 0;
+  return { active, finished, all: active + finished };
+}
+
 export async function getBagById(id: number): Promise<BagWithOrigins | null> {
   const [bag] = await db.select().from(bags).where(eq(bags.id, id)).limit(1);
   if (!bag) return null;

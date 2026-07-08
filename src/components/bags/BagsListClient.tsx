@@ -11,12 +11,14 @@ export default function BagsListClient({
   status,
   query,
   avgDosePerBag = {},
+  counts = { active: 0, finished: 0, all: 0 },
 }: {
   bags: BagWithOrigins[];
   reserveBags?: BagWithOrigins[];
   status: "active" | "finished" | "all";
   query: string;
   avgDosePerBag?: Record<number, number>;
+  counts?: { active: number; finished: number; all: number };
 }) {
   const router = useRouter();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -88,7 +90,7 @@ export default function BagsListClient({
                 boxShadow: status === s ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
               }}
             >
-              {s === "active" ? "Active" : s === "finished" ? "Finished" : "All"}
+              {s === "active" ? `Active (${counts.active})` : s === "finished" ? `Finished (${counts.finished})` : `All (${counts.all})`}
             </button>
           ))}
         </div>

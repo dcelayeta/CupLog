@@ -92,7 +92,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Drink suggestion card — random drink from recipe library on load; ↺ Shuffle button; obeys same caffeine-aware visibility rules as next shot card; hides after 7pm
 
 ### Bags (Bean Inventory)
-- [x] Bag list — active bags by default, toggle to show finished
+- [x] Bag list — active bags by default, toggle to show finished; count badges on Active/Finished/All tabs
 - [x] Bag cards: roaster, name, roast level, days since roast + freshness label, decaf/blend badges, origin countries
 - [x] Per-bag freshness windows — auto-estimated from roast level + processing method (15 combinations); user-overridable
 - [x] Bag detail — 5-zone freshness timeline with today marker; context-specific writeup per roast+process combination; shot history stats

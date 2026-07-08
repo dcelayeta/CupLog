@@ -77,7 +77,7 @@ export function getFreshnessLabel(
 ): string {
   const midPeak = Math.round((peakStartDay + peakEndDay) / 2);
   if (days < 0) return `Ready in ${Math.abs(days)}d`;
-  if (days < peakStartDay) return "Too fresh — wait";
+  if (days < peakStartDay) return `Too fresh — wait (${peakStartDay - days}d)`;
   if (days <= midPeak) return "Peak window";
   if (days <= peakEndDay) return "Still excellent";
   if (days <= peakEndDay + 10) return "Use soon";

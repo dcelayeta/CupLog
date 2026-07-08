@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { getBags, searchBags } from "@/lib/bags/queries";
+import { getBags, getBagCounts, searchBags } from "@/lib/bags/queries";
 import BagsListClient from "@/components/bags/BagsListClient";
 import { getRecentAvgDosePerBag } from "@/lib/shots/queries";
 import { getAppConfig } from "@/lib/config/queries";
@@ -16,10 +16,11 @@ export default async function BagsPage({
     params.status === "finished" ? "finished" : params.status === "all" ? "all" : "active";
   const query = params.q ?? "";
 
-  const [bags, reserveBags, config] = await Promise.all([
+  const [bags, reserveBags, config, counts] = await Promise.all([
     query ? searchBags(query, status) : getBags(status),
     status === "active" && !query ? getBags("reserve") : Promise.resolve([]),
     getAppConfig(),
+    getBagCounts(),
   ]);
 
   const bagIds = [...bags, ...reserveBags].map((b) => b.id);
@@ -55,7 +56,7 @@ export default async function BagsPage({
         </div>
       </div>
 
-      <BagsListClient bags={bags} reserveBags={reserveBags} status={status} query={query} avgDosePerBag={avgDosePerBag} />
+      <BagsListClient bags={bags} reserveBags={reserveBags} status={status} query={query} avgDosePerBag={avgDosePerBag} counts={counts} />
     </div>
   );
 }
