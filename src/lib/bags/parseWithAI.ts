@@ -294,7 +294,8 @@ export async function parseBagWithAI(input: {
       const sameBags = await db
         .select({ id: bags.id, name: bags.name })
         .from(bags)
-        .where(sql`lower(${bags.roaster}) = lower(${data.roaster})`);
+        .where(sql`lower(${bags.roaster}) = lower(${data.roaster})`)
+        .orderBy(desc(bags.id));
 
       let bestScore = 0;
       let bestBag: { id: number; name: string } | undefined;

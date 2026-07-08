@@ -2,7 +2,7 @@
 
 import { db } from "@/db/client";
 import { bags, bagOrigins, shots } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { findDuplicateBag } from "./queries";
@@ -81,7 +81,8 @@ export async function createBag(
     const sameBags = await db
       .select({ id: bags.id, name: bags.name })
       .from(bags)
-      .where(sql`lower(${bags.roaster}) = lower(${roaster})`);
+      .where(sql`lower(${bags.roaster}) = lower(${roaster})`)
+      .orderBy(desc(bags.id));
     let bestScore = 0;
     let bestBag: { id: number; name: string } | undefined;
     for (const bag of sameBags) {
@@ -129,20 +130,18 @@ export async function createBag(
       if (!isBlend) isBlend = prior.isBlend ?? false;
       if (!isDecaf) isDecaf = prior.isDecaf ?? false;
 
-      const hasOrigins = origins.some((o) => o.country?.trim());
-      if (!hasOrigins) {
-        const priorOrigins = await db
-          .select({ country: bagOrigins.country, region: bagOrigins.region, farm: bagOrigins.farm, variety: bagOrigins.variety })
-          .from(bagOrigins)
-          .where(eq(bagOrigins.bagId, priorBagId));
-        if (priorOrigins.length) {
-          origins = priorOrigins.map((o) => ({
-            country: o.country,
-            region: o.region ?? undefined,
-            farm: o.farm ?? undefined,
-            variety: o.variety ?? undefined,
-          }));
-        }
+      // Always replace with prior bag's authoritative origin list
+      const priorOrigins = await db
+        .select({ country: bagOrigins.country, region: bagOrigins.region, farm: bagOrigins.farm, variety: bagOrigins.variety })
+        .from(bagOrigins)
+        .where(eq(bagOrigins.bagId, priorBagId));
+      if (priorOrigins.length) {
+        origins = priorOrigins.map((o) => ({
+          country: o.country,
+          region: o.region ?? undefined,
+          farm: o.farm ?? undefined,
+          variety: o.variety ?? undefined,
+        }));
       }
     }
   }
