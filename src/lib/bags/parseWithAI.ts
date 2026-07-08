@@ -29,8 +29,25 @@ export type ParsedBagData = {
 };
 
 type ParseResult =
-  | { success: true; data: ParsedBagData; urlFetched?: boolean; urlError?: string; priorBagId?: number }
+  | {
+      success: true;
+      data: ParsedBagData;
+      urlFetched?: boolean;
+      urlError?: string;
+      priorBagId?: number;
+      potentialMatch?: { id: number; name: string };
+    }
   | { success: false; error: string };
+
+function nameSimilarity(a: string, b: string): number {
+  const tokenize = (s: string) =>
+    new Set(s.toLowerCase().split(/[\s\-\/,]+/).filter((w) => w.length >= 3));
+  const A = tokenize(a);
+  const B = tokenize(b);
+  const intersection = [...A].filter((w) => B.has(w)).length;
+  const union = new Set([...A, ...B]).size;
+  return union === 0 ? 0 : intersection / union;
+}
 
 const SYSTEM_PROMPT = `You are a coffee bag data extractor. Extract structured data from coffee bag descriptions, photos, or any text about a coffee bag.
 
@@ -240,7 +257,30 @@ export async function parseBagWithAI(input: {
       }
     }
 
-    return { success: true, data, urlFetched, urlError, priorBagId };
+    // If no exact match, look for a fuzzy name match from the same roaster
+    let potentialMatch: { id: number; name: string } | undefined;
+    if (!priorBagId && data.roaster && data.name) {
+      const sameBags = await db
+        .select({ id: bags.id, name: bags.name })
+        .from(bags)
+        .where(sql`lower(${bags.roaster}) = lower(${data.roaster})`);
+
+      let bestScore = 0;
+      let bestBag: { id: number; name: string } | undefined;
+      for (const bag of sameBags) {
+        if (!bag.name) continue;
+        const score = nameSimilarity(data.name, bag.name);
+        if (score > bestScore) {
+          bestScore = score;
+          bestBag = { id: bag.id, name: bag.name };
+        }
+      }
+      if (bestScore >= 0.35 && bestBag) {
+        potentialMatch = bestBag;
+      }
+    }
+
+    return { success: true, data, urlFetched, urlError, priorBagId, potentialMatch };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return { success: false, error: `Parse failed: ${message}` };
@@ -415,6 +455,45 @@ Critical rules:
     const message = err instanceof Error ? err.message : "Unknown error";
     return { error: `Failed: ${message}` };
   }
+}
+
+export async function enrichFromPriorBag(
+  data: ParsedBagData,
+  priorBagId: number,
+): Promise<ParsedBagData> {
+  const [prior] = await db
+    .select({
+      roastLevel: bags.roastLevel,
+      processingMethod: bags.processingMethod,
+      isBlend: bags.isBlend,
+      isDecaf: bags.isDecaf,
+    })
+    .from(bags)
+    .where(eq(bags.id, priorBagId));
+
+  if (prior) {
+    if (!data.roastLevel || data.roastLevel === "unspecified") data.roastLevel = prior.roastLevel ?? undefined;
+    if (!data.processingMethod || data.processingMethod === "unspecified") data.processingMethod = prior.processingMethod ?? undefined;
+    if (data.isBlend === undefined) data.isBlend = prior.isBlend;
+    if (data.isDecaf === undefined) data.isDecaf = prior.isDecaf;
+
+    if (!data.origins?.length) {
+      const priorOrigins = await db
+        .select({ country: bagOrigins.country, region: bagOrigins.region, farm: bagOrigins.farm, variety: bagOrigins.variety })
+        .from(bagOrigins)
+        .where(eq(bagOrigins.bagId, priorBagId));
+      if (priorOrigins.length) {
+        data.origins = priorOrigins.map((o) => ({
+          country: o.country,
+          region: o.region ?? undefined,
+          farm: o.farm ?? undefined,
+          variety: o.variety ?? undefined,
+        }));
+      }
+    }
+  }
+
+  return data;
 }
 
 const FAIL_REASON_DESCRIPTIONS: Record<string, string> = {

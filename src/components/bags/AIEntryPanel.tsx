@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { parseBagWithAI, getDialInRecommendation } from "@/lib/bags/parseWithAI";
+import { parseBagWithAI, getDialInRecommendation, enrichFromPriorBag } from "@/lib/bags/parseWithAI";
 import type { ParsedBagData } from "@/lib/bags/parseWithAI";
 
 export default function AIEntryPanel({
@@ -25,6 +25,8 @@ export default function AIEntryPanel({
   const [isTipping, setIsTipping] = useState(false);
   const [tip, setTip] = useState<string | null>(null);
   const [tipError, setTipError] = useState<string | null>(null);
+  const [potentialMatch, setPotentialMatch] = useState<{ id: number; name: string } | null>(null);
+  const [confirmedPriorId, setConfirmedPriorId] = useState<number | undefined>(undefined);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Resize to max 1200px and re-encode as JPEG — handles HEIC conversion and keeps payload under server action limit
@@ -62,6 +64,8 @@ export default function AIEntryPanel({
     setUrl("");
     setText("");
     setImageFile(null);
+    setPotentialMatch(null);
+    setConfirmedPriorId(undefined);
   };
 
   const handleParse = async () => {
@@ -95,6 +99,8 @@ export default function AIEntryPanel({
       setUrlWarning(result.urlFetched === false ? `Couldn't fetch URL (${result.urlError ?? "unknown error"}) — URL was skipped.` : null);
       setTip(null);
       setTipError(null);
+      setPotentialMatch(result.potentialMatch ?? null);
+      setConfirmedPriorId(result.priorBagId);
 
       // Auto-fetch dial-in tip right after parsing
       setIsTipping(true);
@@ -112,6 +118,31 @@ export default function AIEntryPanel({
     } finally {
       setIsParsing(false);
     }
+  };
+
+  const handleConfirmMatch = async () => {
+    if (!parsedData || !potentialMatch) return;
+    setPotentialMatch(null);
+    setConfirmedPriorId(potentialMatch.id);
+
+    const enriched = await enrichFromPriorBag(parsedData, potentialMatch.id);
+    onParsed(enriched);
+    setParsedData(enriched);
+
+    setTip(null);
+    setTipError(null);
+    setIsTipping(true);
+    onTipLoading?.(true);
+    getDialInRecommendation(enriched, potentialMatch.id).then((tipResult) => {
+      setIsTipping(false);
+      onTipLoading?.(false);
+      if ("error" in tipResult) {
+        setTipError(tipResult.error);
+      } else {
+        setTip(tipResult.tip);
+        onTip?.(tipResult.tip);
+      }
+    });
   };
 
   const canParse = (url.trim().length > 0 || text.trim().length > 0 || imageFile !== null) && !isParsing && !isConverting;
@@ -189,6 +220,36 @@ export default function AIEntryPanel({
               </p>
             ) : null}
           </div>
+
+          {/* Same coffee prompt */}
+          {potentialMatch && (
+            <div className="px-4 py-3 row-divider">
+              <p className="text-[14px] font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+                Same coffee as "{potentialMatch.name}"?
+              </p>
+              <p className="text-[13px] mb-3" style={{ color: "var(--text-secondary)" }}>
+                A previous bag with a similar name was found. Confirm to use its history for the dial-in tip.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmMatch}
+                  className="flex-1 py-2 rounded-full text-[15px] font-medium"
+                  style={{ backgroundColor: "var(--accent)", color: "#FFFFFF" }}
+                >
+                  Yes, same coffee
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPotentialMatch(null)}
+                  className="flex-1 py-2 rounded-full text-[15px] font-medium"
+                  style={{ backgroundColor: "rgba(120,120,128,0.12)", color: "var(--text-primary)" }}
+                >
+                  No, different
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* URL fetch warning */}
           {urlWarning && (
