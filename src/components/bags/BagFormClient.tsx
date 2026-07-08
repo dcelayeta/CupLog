@@ -256,6 +256,7 @@ export default function BagFormClient({
     setFormKey((k) => k + 1); // remount uncontrolled inputs
   };
   const [duplicateBag, setDuplicateBag] = useState<Bag | null>(null);
+  const [potentialMatchBag, setPotentialMatchBag] = useState<{ id: number; name: string } | null>(null);
   const [isModalPending, startModalTransition] = useTransition();
 
   const action = mode === "edit" && updateAction ? updateAction : createAction;
@@ -270,6 +271,11 @@ export default function BagFormClient({
 
       if (result && "duplicate" in result) {
         setDuplicateBag(result.duplicate);
+        return result;
+      }
+
+      if (result && "potentialMatch" in result) {
+        setPotentialMatchBag(result.potentialMatch);
         return result;
       }
 
@@ -304,6 +310,25 @@ export default function BagFormClient({
   const handleAddNew = () => {
     const formData = buildFormData({ force: "true" });
     setDuplicateBag(null);
+    startModalTransition(async () => {
+      const result = await createAction(null, formData);
+      if (result && "success" in result) router.push(`/bags/${result.id}`);
+    });
+  };
+
+  const handleConfirmFuzzyMatch = () => {
+    if (!potentialMatchBag) return;
+    const formData = buildFormData({ force: "true", priorBagId: String(potentialMatchBag.id) });
+    setPotentialMatchBag(null);
+    startModalTransition(async () => {
+      const result = await createAction(null, formData);
+      if (result && "success" in result) router.push(`/bags/${result.id}`);
+    });
+  };
+
+  const handleDismissFuzzyMatch = () => {
+    const formData = buildFormData({ force: "true" });
+    setPotentialMatchBag(null);
     startModalTransition(async () => {
       const result = await createAction(null, formData);
       if (result && "success" in result) router.push(`/bags/${result.id}`);
@@ -365,6 +390,45 @@ export default function BagFormClient({
           </h1>
           <div className="w-16" />
         </div>
+
+        {/* Same coffee prompt */}
+        {potentialMatchBag && (
+          <div className="px-4 mb-4">
+            <div
+              className="rounded-2xl overflow-hidden"
+              style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+            >
+              <div className="px-4 py-3">
+                <p className="text-[15px] font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+                  Same coffee as &ldquo;{potentialMatchBag.name}&rdquo;?
+                </p>
+                <p className="text-[13px] mb-3" style={{ color: "var(--text-secondary)" }}>
+                  A previous bag with a similar name was found. Confirm to generate a dial-in tip using its shot history.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleConfirmFuzzyMatch}
+                    disabled={isModalPending}
+                    className="flex-1 py-2.5 rounded-full text-[15px] font-medium transition-opacity disabled:opacity-50"
+                    style={{ backgroundColor: "var(--accent)", color: "#FFFFFF" }}
+                  >
+                    {isModalPending ? "Saving…" : "Yes, same coffee"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDismissFuzzyMatch}
+                    disabled={isModalPending}
+                    className="flex-1 py-2.5 rounded-full text-[15px] font-medium transition-opacity disabled:opacity-50"
+                    style={{ backgroundColor: "rgba(120,120,128,0.12)", color: "var(--text-primary)" }}
+                  >
+                    No, different
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* AI Entry — add mode only */}
         {mode === "add" && (

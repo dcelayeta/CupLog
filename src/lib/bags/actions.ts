@@ -8,6 +8,18 @@ import { redirect } from "next/navigation";
 import { findDuplicateBag } from "./queries";
 import type { Bag, NewBag } from "@/db/schema";
 import { estimatePeakWindow, type RoastLevel, type ProcessingMethod } from "./freshness";
+import { getDialInRecommendation } from "./parseWithAI";
+import type { ParsedBagData } from "./parseWithAI";
+
+function nameSimilarity(a: string, b: string): number {
+  const tokenize = (s: string) =>
+    new Set(s.toLowerCase().split(/[\s\-\/,]+/).filter((w) => w.length >= 3));
+  const A = tokenize(a);
+  const B = tokenize(b);
+  const intersection = [...A].filter((w) => B.has(w)).length;
+  const union = new Set([...A, ...B]).size;
+  return union === 0 ? 0 : intersection / union;
+}
 
 type OriginInput = {
   country: string;
@@ -19,7 +31,8 @@ type OriginInput = {
 
 type CreateBagResult =
   | { success: true; id: number }
-  | { duplicate: Bag };
+  | { duplicate: Bag }
+  | { potentialMatch: { id: number; name: string } };
 
 export async function createBag(
   _prev: unknown,
@@ -35,6 +48,20 @@ export async function createBag(
   if (!force) {
     const dup = await findDuplicateBag(roaster, name);
     if (dup) return { duplicate: dup };
+
+    // Fuzzy name match — same roaster, similar name (Jaccard word overlap ≥ 0.35)
+    const sameBags = await db
+      .select({ id: bags.id, name: bags.name })
+      .from(bags)
+      .where(sql`lower(${bags.roaster}) = lower(${roaster})`);
+    let bestScore = 0;
+    let bestBag: { id: number; name: string } | undefined;
+    for (const bag of sameBags) {
+      if (!bag.name) continue;
+      const score = nameSimilarity(name, bag.name);
+      if (score > bestScore) { bestScore = score; bestBag = { id: bag.id, name: bag.name }; }
+    }
+    if (bestScore >= 0.35 && bestBag) return { potentialMatch: bestBag };
   }
 
   // If replacing, mark old bag as finished
@@ -69,6 +96,25 @@ export async function createBag(
 
   const status = (formData.get("status") as "active" | "reserve") === "reserve" ? "reserve" : "active";
 
+  const priorBagId = formData.get("priorBagId") ? Number(formData.get("priorBagId")) : undefined;
+
+  // If user confirmed a fuzzy match and no AI tip was provided, generate one now
+  let dialInTip: string | null = (formData.get("dialInTip") as string) || null;
+  if (priorBagId && !dialInTip) {
+    const parsedData: ParsedBagData = {
+      roaster,
+      name,
+      roastLevel,
+      processingMethod,
+      origins: origins
+        .filter((o) => o.country?.trim())
+        .map((o) => ({ country: o.country, region: o.region || undefined, farm: o.farm || undefined, variety: o.variety || undefined })),
+      notes: (formData.get("notes") as string) || undefined,
+    };
+    const tipResult = await getDialInRecommendation(parsedData, priorBagId);
+    if ("tip" in tipResult) dialInTip = tipResult.tip;
+  }
+
   const bagData: NewBag = {
     roaster,
     name,
@@ -82,7 +128,7 @@ export async function createBag(
     price: formData.get("price") ? Number(formData.get("price")) : null,
     weightG: formData.get("weightG") ? Number(formData.get("weightG")) : null,
     weightCorrectionG: formData.get("weightCorrectionG") ? Number(formData.get("weightCorrectionG")) : 0,
-    dialInTip: (formData.get("dialInTip") as string) || null,
+    dialInTip,
     notes: (formData.get("notes") as string) || null,
     peakStartDay,
     peakEndDay,
