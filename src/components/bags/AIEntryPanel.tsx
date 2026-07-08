@@ -99,7 +99,7 @@ export default function AIEntryPanel({
       // Auto-fetch dial-in tip right after parsing
       setIsTipping(true);
       onTipLoading?.(true);
-      getDialInRecommendation(result.data).then((tipResult) => {
+      getDialInRecommendation(result.data, result.priorBagId).then((tipResult) => {
         setIsTipping(false);
         onTipLoading?.(false);
         if ("error" in tipResult) {

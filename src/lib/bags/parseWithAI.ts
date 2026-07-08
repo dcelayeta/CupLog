@@ -2,7 +2,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db/client";
-import { shots, bags, equipmentProfiles } from "@/db/schema";
+import { shots, bags, bagOrigins, equipmentProfiles } from "@/db/schema";
 import { eq, desc, sql, and, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
@@ -29,7 +29,7 @@ export type ParsedBagData = {
 };
 
 type ParseResult =
-  | { success: true; data: ParsedBagData; urlFetched?: boolean; urlError?: string }
+  | { success: true; data: ParsedBagData; urlFetched?: boolean; urlError?: string; priorBagId?: number }
   | { success: false; error: string };
 
 const SYSTEM_PROMPT = `You are a coffee bag data extractor. Extract structured data from coffee bag descriptions, photos, or any text about a coffee bag.
@@ -195,7 +195,52 @@ export async function parseBagWithAI(input: {
     const jsonText = raw.text.slice(start, end + 1);
 
     const data: ParsedBagData = JSON.parse(jsonText);
-    return { success: true, data, urlFetched, urlError };
+
+    // Look up an existing bag with the same roaster + name to backfill missing
+    // coffee-level fields (roast level, process, origins) and enrich dial-in context
+    let priorBagId: number | undefined;
+    if (data.roaster && data.name) {
+      const [prior] = await db
+        .select({
+          id: bags.id,
+          roastLevel: bags.roastLevel,
+          processingMethod: bags.processingMethod,
+          isBlend: bags.isBlend,
+          isDecaf: bags.isDecaf,
+        })
+        .from(bags)
+        .where(and(
+          sql`lower(${bags.roaster}) = lower(${data.roaster})`,
+          sql`lower(${bags.name}) = lower(${data.name})`,
+        ))
+        .orderBy(desc(bags.id))
+        .limit(1);
+
+      if (prior) {
+        priorBagId = prior.id;
+        // Backfill coffee-level fields Claude couldn't find
+        if (!data.roastLevel || data.roastLevel === "unspecified") data.roastLevel = prior.roastLevel ?? undefined;
+        if (!data.processingMethod || data.processingMethod === "unspecified") data.processingMethod = prior.processingMethod ?? undefined;
+        if (data.isBlend === undefined) data.isBlend = prior.isBlend;
+        if (data.isDecaf === undefined) data.isDecaf = prior.isDecaf;
+
+        // Backfill origins if Claude found none
+        if (!data.origins?.length) {
+          const priorOrigins = await db
+            .select({ country: bagOrigins.country, region: bagOrigins.region, farm: bagOrigins.farm, variety: bagOrigins.variety })
+            .from(bagOrigins)
+            .where(eq(bagOrigins.bagId, prior.id));
+          if (priorOrigins.length) data.origins = priorOrigins.map((o) => ({
+            country: o.country,
+            region: o.region ?? undefined,
+            farm: o.farm ?? undefined,
+            variety: o.variety ?? undefined,
+          }));
+        }
+      }
+    }
+
+    return { success: true, data, urlFetched, urlError, priorBagId };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return { success: false, error: `Parse failed: ${message}` };
@@ -203,7 +248,8 @@ export async function parseBagWithAI(input: {
 }
 
 export async function getDialInRecommendation(
-  bagData: ParsedBagData
+  bagData: ParsedBagData,
+  priorBagId?: number,
 ): Promise<{ tip: string } | { error: string }> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return { error: "ANTHROPIC_API_KEY is not configured." };
@@ -215,7 +261,38 @@ export async function getDialInRecommendation(
     .where(eq(equipmentProfiles.isActive, true))
     .limit(1);
 
-  // Recent shots from bags with the same roast level for grind reference
+  // If we have a prior bag of the same coffee, query its shots directly — highest-quality reference
+  let sameCoffeeShots: Array<{
+    doseG: number; yieldG: number | null; shotTimeSeconds: number | null;
+    grindSetting: number | null; shotRating: number | null; tasteBalance: number | null;
+    notes: string | null; bagName: string; roaster: string;
+  }> = [];
+
+  if (priorBagId && bagData.roaster && bagData.name) {
+    sameCoffeeShots = await db
+      .select({
+        doseG: shots.doseG,
+        yieldG: shots.yieldG,
+        shotTimeSeconds: shots.shotTimeSeconds,
+        grindSetting: shots.grindSetting,
+        shotRating: shots.shotRating,
+        tasteBalance: shots.tasteBalance,
+        notes: shots.notes,
+        bagName: bags.name,
+        roaster: bags.roaster,
+      })
+      .from(shots)
+      .innerJoin(bags, eq(shots.bagId, bags.id))
+      .where(and(
+        sql`lower(${bags.roaster}) = lower(${bagData.roaster})`,
+        sql`lower(${bags.name}) = lower(${bagData.name})`,
+        eq(shots.isFailed, false),
+      ))
+      .orderBy(desc(shots.pulledAt))
+      .limit(8);
+  }
+
+  // Recent shots from bags with the same roast level / process for grind reference
   const similarShotsQuery = db
     .select({
       doseG: shots.doseG,
@@ -237,7 +314,6 @@ export async function getDialInRecommendation(
 
   const similarShots = await similarShotsQuery;
 
-  // Filter client-side for same roast level / process (avoids complex conditional drizzle where)
   const relevant = similarShots.filter((s) => {
     const sameRoast = bagData.roastLevel && bagData.roastLevel !== "unspecified"
       ? s.roastLevel === bagData.roastLevel
@@ -286,7 +362,23 @@ export async function getDialInRecommendation(
     ].filter(Boolean).join(" · ");
   });
 
-  const context = `New bag:\n${bagLines}\n\n${equipmentStr}\n\nRecent shots for context:\n${shotLines.length ? shotLines.map((l) => `  ${l}`).join("\n") : "  (no similar shots yet)"}`;
+  const TASTE_LABELS_SAME = ["", "Very Sour", "Sour", "Slightly Sour", "Balanced", "Slightly Bitter", "Bitter", "Very Bitter"];
+  const sameCoffeeSection = sameCoffeeShots.length > 0
+    ? `\n\nPrevious bags of this SAME coffee — USE THESE AS PRIMARY GRIND REFERENCE:\n${sameCoffeeShots.map((s) => {
+        const ratio = s.yieldG && s.doseG ? (s.yieldG / s.doseG).toFixed(2) : "?";
+        const taste = s.tasteBalance != null ? (TASTE_LABELS_SAME[Math.round(s.tasteBalance)] ?? null) : null;
+        return [
+          `${s.doseG}g→${s.yieldG ?? "?"}g (1:${ratio})`,
+          s.shotTimeSeconds ? `${s.shotTimeSeconds}s` : null,
+          s.grindSetting ? `grind ${s.grindSetting}` : null,
+          s.shotRating ? `${s.shotRating}/5★` : null,
+          taste,
+          s.notes ? `"${s.notes}"` : null,
+        ].filter(Boolean).join(" · ");
+      }).map((l) => `  ${l}`).join("\n")}`
+    : "";
+
+  const context = `New bag:\n${bagLines}\n\n${equipmentStr}${sameCoffeeSection}\n\nRecent similar shots for context:\n${shotLines.length ? shotLines.map((l) => `  ${l}`).join("\n") : "  (no similar shots yet)"}`;
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
