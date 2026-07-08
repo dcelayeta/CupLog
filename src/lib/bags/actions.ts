@@ -12,13 +12,41 @@ import { getDialInRecommendation } from "./parseWithAI";
 import type { ParsedBagData } from "./parseWithAI";
 
 function nameSimilarity(a: string, b: string): number {
-  const tokenize = (s: string) =>
-    new Set(s.toLowerCase().split(/[\s\-\/,]+/).filter((w) => w.length >= 3));
+  const normalize = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, "");
+  const tokenize = (s: string): string[] =>
+    normalize(s).split(/\s+/).filter((w) => w.length >= 3);
+
+  const charDice = (x: string, y: string): number => {
+    if (x === y) return 1;
+    const bg = (s: string) => {
+      const set = new Set<string>();
+      for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+      return set;
+    };
+    const X = bg(x); const Y = bg(y);
+    if (!X.size || !Y.size) return 0;
+    const inter = [...X].filter((g) => Y.has(g)).length;
+    return (2 * inter) / (X.size + Y.size);
+  };
+
   const A = tokenize(a);
   const B = tokenize(b);
-  const intersection = [...A].filter((w) => B.has(w)).length;
-  const union = new Set([...A, ...B]).size;
-  return union === 0 ? 0 : intersection / union;
+  if (!A.length || !B.length) return 0;
+
+  const setA = new Set(A); const setB = new Set(B);
+  const wordInter = [...setA].filter((w) => setB.has(w)).length;
+  const wordUnion = new Set([...setA, ...setB]).size;
+  const wordJaccard = wordUnion === 0 ? 0 : wordInter / wordUnion;
+
+  const [shorter, longer] = A.length <= B.length ? [A, B] : [B, A];
+  let charTotal = 0;
+  for (const token of shorter) {
+    charTotal += Math.max(...longer.map((t) => charDice(token, t)));
+  }
+  const charScore = 0.8 * (charTotal / shorter.length);
+
+  return Math.max(wordJaccard, charScore);
 }
 
 type OriginInput = {
@@ -49,7 +77,7 @@ export async function createBag(
     const dup = await findDuplicateBag(roaster, name);
     if (dup) return { duplicate: dup };
 
-    // Fuzzy name match — same roaster, similar name (Jaccard word overlap ≥ 0.35)
+    // Fuzzy name match — same roaster, similar name (score ≥ 0.45)
     const sameBags = await db
       .select({ id: bags.id, name: bags.name })
       .from(bags)
@@ -61,7 +89,7 @@ export async function createBag(
       const score = nameSimilarity(name, bag.name);
       if (score > bestScore) { bestScore = score; bestBag = { id: bag.id, name: bag.name }; }
     }
-    if (bestScore >= 0.35 && bestBag) return { potentialMatch: bestBag };
+    if (bestScore >= 0.45 && bestBag) return { potentialMatch: bestBag };
   }
 
   // If replacing, mark old bag as finished
