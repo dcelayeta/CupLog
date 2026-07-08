@@ -29,7 +29,7 @@ export type ParsedBagData = {
 };
 
 type ParseResult =
-  | { success: true; data: ParsedBagData }
+  | { success: true; data: ParsedBagData; urlFetched?: boolean; urlError?: string }
   | { success: false; error: string };
 
 const SYSTEM_PROMPT = `You are a coffee bag data extractor. Extract structured data from coffee bag descriptions, photos, or any text about a coffee bag.
@@ -70,11 +70,6 @@ For processingMethod: "washed"/"fully washed" → washed, "natural"/"dry process
 If the coffee is clearly from one country, set isBlend to false and include one origin.
 If multiple countries are mentioned, set isBlend to true and include one origin per country.`;
 
-function isUrl(text: string): boolean {
-  const t = text.trim();
-  return /^https?:\/\/\S+$/.test(t);
-}
-
 async function fetchPageText(url: string): Promise<string> {
   const res = await fetch(url, {
     headers: { "User-Agent": "Mozilla/5.0 (compatible; Yield/1.0)" },
@@ -105,6 +100,7 @@ async function fetchPageText(url: string): Promise<string> {
 }
 
 export async function parseBagWithAI(input: {
+  url?: string;
   text?: string;
   imageBase64?: string;
   imageMimeType?: string;
@@ -113,20 +109,27 @@ export async function parseBagWithAI(input: {
     return { success: false, error: "ANTHROPIC_API_KEY is not configured." };
   }
 
-  if (!input.text && !input.imageBase64) {
-    return { success: false, error: "Provide text or an image." };
+  if (!input.url && !input.text && !input.imageBase64) {
+    return { success: false, error: "Provide a URL, notes, or an image." };
   }
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  // If the text input is a URL, fetch and use the page content instead
-  let resolvedText = input.text;
-  if (input.text && isUrl(input.text)) {
+  // Fetch URL if provided
+  let pageText: string | undefined;
+  let urlFetched: boolean | undefined;
+  let urlError: string | undefined;
+  if (input.url) {
     try {
-      resolvedText = await fetchPageText(input.text);
+      pageText = await fetchPageText(input.url);
+      urlFetched = true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      return { success: false, error: `Could not fetch URL: ${msg}` };
+      if (!input.imageBase64 && !input.text) {
+        return { success: false, error: `Could not fetch URL: ${msg}` };
+      }
+      urlFetched = false;
+      urlError = msg;
     }
   }
 
@@ -148,13 +151,21 @@ export async function parseBagWithAI(input: {
       });
     }
 
-    if (resolvedText && input.imageBase64) {
+    // Build sources list for the user message
+    const sources: string[] = [];
+    if (input.imageBase64) sources.push("SOURCE 1 — bag photo (image above): extract roast date, price paid, bag weight, and any label text visible in the photo.");
+    if (pageText) sources.push(`SOURCE ${sources.length + 1} — product page: extract roaster, coffee name, country, region, farm, variety, process method, roast level, and tasting notes.\n\n${pageText}`);
+    if (input.text) sources.push(`SOURCE ${sources.length + 1} — additional notes: ${input.text}`);
+
+    if (sources.length > 1) {
       content.push({
         type: "text",
-        text: `Extract the coffee bag data from the image above AND the following text/page content. Combine information from both sources — use ALL details explicitly found in either.\n\n${resolvedText}`,
+        text: `Extract structured bag data from ALL sources below and map everything into the JSON fields.\n\n${sources.join("\n\n")}`,
       });
-    } else if (resolvedText) {
-      content.push({ type: "text", text: resolvedText });
+    } else if (pageText) {
+      content.push({ type: "text", text: pageText });
+    } else if (input.text) {
+      content.push({ type: "text", text: input.text });
     } else {
       content.push({
         type: "text",
@@ -184,7 +195,7 @@ export async function parseBagWithAI(input: {
     const jsonText = raw.text.slice(start, end + 1);
 
     const data: ParsedBagData = JSON.parse(jsonText);
-    return { success: true, data };
+    return { success: true, data, urlFetched, urlError };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return { success: false, error: `Parse failed: ${message}` };

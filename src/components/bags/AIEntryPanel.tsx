@@ -14,12 +14,14 @@ export default function AIEntryPanel({
   onTipLoading?: (loading: boolean) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [url, setUrl] = useState("");
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [parsedData, setParsedData] = useState<ParsedBagData | null>(null);
+  const [urlWarning, setUrlWarning] = useState<string | null>(null);
   const [isTipping, setIsTipping] = useState(false);
   const [tip, setTip] = useState<string | null>(null);
   const [tipError, setTipError] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export default function AIEntryPanel({
   // Resize to max 1200px and re-encode as JPEG — handles HEIC conversion and keeps payload under server action limit
   const prepareImage = (file: File): Promise<File> =>
     new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
+      const objUrl = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
         const maxDim = 1200;
@@ -37,17 +39,17 @@ export default function AIEntryPanel({
         canvas.width = Math.round(img.naturalWidth * scale);
         canvas.height = Math.round(img.naturalHeight * scale);
         const ctx = canvas.getContext("2d");
-        if (!ctx) { URL.revokeObjectURL(url); reject(new Error("Canvas unavailable")); return; }
+        if (!ctx) { URL.revokeObjectURL(objUrl); reject(new Error("Canvas unavailable")); return; }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         canvas.toBlob((blob) => {
-          URL.revokeObjectURL(url);
+          URL.revokeObjectURL(objUrl);
           if (!blob) { reject(new Error("Compression failed")); return; }
           const name = file.name.replace(/\.(heic|heif)$/i, ".jpg");
           resolve(new File([blob], name, { type: "image/jpeg" }));
         }, "image/jpeg", 0.85);
       };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not load image")); };
-      img.src = url;
+      img.onerror = () => { URL.revokeObjectURL(objUrl); reject(new Error("Could not load image")); };
+      img.src = objUrl;
     });
 
   const handleClose = () => {
@@ -56,6 +58,8 @@ export default function AIEntryPanel({
     setParsedData(null);
     setTip(null);
     setTipError(null);
+    setUrlWarning(null);
+    setUrl("");
     setText("");
     setImageFile(null);
   };
@@ -75,6 +79,7 @@ export default function AIEntryPanel({
       }
 
       const result = await parseBagWithAI({
+        url: url.trim() || undefined,
         text: text.trim() || undefined,
         imageBase64,
         imageMimeType,
@@ -87,6 +92,7 @@ export default function AIEntryPanel({
 
       onParsed(result.data);
       setParsedData(result.data);
+      setUrlWarning(result.urlFetched === false ? `Couldn't fetch URL (${result.urlError ?? "unknown error"}) — URL was skipped.` : null);
       setTip(null);
       setTipError(null);
 
@@ -108,7 +114,7 @@ export default function AIEntryPanel({
     }
   };
 
-  const canParse = (text.trim().length > 0 || imageFile !== null) && !isParsing && !isConverting;
+  const canParse = (url.trim().length > 0 || text.trim().length > 0 || imageFile !== null) && !isParsing && !isConverting;
 
   if (!isOpen) {
     return (
@@ -123,16 +129,7 @@ export default function AIEntryPanel({
             boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
           }}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2a10 10 0 1 0 10 10" />
             <path d="M12 6v6l4 2" />
             <path d="M22 2 12 12" />
@@ -193,6 +190,13 @@ export default function AIEntryPanel({
             ) : null}
           </div>
 
+          {/* URL fetch warning */}
+          {urlWarning && (
+            <div className="px-4 py-2.5 row-divider">
+              <p className="text-[13px]" style={{ color: "var(--warning)" }}>⚠ {urlWarning}</p>
+            </div>
+          )}
+
           {/* Dial-in tip section */}
           {(isTipping || tip || tipError) && (
             <div className="px-4 py-3">
@@ -231,19 +235,11 @@ export default function AIEntryPanel({
     <div className="px-4 mb-2">
       <div
         className="rounded-2xl overflow-hidden"
-        style={{
-          backgroundColor: "var(--card)",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
-        }}
+        style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
       >
         {/* Header */}
-        <div
-          className="row-divider flex items-center justify-between px-4 py-3"
-        >
-          <span
-            className="text-[15px] font-semibold"
-            style={{ color: "var(--text-primary)" }}
-          >
+        <div className="row-divider flex items-center justify-between px-4 py-3">
+          <span className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
             Parse with AI
           </span>
           <button
@@ -294,19 +290,31 @@ export default function AIEntryPanel({
           />
         </button>
 
-        {/* Text paste */}
+        {/* URL input */}
+        <div className="row-divider flex items-center px-6 min-h-[52px] gap-3">
+          <span className="text-[17px] shrink-0" style={{ color: "var(--text-primary)" }}>URL</span>
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://roaster.com/products/…"
+            className="flex-1 bg-transparent outline-none text-[17px] text-right placeholder:text-[var(--text-secondary)] min-w-0"
+            style={{ color: url ? "var(--accent)" : "var(--text-secondary)" }}
+            autoCapitalize="none"
+            autoCorrect="off"
+          />
+        </div>
+
+        {/* Notes */}
         <div className="px-6 py-3 row-divider">
-          <p
-            className="text-[13px] mb-2"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Paste a URL, description, tasting notes, or anything about the bag
+          <p className="text-[13px] mb-2" style={{ color: "var(--text-secondary)" }}>
+            Notes (optional — tasting notes, purchase info, anything extra)
           </p>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="https://metriccoffee.com/products/andale-market — or paste any description, notes, or text about the bag"
-            rows={4}
+            placeholder="Bought today at the roaster, $22, roasted last Thursday…"
+            rows={3}
             className="w-full bg-transparent outline-none text-[17px] resize-none placeholder:text-[var(--text-secondary)]"
             style={{ color: "var(--text-primary)" }}
           />
@@ -328,10 +336,7 @@ export default function AIEntryPanel({
             onClick={handleParse}
             disabled={!canParse}
             className="w-full py-3 rounded-full text-[17px] font-medium transition-opacity disabled:opacity-40"
-            style={{
-              backgroundColor: "var(--accent)",
-              color: "#FFFFFF",
-            }}
+            style={{ backgroundColor: "var(--accent)", color: "#FFFFFF" }}
           >
             {isParsing ? "Parsing…" : "Parse"}
           </button>
