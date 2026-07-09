@@ -498,6 +498,7 @@ export type RecentShotSummary = {
   tasteBalance: number | null;
   isLocked: boolean;
   isFailed: boolean;
+  lagG: number | null;
 };
 
 export async function getRecentShotsForAllBags(
@@ -510,7 +511,7 @@ export async function getRecentShotsForAllBags(
   const rows = await db.all(sql`
     SELECT id, bag_id, pulled_at, grind_setting, dose_g, grinder_retention_g,
            yield_g, shot_time_seconds, shot_rating, flow_characteristics,
-           taste_balance, is_locked, is_failed
+           taste_balance, is_locked, is_failed, lag_g
     FROM shots
     WHERE bag_id IN (${idList})
     ORDER BY bag_id, pulled_at DESC
@@ -519,7 +520,7 @@ export async function getRecentShotsForAllBags(
     dose_g: number; grinder_retention_g: number | null; yield_g: number | null;
     shot_time_seconds: number | null; shot_rating: number | null;
     flow_characteristics: string | null; taste_balance: number | null;
-    is_locked: number; is_failed: number | null;
+    is_locked: number; is_failed: number | null; lag_g: number | null;
   }[];
 
   const result: Record<number, RecentShotSummary[]> = {};
@@ -540,6 +541,7 @@ export async function getRecentShotsForAllBags(
       tasteBalance: row.taste_balance != null ? Number(row.taste_balance) : null,
       isLocked: Boolean(row.is_locked),
       isFailed: Boolean(row.is_failed),
+      lagG: row.lag_g != null ? Number(row.lag_g) : null,
     });
   }
   return result;

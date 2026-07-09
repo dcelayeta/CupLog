@@ -7,6 +7,7 @@ import type { BagOption, LastShotDefaults, RecentShotSummary } from "@/lib/shots
 import type { EquipmentProfile, ExtractionThreshold } from "@/db/schema";
 import { classifyTime, classifyRatio } from "@/lib/shots/classification";
 import { detectDrink, detectEspressoBase, ALL_DRINK_NAMES, DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
+import { TARGET_RATIOS } from "@/lib/shots/targetRatios";
 import ClassificationBadge from "./ClassificationBadge";
 import FlowIllustration from "./FlowIllustration";
 import PillRating from "./PillRating";
@@ -79,6 +80,34 @@ function LiveDrinkBar({ espressoMl, milkMl, foamMl, hotWaterMl, hasChocolate, ha
       ))}
     </div>
   );
+}
+
+function nearestPresetLabel(ratio: number): string {
+  let best = TARGET_RATIOS[0];
+  let bestDiff = Math.abs(ratio - best.ratio);
+  for (const preset of TARGET_RATIOS) {
+    const diff = Math.abs(ratio - preset.ratio);
+    if (diff < bestDiff) {
+      best = preset;
+      bestDiff = diff;
+    }
+  }
+  return best.label;
+}
+
+function lastShotRatioLabel(defaults: LastShotDefaults | undefined | null): string | null {
+  if (!defaults || defaults.yieldG == null || !defaults.doseG) return null;
+  const effectiveDose = defaults.grinderRetentionG != null
+    ? defaults.doseG - defaults.grinderRetentionG
+    : defaults.doseG;
+  if (!effectiveDose) return null;
+  return nearestPresetLabel(defaults.yieldG / effectiveDose);
+}
+
+function averageLag(shots: RecentShotSummary[]): number | null {
+  const lags = shots.filter((s) => !s.isFailed && s.lagG != null).map((s) => s.lagG as number);
+  if (lags.length === 0) return null;
+  return lags.reduce((a, b) => a + b, 0) / lags.length;
 }
 
 function parseNum(v: string) {
@@ -257,6 +286,9 @@ export default function LogFormClient({
   const [doseG, setDoseG] = useState(effectiveDefaults ? effectiveDefaults.doseG.toString() : "18");
   const [yieldG, setYieldG] = useState("36");
   const [shotTimeSeconds, setShotTimeSeconds] = useState("28");
+  const [targetRatioLabel, setTargetRatioLabel] = useState<string | null>(
+    lastShotRatioLabel(effectiveDefaults)
+  );
   const [grindSetting, setGrindSetting] = useState(
     effectiveDefaults?.grindSetting != null ? effectiveDefaults.grindSetting.toString() : ""
   );
@@ -312,6 +344,22 @@ export default function LogFormClient({
   // Derived live values
   const dose = parseNum(doseG);
   const yield_ = parseNum(yieldG);
+
+  // Target ratio preset: recompute suggested yield + time whenever the preset,
+  // dose, or retention changes — ratio math is based on adjusted (in-basket) dose.
+  useEffect(() => {
+    if (!targetRatioLabel) return;
+    const preset = TARGET_RATIOS.find((r) => r.label === targetRatioLabel);
+    const doseNum = parseNum(doseG);
+    if (!preset || doseNum === null) return;
+    const effectiveDose = doseNum - (parseNum(grinderRetentionG) ?? 0);
+    setYieldG((Math.round(effectiveDose * preset.ratio * 10) / 10).toFixed(1));
+    setShotTimeSeconds(Math.round((preset.timeMinSeconds + preset.timeMaxSeconds) / 2).toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doseG, grinderRetentionG, targetRatioLabel]);
+
+  const handleYieldChange = (v: string) => { setYieldG(v); setTargetRatioLabel(null); };
+  const handleShotTimeChange = (v: string) => { setShotTimeSeconds(v); setTargetRatioLabel(null); };
   const liveRatioDerived = dose && yield_ ? yield_ / dose : null;
   const liveRatio = liveRatioDerived ? liveRatioDerived.toFixed(2) : null;
   const liveTime = parseIntVal(shotTimeSeconds);
@@ -387,6 +435,7 @@ export default function LogFormClient({
                   setDistributionToolUsed(d.distributionToolUsed);
                   setPreinfusionSeconds(d.preinfusionSeconds?.toString() ?? "");
                 }
+                setTargetRatioLabel(lastShotRatioLabel(d));
               }}
               className="text-right outline-none bg-transparent text-[17px] max-w-[200px] truncate"
               style={{ color: "var(--accent)" }}
@@ -621,6 +670,53 @@ export default function LogFormClient({
             </div>
           )}
 
+          {/* ── Target Ratio ── */}
+          <div className="px-4 py-3" style={{ borderTop: "1px solid var(--separator)" }}>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Target Ratio</span>
+              {targetRatioLabel !== null && (
+                <button type="button" onClick={() => setTargetRatioLabel(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
+              )}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {TARGET_RATIOS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => setTargetRatioLabel(targetRatioLabel === preset.label ? null : preset.label)}
+                  className="text-[13px] font-medium px-3 py-1.5 rounded-full"
+                  style={
+                    targetRatioLabel === preset.label
+                      ? { backgroundColor: "var(--accent)", color: "#fff" }
+                      : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                  }
+                >
+                  {preset.label} · 1:{preset.ratio}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Target ratio inline info */}
+          {targetRatioLabel && dose !== null && (() => {
+            const preset = TARGET_RATIOS.find((r) => r.label === targetRatioLabel)!;
+            const effectiveDose = dose - (parseNum(grinderRetentionG) ?? 0);
+            const targetYield = Math.round(effectiveDose * preset.ratio * 10) / 10;
+            const avgLag = averageLag(recentShotsByBag?.[Number(bagId)] ?? []);
+            const stopAtG = avgLag !== null ? Math.round((targetYield - avgLag) * 10) / 10 : null;
+            return (
+              <div
+                className="px-6 py-2 flex items-center gap-2"
+                style={{ backgroundColor: "var(--card-secondary)" }}
+              >
+                <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                  target {targetYield.toFixed(1)}g in {preset.timeMinSeconds}–{preset.timeMaxSeconds}s
+                  {stopAtG !== null && ` (stop at ~${stopAtG.toFixed(1)}g)`}
+                </span>
+              </div>
+            );
+          })()}
+
           {/* ── Prep tools ── */}
           <div className="flex items-center px-6 min-h-[52px]" style={{ borderTop: "1px solid var(--separator)" }}>
             <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>WDT Used</span>
@@ -687,10 +783,10 @@ export default function LogFormClient({
             </div>
           </div>
           <Row label="Shot Time (s)">
-            <StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} />
+            <StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={handleShotTimeChange} step={1} min={0} max={120} />
           </Row>
           <Row label="Yield (g)">
-            <StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} />
+            <StepperInput name="yieldG" value={yieldG} onChange={handleYieldChange} step={0.1} min={0} max={100} />
           </Row>
           <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass)}>
             <StepperInput name="lagG" value={lagG} onChange={setLagG} step={1} min={0} max={20} />

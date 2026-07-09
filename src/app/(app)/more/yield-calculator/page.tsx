@@ -2,15 +2,7 @@
 
 import Link from "next/link";
 import { useState, useRef } from "react";
-
-const RATIOS: { label: string; ratio: number; description: string; time: string }[] = [
-  { label: "Turbo Ristretto", ratio: 1.0, description: "Very concentrated, intense",     time: "15–20s" },
-  { label: "Ristretto",       ratio: 1.5, description: "Short, syrupy, sweet-forward",   time: "20–25s" },
-  { label: "Espresso",        ratio: 2.0, description: "Standard espresso",               time: "25–30s" },
-  { label: "Normale",         ratio: 2.5, description: "Balanced, slightly longer",       time: "28–32s" },
-  { label: "Long Pull",       ratio: 3.0, description: "More volume, lighter body",       time: "35–40s" },
-  { label: "Lungo",           ratio: 4.0, description: "Extended pull, thin body",        time: "40–50s" },
-];
+import { TARGET_RATIOS, formatTimeRange } from "@/lib/shots/targetRatios";
 
 const PRESETS = [
   { label: "Single", dose: 9 },
@@ -174,7 +166,7 @@ export default function YieldCalculatorPage() {
           className="rounded-2xl overflow-hidden"
           style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
         >
-          {RATIOS.map((r, i) => {
+          {TARGET_RATIOS.map((r, i) => {
             const yield_ = Math.round(dose * r.ratio * 10) / 10;
             const isStandard = r.ratio >= STANDARD_MIN && r.ratio <= STANDARD_MAX;
             return (
@@ -191,7 +183,7 @@ export default function YieldCalculatorPage() {
                     {r.label}
                   </p>
                   <p className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
-                    {r.description} · {r.time}
+                    {r.description} · {formatTimeRange(r)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 ml-3">

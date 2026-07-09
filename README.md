@@ -114,6 +114,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] StepperInput (−/+ buttons) for dose, yield, grind, retention, milk, foam, hot water — avoids decimal keyboard on iOS
 - [x] Live ratio + classification badge preview
 - [x] Live adjusted dose display (`dose − retention`) and "stopped at Xg" lag helper
+- [x] Target Ratio picker in log form — Turbo Ristretto/Ristretto/Espresso/Normale/Long Pull/Lungo presets (shared with Yield Calculator); selecting one live-fills yield + shot time from the adjusted dose and tracks dose/retention changes; defaults to the nearest preset for the bean's last shot; shows a "target Xg in Y–Zs (stop at ~Wg)" hint using that bean's average lag; clears if yield/time are edited manually; purely a pull guide — doesn't affect Fast/Normal/Slow classification, which stays calibrated to standard espresso ratios
 - [x] Taste section: sour↔bitter spectrum (1=Very Sour · 4=Balanced · 7=Very Bitter) + 5-star shot rating
 - [x] Drink section: milk type/quantity, foam (5ml steps), hot water, live drink detection badge
 - [x] Pressure and temperature stored as schema defaults (9 bar, 93°C) — not shown in UI
