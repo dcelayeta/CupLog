@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { getDaysSinceRoast, getFreshnessLabel } from "@/lib/bags/freshness";
 import { classifyTime, classifyRatio } from "@/lib/shots/classification";
+import { classifyShotAgainstTarget } from "@/lib/shots/targetHit";
 import {
   getCoachingState,
   upsertCoachingState,
@@ -156,6 +157,7 @@ Summarize what happened — ratio, time, balance, and any notable observations f
 
 ### 2. What the Numbers Say
 - Compare time and ratio against database labels. Only bring in the industry standard comparison if the shot falls outside the industry standard ranges (time < 20s or > 45s; ratio < 1.5 or > 3.0) OR if Diego's configured label and the industry standard disagree — skip the standard comparison entirely when both say the same thing (e.g. both call it "fast"), as stating both adds no value
+- If current_shot.target is set, pick ONE framing per metric and state it once — either the target (hit/missed) or the classification label, never both stitched together with a "but." A pattern like "Time is Fast (industry under-extracted) — but you're pulling a ristretto intentionally, so that's expected" is a bug in your reasoning, not useful nuance: when a target explains the number, just say the target was hit and move on; don't also surface the generic label it would otherwise contradict
 - Does taste and balance match what numbers predict?
 - Do notes reveal anything numbers miss?
 - Flag contradictions explicitly
@@ -189,6 +191,12 @@ Meaningful pattern or improvement vs recent history. 1-2 sentences maximum. null
 ## Adjusted Dose
 
 When adjusted_dose_g is present in current_shot or a context shot, use it as the effective dose for all brewing calculations — brew ratio, extraction comparisons, and dose recommendations. The dose_g field is the raw ground amount before grinder retention; adjusted_dose_g = dose_g − grinder_retention_g is what actually ends up in the basket. Always reference adjusted dose in your analysis when it exists; mention the retention figure if it is notably high (≥1g).
+
+## Target Ratio (User Intention)
+
+current_shot.target may be null (no target style was picked — treat the shot on its own numbers) or an object describing the pull style Diego selected before pulling: intended_style, target_yield_g, target_time_range_seconds, hit_target, yield_delta_g, time_in_range, and closer_to_style (the style his pour actually matched, if he missed).
+
+Treat this as light supporting context, not the centerpiece of the analysis — one brief mention is enough, in whichever section it's most relevant (usually Shot Summary or the recommendation), not repeated across multiple sections. If hit_target is true, a short acknowledgment is enough ("nailed your Ristretto target"); don't dwell on it. If false, one sentence naming what style it landed closer to instead is enough — don't re-derive the miss from multiple angles. context_shots[].target_style can inform a pattern note (e.g. consistently running long) only if it's a real recurring pattern, not on every analysis.
 
 ## Bean Scoping
 
@@ -322,6 +330,29 @@ async function assembleUserMessage(shotId: number) {
   const timeClass = shot.shotTimeSeconds != null ? classifyTime(shot.shotTimeSeconds) : { label: "—" };
   const ratioClass = brewRatio != null ? classifyRatio(brewRatio) : { label: "—" };
 
+  // What the user was actually aiming for, vs. what happened — lets the AI
+  // coach toward the user's stated intention instead of a generic standard.
+  const targetInfo = shot.targetRatioLabel && shot.yieldG != null && shot.shotTimeSeconds != null
+    ? (() => {
+        const c = classifyShotAgainstTarget({
+          doseG: shot.doseG,
+          grinderRetentionG: shot.grinderRetentionG,
+          yieldG: shot.yieldG!,
+          shotTimeSeconds: shot.shotTimeSeconds!,
+          targetRatioLabel: shot.targetRatioLabel,
+        });
+        return {
+          intended_style: shot.targetRatioLabel,
+          target_yield_g: c.targetZone ? Math.round(c.targetZone.yieldForDose * 10) / 10 : null,
+          target_time_range_seconds: c.targetZone ? [c.targetZone.timeMinSeconds, c.targetZone.timeMaxSeconds] : null,
+          hit_target: c.hitTarget,
+          yield_delta_g: c.yieldDelta != null ? Math.round(c.yieldDelta * 10) / 10 : null,
+          time_in_range: c.timeInRange,
+          closer_to_style: c.nearMissZone?.label ?? null,
+        };
+      })()
+    : null;
+
   const userMessage = {
     request: "analyze_shot",
     analysis_mode: analysisMode,
@@ -406,6 +437,7 @@ async function assembleUserMessage(shotId: number) {
         shot_time_seconds: s.shotTimeSeconds,
         time_classification: s.shotTimeSeconds != null ? classifyTime(s.shotTimeSeconds).label : null,
         ratio_classification: r != null ? classifyRatio(r).label : null,
+        target_style: s.targetRatioLabel ?? null,
         balance: s.tasteBalance,
         shot_quality: s.shotRating,
         notes: s.notes,
@@ -432,6 +464,7 @@ async function assembleUserMessage(shotId: number) {
           : null,
       lag_g: shot.lagG,
       days_since_roast_at_pull: daysSinceRoast,
+      target: targetInfo,
       taste: {
         balance: shot.tasteBalance,
         shot_quality: shot.shotRating,

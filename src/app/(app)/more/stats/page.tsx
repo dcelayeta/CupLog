@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { db } from "@/db/client";
 import { sql } from "drizzle-orm";
+import { classifyShotAgainstTarget } from "@/lib/shots/targetHit";
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,49 @@ async function getScatterData(): Promise<ScatterPoint[][]> {
       timePoints.push({ x: Number(r.shot_time_seconds), y: tb, rating });
   }
   return [ratioPoints, timePoints];
+}
+
+interface YieldTimePoint { x: number; y: number; hit: "on" | "off" | "none"; }
+interface TargetTrackingData {
+  points: YieldTimePoint[];
+  onTarget: number;
+  offTarget: number;
+  noTarget: number;
+}
+
+async function getTargetTrackingData(): Promise<TargetTrackingData> {
+  const rows = await db.all(sql`
+    SELECT dose_g, grinder_retention_g, yield_g, shot_time_seconds, target_ratio_label
+    FROM shots
+    WHERE is_failed = 0 AND dose_g IS NOT NULL AND yield_g IS NOT NULL AND shot_time_seconds IS NOT NULL
+  `) as {
+    dose_g: number; grinder_retention_g: number | null;
+    yield_g: number; shot_time_seconds: number; target_ratio_label: string | null;
+  }[];
+
+  const points: YieldTimePoint[] = [];
+  let onTarget = 0, offTarget = 0, noTarget = 0;
+
+  for (const r of rows) {
+    const doseG = Number(r.dose_g);
+    const grinderRetentionG = r.grinder_retention_g != null ? Number(r.grinder_retention_g) : null;
+    const yieldG = Number(r.yield_g);
+    const shotTimeSeconds = Number(r.shot_time_seconds);
+    const targetRatioLabel = r.target_ratio_label;
+
+    let hit: YieldTimePoint["hit"] = "none";
+    if (targetRatioLabel) {
+      const { hitTarget } = classifyShotAgainstTarget({ doseG, grinderRetentionG, yieldG, shotTimeSeconds, targetRatioLabel });
+      hit = hitTarget ? "on" : "off";
+      if (hitTarget) onTarget++; else offTarget++;
+    } else {
+      noTarget++;
+    }
+
+    points.push({ x: shotTimeSeconds, y: yieldG, hit });
+  }
+
+  return { points, onTarget, offTarget, noTarget };
 }
 
 interface RatingTrendPoint { rating: number; tasteBalance: number | null; }
@@ -562,6 +606,80 @@ function ScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, xFormat }: {
   );
 }
 
+const HIT_COLORS = { on: "#34C759", off: "#FF9500", none: "#8E8E93" } as const;
+
+function YieldTimeScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, yMin, yMax, yTicks }: {
+  points: YieldTimePoint[]; title: string; subtitle: string;
+  xMin: number; xMax: number; xTicks: number[];
+  yMin: number; yMax: number; yTicks: number[];
+}) {
+  const W = 300, H = 190, padL = 30, padR = 10, padT = 12, padB = 28;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const xPos = (v: number) => padL + (v - xMin) / (xMax - xMin) * plotW;
+  const yPos = (v: number) => padT + (yMax - v) / (yMax - yMin) * plotH;
+
+  return (
+    <div className="rounded-2xl overflow-hidden mb-4"
+      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+      <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
+        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
+      </div>
+      {points.length === 0 ? (
+        <div className="px-4 py-8 text-center">
+          <p className="text-[15px]" style={{ color: "var(--text-secondary)" }}>No data yet</p>
+        </div>
+      ) : (
+        <>
+          <div className="px-2">
+            <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+              {yTicks.map(v => (
+                <g key={v}>
+                  <line x1={padL} y1={yPos(v)} x2={padL + plotW} y2={yPos(v)}
+                    style={{ stroke: "var(--divider)" }} strokeWidth={0.5} />
+                  <text x={padL - 4} y={yPos(v) + 3} textAnchor="end" fontSize={8}
+                    fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+                    {v}g
+                  </text>
+                </g>
+              ))}
+              {xTicks.map(v => (
+                <g key={v}>
+                  <line x1={xPos(v)} y1={padT + plotH} x2={xPos(v)} y2={padT + plotH + 4}
+                    style={{ stroke: "var(--divider)" }} strokeWidth={1} />
+                  <text x={xPos(v)} y={H - 5} textAnchor="middle" fontSize={8}
+                    fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+                    {v}s
+                  </text>
+                </g>
+              ))}
+              {points.map((pt, i) => {
+                const cx = xPos(pt.x), cy = yPos(pt.y);
+                if (cx < padL || cx > padL + plotW || cy < padT || cy > padT + plotH) return null;
+                return <circle key={i} cx={cx} cy={cy} r={3.5} fill={HIT_COLORS[pt.hit]} opacity={0.72} />;
+              })}
+            </svg>
+          </div>
+          <div className="px-4 pb-3 flex items-center gap-3 flex-wrap">
+            <span className="flex items-center gap-1">
+              <svg width="8" height="8" style={{ flexShrink: 0 }}><circle cx="4" cy="4" r="3.5" fill={HIT_COLORS.on} /></svg>
+              <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>on target</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <svg width="8" height="8" style={{ flexShrink: 0 }}><circle cx="4" cy="4" r="3.5" fill={HIT_COLORS.off} /></svg>
+              <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>off target</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <svg width="8" height="8" style={{ flexShrink: 0 }}><circle cx="4" cy="4" r="3.5" fill={HIT_COLORS.none} /></svg>
+              <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>no target</span>
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TrendChart({ points, title, subtitle, yMin, yMax, yTicks, yFormat, connectLine = false, rollingWindow = 0, legend, stat, statColor }: {
   points: Array<{ y: number; color: string }>;
   title: string; subtitle: string;
@@ -858,7 +976,7 @@ export default async function StatsPage() {
     ratingTrend, freshnessPoints, retentionValues, flowRateDist,
     roastTypeDist, shotsPerCoffee, processMethodDist, originRatingDist, blendDist,
     drinkTypeDist, drinkRatingTrend, shotVsDrinkRatings,
-    failedStats, flowCharStats, latteArtStats,
+    failedStats, flowCharStats, latteArtStats, targetTracking,
   ] = await Promise.all([
     getRatingDistribution(),
     getTasteDistribution(),
@@ -878,6 +996,7 @@ export default async function StatsPage() {
     getFailedShotStats(),
     getFlowCharacteristicsStats(),
     getLatteArtStats(),
+    getTargetTrackingData(),
   ]);
 
   const ratingBars: BarSpec[] = [
@@ -915,6 +1034,26 @@ export default async function StatsPage() {
     color: flowZoneColor(b),
   }));
   const totalFlowRated = flowBars.reduce((a, b) => a + b.count, 0);
+
+  // Target accuracy — bars scaled only to On/Off so the (usually much larger)
+  // "no target" count doesn't crush the comparison that actually matters;
+  // it's surfaced as a footnote instead.
+  const targetBars: BarSpec[] = [
+    { label: "On", count: targetTracking.onTarget, color: "#34C759" },
+    { label: "Off", count: targetTracking.offTarget, color: "#FF9500" },
+  ];
+  const totalTargeted = targetTracking.onTarget + targetTracking.offTarget;
+  const targetHitRate = totalTargeted > 0 ? (targetTracking.onTarget / totalTargeted) * 100 : null;
+
+  const yieldValues = targetTracking.points.map(p => p.y);
+  let yieldAxisMin = 10, yieldAxisMax = 60, yieldAxisTicks = [20, 40, 60];
+  if (yieldValues.length > 0) {
+    const lo = Math.min(...yieldValues), hi = Math.max(...yieldValues);
+    yieldAxisMin = Math.max(0, Math.floor(lo / 10) * 10 - 10);
+    yieldAxisMax = Math.ceil(hi / 10) * 10 + 10;
+    yieldAxisTicks = [];
+    for (let v = Math.ceil(yieldAxisMin / 10) * 10; v <= yieldAxisMax; v += 10) yieldAxisTicks.push(v);
+  }
 
   // Averages for stat lines
   const avgRating = totalRated > 0
@@ -1127,6 +1266,25 @@ export default async function StatsPage() {
           xTicks={[20, 30, 40, 50]}
           xFormat={v => `${v}s`}
         />
+        <YieldTimeScatterPlot
+          points={targetTracking.points}
+          title="Yield vs time"
+          subtitle={`${targetTracking.points.length} shots`}
+          xMin={15} xMax={60}
+          xTicks={[20, 30, 40, 50, 60]}
+          yMin={yieldAxisMin} yMax={yieldAxisMax}
+          yTicks={yieldAxisTicks}
+        />
+        {totalTargeted > 0 && (
+          <BarChart
+            bars={targetBars}
+            title="Target accuracy"
+            subtitle={`${totalTargeted} targeted`}
+            stat={targetHitRate != null ? `${targetHitRate.toFixed(0)}% on target` : undefined}
+            statColor="#34C759"
+            footnote={targetTracking.noTarget > 0 ? `${targetTracking.noTarget} shot${targetTracking.noTarget !== 1 ? "s" : ""} have no target set` : undefined}
+          />
+        )}
         <TrendChart
           points={retentionPoints}
           title="Grinder retention"

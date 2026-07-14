@@ -1,6 +1,5 @@
-import { TARGET_RATIOS } from "@/lib/shots/targetRatios";
+import { classifyShotAgainstTarget, YIELD_TOLERANCE_G } from "@/lib/shots/targetHit";
 
-const YIELD_TOLERANCE_G = 3; // a bit lax to absorb lag-drip variance around the averaged "stop at" hint
 const MAX_TIME_SECONDS = 60; // most machines (e.g. Bambino) auto-stop the shot at 60s
 const MAX_YIELD_G = 80;
 const TIME_TICK_STEP = 5;
@@ -36,35 +35,9 @@ export default function ShotTargetChart({
   const effectiveDose = grinderRetentionG != null ? doseG - grinderRetentionG : doseG;
   if (effectiveDose <= 0) return null;
 
-  // Each preset's target yield scales linearly with dose (yield = dose × ratio).
-  const zones = TARGET_RATIOS.map((preset) => ({
-    ...preset,
-    yieldForDose: effectiveDose * preset.ratio,
-  }));
-
-  const targetZone = zones.find((z) => z.label === targetRatioLabel) ?? null;
-
-  const actualRatio = yieldG / effectiveDose;
-  const nearestActualZone = zones.reduce((best, z) =>
-    Math.abs(z.ratio - actualRatio) < Math.abs(best.ratio - actualRatio) ? z : best
-  , zones[0]);
-
-  const yieldDelta = targetZone ? yieldG - targetZone.yieldForDose : null;
-  const timeInRange = targetZone
-    ? shotTimeSeconds >= targetZone.timeMinSeconds && shotTimeSeconds <= targetZone.timeMaxSeconds
-    : null;
-  const yieldInRange = yieldDelta !== null ? Math.abs(yieldDelta) <= YIELD_TOLERANCE_G : null;
-  const hitTarget = timeInRange === true && yieldInRange === true;
+  const { zones, targetZone, yieldDelta, timeInRange, yieldInRange, hitTarget, nearMissZone } =
+    classifyShotAgainstTarget({ doseG, grinderRetentionG, yieldG, shotTimeSeconds, targetRatioLabel });
   const dotColor = targetZone ? (hitTarget ? "#34C759" : "#FF9500") : "#8E8E93";
-
-  // If the shot missed its target but landed closer to a different style,
-  // surface that zone too so it's clear what actually happened. When there's
-  // no recorded target at all, use the closest style as an orange reference.
-  const nearMissZone = !targetZone
-    ? nearestActualZone
-    : !hitTarget && nearestActualZone.label !== targetZone.label
-      ? nearestActualZone
-      : null;
 
   const W = 320, H = 230;
   const PAD = { l: 34, r: 16, t: 20, b: 24 };

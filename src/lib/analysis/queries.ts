@@ -284,6 +284,7 @@ export async function getContextShots(
     grinderRetentionG: shots.grinderRetentionG,
     yieldG: shots.yieldG,
     shotTimeSeconds: shots.shotTimeSeconds,
+    targetRatioLabel: shots.targetRatioLabel,
     tasteBalance: shots.tasteBalance,
     shotRating: shots.shotRating,
     notes: shots.notes,

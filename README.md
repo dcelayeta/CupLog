@@ -125,7 +125,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Lock badge on history cards — purple pill with lock icon for locked shots
 - [x] Shot detail — all fields, classifications, freshness badge, taste display, drink composition bar; flow illustration shown inline when flow was logged
 - [x] `targetRatioLabel` persisted per shot (log + edit forms) — the intended pull style, independent of measured yield/time
-- [x] Target vs. actual chart on shot detail — time × yield scatter zoomed to fit the target zone (and a "near-miss" zone if the shot landed closer to a different style), bordered colored bands (blue = target, orange = near-miss) sized to the real ±3g yield tolerance, dot color-coded hit/miss, actual `(time, yield)` labeled next to the dot in matching color; axes fixed to realistic bounds (60s machine auto-stop, 80g ceiling); shots with no recorded target still show the closest matching style as an orange reference zone
+- [x] Target vs. actual chart on shot detail — time × yield scatter zoomed to fit the target zone (and a "near-miss" zone if the shot landed closer to a different style), bordered colored bands (blue = target, orange = near-miss) sized to the real ±3g yield tolerance, dot color-coded hit/miss, actual `(time, yield)` labeled next to the dot in matching color; axes fixed to realistic bounds (60s machine auto-stop, 80g ceiling); shots with no recorded target still show the closest matching style as an orange reference zone; hit/miss classification lives in `src/lib/shots/targetHit.ts`, shared with the Stats page and AI analysis so all three can't drift apart
 - [x] `ClientDateTime` uses a hand-rolled date/time formatter instead of `toLocaleString` — avoids SSR/hydration mismatches from Node ICU version differences in the en-US separator
 - [x] Dialed In Recipe card on bag detail — shows grind, adjusted dose, target yield range (±2g) from most recent locked shot; "Edit locked shot" link
 - [x] Log form shows locked parameters (grind, adjusted dose, target yield) and AI recommendation inline between Bean and Shot sections
@@ -133,6 +133,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Edit shot (including drink), delete shot (confirm step)
 - [x] Parameters locked toggle in edit form — manually lock/unlock shot parameters
 - [x] AI shot analysis — structured coaching response; verdict badge; cached in DB; never re-calls API on return visits
+- [x] AI analysis includes the shot's target ratio intention (`current_shot.target`: intended style, target yield/time, hit/miss, what style it landed closer to if missed) plus `target_style` on recent context shots — lets the coach reason about intention vs. result instead of only the raw numbers; prompt tuned to mention it once briefly rather than re-deriving the hit/miss against the industry-standard label
 - [x] `is_stable` flag on AI analysis — set by Claude when recommendation is to hold all parameters unchanged; auto-locks the shot (`isLocked = true`); stable format: "Lock grind X, dose Yg, target Z1–Z2g yield."
 - [x] Latte art tracking — 5-level artist scale (Pollock → Calder → Picasso → Monet → Van Gogh) on eligible drinks; picker in log/edit forms; displayed on shot detail and drink list
 
@@ -148,6 +149,8 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Failed shots section — failure reason horizontal bar chart
 
 **Technique section**
+- [x] Yield vs time scatter (all shots) — dots color-coded on-target/off-target/no-target using the shared `classifyShotAgainstTarget` logic; y-axis auto-scaled to data
+- [x] Target accuracy bar chart — On/Off counts (bars scaled to each other, not crushed by the much larger "no target" bucket) with a "X% on target" stat line; no-target count shown as a footnote
 - [x] Grinder retention trend — connected dots to surface drift/cleaning need
 - [x] Roast age vs taste scatter — validates freshness window effectiveness
 
