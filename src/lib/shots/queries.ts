@@ -58,6 +58,7 @@ export type ShotDetail = {
   doseG: number;
   yieldG: number | null;
   shotTimeSeconds: number | null;
+  targetRatioLabel: string | null;
   lagG: number | null;
   preinfusionSeconds: number | null;
   temperatureC: number | null;
@@ -413,6 +414,7 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       doseG: shots.doseG,
       yieldG: shots.yieldG,
       shotTimeSeconds: shots.shotTimeSeconds,
+      targetRatioLabel: shots.targetRatioLabel,
       lagG: shots.lagG,
       preinfusionSeconds: shots.preinfusionSeconds,
       temperatureC: shots.temperatureC,

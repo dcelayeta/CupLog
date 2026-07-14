@@ -124,6 +124,9 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Archived bag label (`[Archived]`) on shots from removed bags
 - [x] Lock badge on history cards — purple pill with lock icon for locked shots
 - [x] Shot detail — all fields, classifications, freshness badge, taste display, drink composition bar; flow illustration shown inline when flow was logged
+- [x] `targetRatioLabel` persisted per shot (log + edit forms) — the intended pull style, independent of measured yield/time
+- [x] Target vs. actual chart on shot detail — time × yield scatter zoomed to fit the target zone (and a "near-miss" zone if the shot landed closer to a different style), unlabeled colored bands (blue = target, orange = near-miss) sized to the real ±3g yield tolerance, dot color-coded hit/miss, actual `(time, yield)` labeled next to the dot in matching color; axes fixed to realistic bounds (60s machine auto-stop, 80g ceiling)
+- [x] `ClientDateTime` uses a hand-rolled date/time formatter instead of `toLocaleString` — avoids SSR/hydration mismatches from Node ICU version differences in the en-US separator
 - [x] Dialed In Recipe card on bag detail — shows grind, adjusted dose, target yield range (±2g) from most recent locked shot; "Edit locked shot" link
 - [x] Log form shows locked parameters (grind, adjusted dose, target yield) and AI recommendation inline between Bean and Shot sections
 - [x] Parameters locked banner on shot detail — purple banner above shot section when `isLocked = true`
@@ -175,6 +178,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 ### More → Recipes (Static Reference)
 - [x] Visual espresso drink guide — 20+ drinks with composition bars and proportions
 - [x] "Latte Art" badge on eligible drinks (Cortado, Flat White, Cappuccino, Latte, Mocha, Dirty Chai)
+- [x] Espresso ratio shown for drinks with a real convention (Macchiato/Cortado/Affogato → Espresso 1:2, Flat White → Doppio 1:2), pulled from the shared `TARGET_RATIOS` module; drinks without a fixed convention stay "Any"
 
 ### More → Extraction Thresholds
 - [x] Inline editor for time and ratio classification ranges
@@ -187,7 +191,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 
 ### More → Yield Calculator
 - [x] Dose stepper (0.1g steps, 1–30g range) with ±/+ buttons
-- [x] Yields table for 6 standard ratios: Turbo Ristretto (1:1) · Ristretto (1:1.5) · Espresso (1:2) · Normale (1:2.5) · Long Pull (1:3) · Lungo (1:4)
+- [x] Yields table for 6 standard ratios: Turbo Ristretto (1:1) · Ristretto (1:1.5) · Espresso (1:2) · Normale (1:2.5) · Long Pull (1:3) · Lungo (1:4) — presets defined once in `src/lib/shots/targetRatios.ts`, shared with the log form's Target Ratio picker and the recipe reference
 - [x] Standard espresso range (1:1.5–1:2.5) highlighted with accent color and accent pill badge
 - [x] Ratio label, yield in grams, and style description per row
 
@@ -244,6 +248,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 
 | Alias | Command |
 |---|---|
+| `yield-start` | `cd` to the repo and start the local dev server |
 | `yield-backup` | Dump prod DB to timestamped `.sql` file |
 | `yield-shell` | Open Turso prod DB shell |
 | `yield-deploy` | `vercel --prod` |

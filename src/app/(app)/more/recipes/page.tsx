@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { TARGET_RATIOS } from "@/lib/shots/targetRatios";
 
 const MAX_ML = 300;
+
+const ESPRESSO_RATIO = TARGET_RATIOS.find((r) => r.label === "Espresso")!.ratio;
 
 type DrinkVolumes = {
   espresso: number;
@@ -55,7 +58,7 @@ const DRINKS = [
   },
   {
     name: "Macchiato",
-    base: "Espresso",
+    base: `Espresso · 1:${ESPRESSO_RATIO}`,
     milk: null, foam: "20ml", hotWater: null, extras: null,
     description: "Espresso 'stained' with a small dollop of foam.",
     latteArt: false,
@@ -63,7 +66,7 @@ const DRINKS = [
   },
   {
     name: "Cortado",
-    base: "Espresso",
+    base: `Espresso · 1:${ESPRESSO_RATIO}`,
     milk: "30ml steamed", foam: "10ml", hotWater: null, extras: null,
     description: "Equal parts espresso and steamed milk. Minimal foam.",
     latteArt: true,
@@ -71,7 +74,7 @@ const DRINKS = [
   },
   {
     name: "Flat White",
-    base: "Doppio",
+    base: `Doppio · 1:${ESPRESSO_RATIO}`,
     milk: "120ml steamed", foam: "10ml microfoam", hotWater: null, extras: null,
     description: "Doppio with velvety microfoam. Stronger than a latte.",
     latteArt: true,
@@ -103,7 +106,7 @@ const DRINKS = [
   },
   {
     name: "Affogato",
-    base: "Espresso",
+    base: `Espresso · 1:${ESPRESSO_RATIO}`,
     milk: null, foam: null, hotWater: null, extras: "Ice cream (1 scoop)",
     description: "Hot espresso poured over a scoop of vanilla ice cream.",
     latteArt: false,

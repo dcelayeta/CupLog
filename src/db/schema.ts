@@ -127,6 +127,7 @@ export const shots = sqliteTable("shots", {
   doseG: real("dose_g").notNull(),
   yieldG: real("yield_g"),
   shotTimeSeconds: integer("shot_time_seconds"),
+  targetRatioLabel: text("target_ratio_label"), // intended pull style (Ristretto, Espresso, ...) — the user's target, not derived from actual yield/time
   lagG: real("lag_g"), // grams that drip through after pressing stop (no 3-way valve)
   preinfusionSeconds: integer("preinfusion_seconds"),
   temperatureC: real("temperature_c").default(93),

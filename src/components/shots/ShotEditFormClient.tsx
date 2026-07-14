@@ -5,6 +5,7 @@ import { deleteShot } from "@/lib/shots/actions";
 import type { ShotDetail, BagOption } from "@/lib/shots/queries";
 import { classifyTime, classifyRatio } from "@/lib/shots/classification";
 import { detectDrink, detectEspressoBase, ALL_DRINK_NAMES, DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
+import { TARGET_RATIOS } from "@/lib/shots/targetRatios";
 import ClassificationBadge from "./ClassificationBadge";
 import TasteBalanceControl from "./TasteBalanceControl";
 import ShotStarRating from "./ShotStarRating";
@@ -241,6 +242,7 @@ export default function ShotEditFormClient({
   const [isLocked, setIsLocked] = useState(shot.isLocked);
   const [distributionToolUsed, setDistributionToolUsed] = useState(shot.distributionToolUsed);
   const [grinderRetentionG, setGrinderRetentionG] = useState(shot.grinderRetentionG?.toString() ?? "");
+  const [targetRatioLabel, setTargetRatioLabel] = useState<string | null>(shot.targetRatioLabel ?? null);
 
   // Taste
   const [tasteBalance, setTasteBalance] = useState<number | null>(shot.tasteBalance);
@@ -320,6 +322,7 @@ export default function ShotEditFormClient({
         <input type="hidden" name="isLocked" value={isLocked ? "true" : "false"} />
         <input type="hidden" name="distributionToolUsed" value={distributionToolUsed ? "true" : "false"} />
         <input type="hidden" name="flowCharacteristics" value={flowCharacteristics ?? ""} />
+        <input type="hidden" name="targetRatioLabel" value={targetRatioLabel ?? ""} />
         <input type="hidden" name="includeDrink" value={(!isFailed && includeDrink) ? "true" : "false"} />
         <input type="hidden" name="isFailed" value={isFailed ? "true" : "false"} />
         {isFailed && failReason && <input type="hidden" name="failReason" value={failReason} />}
@@ -361,6 +364,33 @@ export default function ShotEditFormClient({
               <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Adjusted dose {adjDose.toFixed(1)}g</span>
             </div>
           )}
+
+          {/* Target Ratio */}
+          <div className="px-4 py-3" style={{ borderTop: "1px solid var(--separator)" }}>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Target Ratio</span>
+              {targetRatioLabel !== null && (
+                <button type="button" onClick={() => setTargetRatioLabel(null)} className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Clear</button>
+              )}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {TARGET_RATIOS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => setTargetRatioLabel(targetRatioLabel === preset.label ? null : preset.label)}
+                  className="text-[13px] font-medium px-3 py-1.5 rounded-full"
+                  style={
+                    targetRatioLabel === preset.label
+                      ? { backgroundColor: "var(--accent)", color: "#fff" }
+                      : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                  }
+                >
+                  {preset.label} · 1:{preset.ratio}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Puck prep */}
           <div className="flex items-center px-6 min-h-[52px]" style={{ borderTop: "1px solid var(--separator)" }}>

@@ -110,6 +110,23 @@ function averageLag(shots: RecentShotSummary[]): number | null {
   return lags.reduce((a, b) => a + b, 0) / lags.length;
 }
 
+// One-time convenience fill for Yield/Shot Time when a target ratio preset is
+// picked — a starting guess, not a binding they stay synced to afterward.
+function computeTargetFill(
+  doseNum: number,
+  retentionNum: number,
+  presetLabel: string | null
+): { yieldG: string; shotTimeSeconds: string } | null {
+  if (!presetLabel) return null;
+  const preset = TARGET_RATIOS.find((r) => r.label === presetLabel);
+  if (!preset) return null;
+  const effectiveDose = doseNum - retentionNum;
+  return {
+    yieldG: (Math.round(effectiveDose * preset.ratio * 10) / 10).toFixed(1),
+    shotTimeSeconds: Math.round((preset.timeMinSeconds + preset.timeMaxSeconds) / 2).toString(),
+  };
+}
+
 function parseNum(v: string) {
   const n = parseFloat(v);
   return isNaN(n) ? null : n;
@@ -282,13 +299,16 @@ export default function LogFormClient({
   )?.toString() ?? "";
 
   // Shot fields
+  const initialTargetRatioLabel = lastShotRatioLabel(effectiveDefaults);
+  const initialTargetFill = effectiveDefaults
+    ? computeTargetFill(effectiveDefaults.doseG, effectiveDefaults.grinderRetentionG ?? 0, initialTargetRatioLabel)
+    : null;
+
   const [bagId, setBagId] = useState(initialBagId);
   const [doseG, setDoseG] = useState(effectiveDefaults ? effectiveDefaults.doseG.toString() : "18");
-  const [yieldG, setYieldG] = useState("36");
-  const [shotTimeSeconds, setShotTimeSeconds] = useState("28");
-  const [targetRatioLabel, setTargetRatioLabel] = useState<string | null>(
-    lastShotRatioLabel(effectiveDefaults)
-  );
+  const [yieldG, setYieldG] = useState(initialTargetFill ? initialTargetFill.yieldG : "36");
+  const [shotTimeSeconds, setShotTimeSeconds] = useState(initialTargetFill ? initialTargetFill.shotTimeSeconds : "28");
+  const [targetRatioLabel, setTargetRatioLabel] = useState<string | null>(initialTargetRatioLabel);
   const [grindSetting, setGrindSetting] = useState(
     effectiveDefaults?.grindSetting != null ? effectiveDefaults.grindSetting.toString() : ""
   );
@@ -345,21 +365,21 @@ export default function LogFormClient({
   const dose = parseNum(doseG);
   const yield_ = parseNum(yieldG);
 
-  // Target ratio preset: recompute suggested yield + time whenever the preset,
-  // dose, or retention changes — ratio math is based on adjusted (in-basket) dose.
-  useEffect(() => {
-    if (!targetRatioLabel) return;
-    const preset = TARGET_RATIOS.find((r) => r.label === targetRatioLabel);
+  // Target ratio preset: fills Yield/Shot Time as a one-time starting guess
+  // when picked (see applyTargetRatio below). It's the intended style, not a
+  // binding — editing the actual measured Yield/Shot Time never clears it.
+  const applyTargetRatio = (label: string) => {
+    const next = targetRatioLabel === label ? null : label;
+    setTargetRatioLabel(next);
     const doseNum = parseNum(doseG);
-    if (!preset || doseNum === null) return;
-    const effectiveDose = doseNum - (parseNum(grinderRetentionG) ?? 0);
-    setYieldG((Math.round(effectiveDose * preset.ratio * 10) / 10).toFixed(1));
-    setShotTimeSeconds(Math.round((preset.timeMinSeconds + preset.timeMaxSeconds) / 2).toString());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doseG, grinderRetentionG, targetRatioLabel]);
-
-  const handleYieldChange = (v: string) => { setYieldG(v); setTargetRatioLabel(null); };
-  const handleShotTimeChange = (v: string) => { setShotTimeSeconds(v); setTargetRatioLabel(null); };
+    if (next && doseNum !== null) {
+      const fill = computeTargetFill(doseNum, parseNum(grinderRetentionG) ?? 0, next);
+      if (fill) {
+        setYieldG(fill.yieldG);
+        setShotTimeSeconds(fill.shotTimeSeconds);
+      }
+    }
+  };
   const liveRatioDerived = dose && yield_ ? yield_ / dose : null;
   const liveRatio = liveRatioDerived ? liveRatioDerived.toFixed(2) : null;
   const liveTime = parseIntVal(shotTimeSeconds);
@@ -403,6 +423,7 @@ export default function LogFormClient({
         <input type="hidden" name="wdtUsed" value={wdtUsed ? "true" : "false"} />
         <input type="hidden" name="distributionToolUsed" value={distributionToolUsed ? "true" : "false"} />
         <input type="hidden" name="flowCharacteristics" value={flowCharacteristics ?? ""} />
+        <input type="hidden" name="targetRatioLabel" value={targetRatioLabel ?? ""} />
         <input type="hidden" name="includeDrink" value={includeDrink ? "true" : "false"} />
         <input type="hidden" name="isFailed" value={isFailed ? "true" : "false"} />
         {isFailed && failReason && <input type="hidden" name="failReason" value={failReason} />}
@@ -435,7 +456,13 @@ export default function LogFormClient({
                   setDistributionToolUsed(d.distributionToolUsed);
                   setPreinfusionSeconds(d.preinfusionSeconds?.toString() ?? "");
                 }
-                setTargetRatioLabel(lastShotRatioLabel(d));
+                const newRatioLabel = lastShotRatioLabel(d);
+                setTargetRatioLabel(newRatioLabel);
+                const fill = d ? computeTargetFill(d.doseG, d.grinderRetentionG ?? 0, newRatioLabel) : null;
+                if (fill) {
+                  setYieldG(fill.yieldG);
+                  setShotTimeSeconds(fill.shotTimeSeconds);
+                }
               }}
               className="text-right outline-none bg-transparent text-[17px] max-w-[200px] truncate"
               style={{ color: "var(--accent)" }}
@@ -683,7 +710,7 @@ export default function LogFormClient({
                 <button
                   key={preset.label}
                   type="button"
-                  onClick={() => setTargetRatioLabel(targetRatioLabel === preset.label ? null : preset.label)}
+                  onClick={() => applyTargetRatio(preset.label)}
                   className="text-[13px] font-medium px-3 py-1.5 rounded-full"
                   style={
                     targetRatioLabel === preset.label
@@ -783,10 +810,10 @@ export default function LogFormClient({
             </div>
           </div>
           <Row label="Shot Time (s)">
-            <StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={handleShotTimeChange} step={1} min={0} max={120} />
+            <StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} />
           </Row>
           <Row label="Yield (g)">
-            <StepperInput name="yieldG" value={yieldG} onChange={handleYieldChange} step={0.1} min={0} max={100} />
+            <StepperInput name="yieldG" value={yieldG} onChange={setYieldG} step={0.1} min={0} max={100} />
           </Row>
           <Row label="Lag (g)" noDivider={!!(liveRatio || timeClass || ratioClass)}>
             <StepperInput name="lagG" value={lagG} onChange={setLagG} step={1} min={0} max={20} />

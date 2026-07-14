@@ -10,6 +10,7 @@ import { getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/
 import TasteBalanceDisplay from "@/components/shots/TasteBalanceDisplay";
 import ShotAnalysisClient from "@/components/shots/ShotAnalysisClient";
 import FlowIllustration from "@/components/shots/FlowIllustration";
+import ShotTargetChart from "@/components/shots/ShotTargetChart";
 
 
 function DetailRow({ label, value, noDivider }: { label: string; value: React.ReactNode; noDivider?: boolean }) {
@@ -305,6 +306,25 @@ export default async function ShotDetailPage({
           </CalcBand>
         )}
       </div>
+
+      {/* Target vs. actual */}
+      {!shot.isFailed && shot.yieldG != null && shot.shotTimeSeconds != null && (
+        <>
+          <SectionHeader title="Target" />
+          <div
+            className="mx-4 rounded-2xl overflow-hidden"
+            style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+          >
+            <ShotTargetChart
+              doseG={shot.doseG}
+              grinderRetentionG={shot.grinderRetentionG}
+              yieldG={shot.yieldG}
+              shotTimeSeconds={shot.shotTimeSeconds}
+              targetRatioLabel={shot.targetRatioLabel}
+            />
+          </div>
+        </>
+      )}
 
       {/* Taste */}
       {(shot.tasteBalance !== null || shot.shotRating !== null) && (
