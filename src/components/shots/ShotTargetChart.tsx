@@ -58,35 +58,37 @@ export default function ShotTargetChart({
   const dotColor = targetZone ? (hitTarget ? "#34C759" : "#FF9500") : "#8E8E93";
 
   // If the shot missed its target but landed closer to a different style,
-  // surface that zone too so it's clear what actually happened.
-  const nearMissZone =
-    !hitTarget && targetZone && nearestActualZone.label !== targetZone.label ? nearestActualZone : null;
+  // surface that zone too so it's clear what actually happened. When there's
+  // no recorded target at all, use the closest style as an orange reference.
+  const nearMissZone = !targetZone
+    ? nearestActualZone
+    : !hitTarget && nearestActualZone.label !== targetZone.label
+      ? nearestActualZone
+      : null;
 
   const W = 320, H = 230;
   const PAD = { l: 34, r: 16, t: 20, b: 24 };
   const cw = W - PAD.l - PAD.r;
   const ch = H - PAD.t - PAD.b;
 
-  // Zoom the axes to fit the target zone, any near-miss zone, and the actual
-  // shot — padded and rounded to tick steps — instead of a fixed wide frame
-  // that's mostly empty for any single shot. Falls back to the full range
-  // when there's no target to frame around.
-  const focusPoints: { time: number; yield: number }[] = targetZone
-    ? [
-        { time: targetZone.timeMinSeconds, yield: targetZone.yieldForDose },
-        { time: targetZone.timeMaxSeconds, yield: targetZone.yieldForDose },
-        { time: shotTimeSeconds, yield: yieldG },
-        ...(nearMissZone
-          ? [
-              { time: nearMissZone.timeMinSeconds, yield: nearMissZone.yieldForDose },
-              { time: nearMissZone.timeMaxSeconds, yield: nearMissZone.yieldForDose },
-            ]
-          : []),
-      ]
-    : [
-        { time: zones[0].timeMinSeconds, yield: zones[0].yieldForDose },
-        { time: zones[zones.length - 1].timeMaxSeconds, yield: zones[zones.length - 1].yieldForDose },
-      ];
+  // Zoom the axes to fit the target zone, any near-miss/reference zone, and
+  // the actual shot — padded and rounded to tick steps — instead of a fixed
+  // wide frame that's mostly empty for any single shot.
+  const focusPoints: { time: number; yield: number }[] = [
+    { time: shotTimeSeconds, yield: yieldG },
+    ...(targetZone
+      ? [
+          { time: targetZone.timeMinSeconds, yield: targetZone.yieldForDose },
+          { time: targetZone.timeMaxSeconds, yield: targetZone.yieldForDose },
+        ]
+      : []),
+    ...(nearMissZone
+      ? [
+          { time: nearMissZone.timeMinSeconds, yield: nearMissZone.yieldForDose },
+          { time: nearMissZone.timeMaxSeconds, yield: nearMissZone.yieldForDose },
+        ]
+      : []),
+  ];
 
   const rawMinTime = Math.min(...focusPoints.map((p) => p.time));
   const rawMaxTime = Math.max(...focusPoints.map((p) => p.time));
@@ -134,21 +136,20 @@ export default function ShotTargetChart({
         x={x1} y={y - bandHalfPx} width={Math.max(x2 - x1, 2)} height={bandHalfPx * 2}
         fill={color}
         fillOpacity={opacity}
+        stroke={color}
+        strokeOpacity="0.5"
+        strokeWidth="1"
       />
     );
   };
 
   return (
     <div className="px-4 py-3">
-      {targetZone && (
+      {(targetZone || nearMissZone) && (
         <p className="text-[13px] font-semibold mb-1">
-          <span style={{ color: "var(--accent)" }}>{targetZone.label}</span>
-          {nearMissZone && (
-            <>
-              {" · "}
-              <span style={{ color: "#FF9500" }}>{nearMissZone.label}</span>
-            </>
-          )}
+          {targetZone && <span style={{ color: "var(--accent)" }}>{targetZone.label}</span>}
+          {targetZone && nearMissZone && " · "}
+          {nearMissZone && <span style={{ color: "#FF9500" }}>{nearMissZone.label}</span>}
         </p>
       )}
       <p className="text-[12px] mb-2" style={{ color: "var(--text-secondary)" }}>
@@ -160,7 +161,7 @@ export default function ShotTargetChart({
               }, ${timeInRange ? "time on target" : shotTimeSeconds < targetZone.timeMinSeconds ? "ran fast" : "ran slow"}${
                 nearMissZone ? ` — closer to ${nearMissZone.label}` : ""
               }.`
-          : "No target ratio recorded for this shot."}
+          : `No target recorded — closest to ${nearMissZone!.label} (${nearMissZone!.yieldForDose.toFixed(1)}g, ${nearMissZone!.timeMinSeconds}–${nearMissZone!.timeMaxSeconds}s).`}
       </p>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block", overflow: "hidden" }}>
         {/* Y gridlines + numeric ticks */}
