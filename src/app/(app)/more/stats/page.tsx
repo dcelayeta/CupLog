@@ -4,6 +4,7 @@ import Link from "next/link";
 import { db } from "@/db/client";
 import { sql } from "drizzle-orm";
 import { classifyShotAgainstTarget } from "@/lib/shots/targetHit";
+import { TARGET_RATIOS } from "@/lib/shots/targetRatios";
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
@@ -65,26 +66,29 @@ async function getScatterData(): Promise<ScatterPoint[][]> {
   return [ratioPoints, timePoints];
 }
 
-interface YieldTimePoint { x: number; y: number; hit: "on" | "off" | "none"; }
+interface YieldTimePoint { x: number; y: number; hit: "on" | "off" | "none" | "failed"; }
 interface TargetTrackingData {
   points: YieldTimePoint[];
   onTarget: number;
   offTarget: number;
   noTarget: number;
+  avgEffectiveDose: number | null;
 }
 
 async function getTargetTrackingData(): Promise<TargetTrackingData> {
   const rows = await db.all(sql`
-    SELECT dose_g, grinder_retention_g, yield_g, shot_time_seconds, target_ratio_label
+    SELECT dose_g, grinder_retention_g, yield_g, shot_time_seconds, target_ratio_label, is_failed
     FROM shots
-    WHERE is_failed = 0 AND dose_g IS NOT NULL AND yield_g IS NOT NULL AND shot_time_seconds IS NOT NULL
+    WHERE dose_g IS NOT NULL AND yield_g IS NOT NULL AND shot_time_seconds IS NOT NULL
   `) as {
     dose_g: number; grinder_retention_g: number | null;
     yield_g: number; shot_time_seconds: number; target_ratio_label: string | null;
+    is_failed: number | null;
   }[];
 
   const points: YieldTimePoint[] = [];
   let onTarget = 0, offTarget = 0, noTarget = 0;
+  let doseSum = 0, doseCount = 0;
 
   for (const r of rows) {
     const doseG = Number(r.dose_g);
@@ -92,6 +96,11 @@ async function getTargetTrackingData(): Promise<TargetTrackingData> {
     const yieldG = Number(r.yield_g);
     const shotTimeSeconds = Number(r.shot_time_seconds);
     const targetRatioLabel = r.target_ratio_label;
+
+    if (r.is_failed) {
+      points.push({ x: shotTimeSeconds, y: yieldG, hit: "failed" });
+      continue;
+    }
 
     let hit: YieldTimePoint["hit"] = "none";
     if (targetRatioLabel) {
@@ -103,9 +112,17 @@ async function getTargetTrackingData(): Promise<TargetTrackingData> {
     }
 
     points.push({ x: shotTimeSeconds, y: yieldG, hit });
+
+    const effectiveDose = grinderRetentionG != null ? doseG - grinderRetentionG : doseG;
+    if (effectiveDose > 0) {
+      doseSum += effectiveDose;
+      doseCount++;
+    }
   }
 
-  return { points, onTarget, offTarget, noTarget };
+  const avgEffectiveDose = doseCount > 0 ? doseSum / doseCount : null;
+
+  return { points, onTarget, offTarget, noTarget, avgEffectiveDose };
 }
 
 interface RatingTrendPoint { rating: number; tasteBalance: number | null; }
@@ -606,17 +623,26 @@ function ScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, xFormat }: {
   );
 }
 
-const HIT_COLORS = { on: "#34C759", off: "#FF9500", none: "#8E8E93" } as const;
+const HIT_COLORS = { on: "#34C759", off: "#FF9500", none: "#8E8E93", failed: "#FF3B30" } as const;
 
-function YieldTimeScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, yMin, yMax, yTicks }: {
+interface YieldTimeReferenceZone {
+  label: string;
+  yieldForDose: number;
+  timeMinSeconds: number;
+  timeMaxSeconds: number;
+}
+
+function YieldTimeScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, yMin, yMax, yTicks, zones = [] }: {
   points: YieldTimePoint[]; title: string; subtitle: string;
   xMin: number; xMax: number; xTicks: number[];
   yMin: number; yMax: number; yTicks: number[];
+  zones?: YieldTimeReferenceZone[];
 }) {
   const W = 300, H = 190, padL = 30, padR = 10, padT = 12, padB = 28;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const xPos = (v: number) => padL + (v - xMin) / (xMax - xMin) * plotW;
   const yPos = (v: number) => padT + (yMax - v) / (yMax - yMin) * plotH;
+  const zoneBandHalfPx = 5;
 
   return (
     <div className="rounded-2xl overflow-hidden mb-4"
@@ -653,6 +679,22 @@ function YieldTimeScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, yMi
                   </text>
                 </g>
               ))}
+              {zones.map((z) => {
+                const zy = yPos(z.yieldForDose);
+                const zx1 = xPos(Math.max(z.timeMinSeconds, xMin));
+                const zx2 = xPos(Math.min(z.timeMaxSeconds, xMax));
+                if (zy < padT || zy > padT + plotH || zx2 <= zx1) return null;
+                return (
+                  <g key={z.label}>
+                    <rect x={zx1} y={zy - zoneBandHalfPx} width={zx2 - zx1} height={zoneBandHalfPx * 2}
+                      fill="var(--accent)" fillOpacity={0.16} />
+                    <text x={zx1} y={zy - zoneBandHalfPx - 2} textAnchor="start" fontSize={7}
+                      fill="var(--accent)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+                      {z.label}
+                    </text>
+                  </g>
+                );
+              })}
               {points.map((pt, i) => {
                 const cx = xPos(pt.x), cy = yPos(pt.y);
                 if (cx < padL || cx > padL + plotW || cy < padT || cy > padT + plotH) return null;
@@ -672,6 +714,10 @@ function YieldTimeScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, yMi
             <span className="flex items-center gap-1">
               <svg width="8" height="8" style={{ flexShrink: 0 }}><circle cx="4" cy="4" r="3.5" fill={HIT_COLORS.none} /></svg>
               <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>no target</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <svg width="8" height="8" style={{ flexShrink: 0 }}><circle cx="4" cy="4" r="3.5" fill={HIT_COLORS.failed} /></svg>
+              <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>failed</span>
             </span>
           </div>
         </>
@@ -1045,7 +1091,19 @@ export default async function StatsPage() {
   const totalTargeted = targetTracking.onTarget + targetTracking.offTarget;
   const targetHitRate = totalTargeted > 0 ? (targetTracking.onTarget / totalTargeted) * 100 : null;
 
-  const yieldValues = targetTracking.points.map(p => p.y);
+  // Reference zones — the six pull styles rendered at a representative (average)
+  // dose, so the aggregate scatter shows roughly where each style falls even
+  // though every shot's own dose differs slightly.
+  const yieldTimeZones = targetTracking.avgEffectiveDose
+    ? TARGET_RATIOS.map((preset) => ({
+        label: preset.label,
+        yieldForDose: targetTracking.avgEffectiveDose! * preset.ratio,
+        timeMinSeconds: preset.timeMinSeconds,
+        timeMaxSeconds: preset.timeMaxSeconds,
+      }))
+    : [];
+
+  const yieldValues = targetTracking.points.map(p => p.y).concat(yieldTimeZones.map(z => z.yieldForDose));
   let yieldAxisMin = 10, yieldAxisMax = 60, yieldAxisTicks = [20, 40, 60];
   if (yieldValues.length > 0) {
     const lo = Math.min(...yieldValues), hi = Math.max(...yieldValues);
@@ -1274,6 +1332,7 @@ export default async function StatsPage() {
           xTicks={[20, 30, 40, 50, 60]}
           yMin={yieldAxisMin} yMax={yieldAxisMax}
           yTicks={yieldAxisTicks}
+          zones={yieldTimeZones}
         />
         {totalTargeted > 0 && (
           <BarChart

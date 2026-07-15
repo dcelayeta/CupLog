@@ -149,7 +149,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Failed shots section — failure reason horizontal bar chart
 
 **Technique section**
-- [x] Yield vs time scatter (all shots) — dots color-coded on-target/off-target/no-target using the shared `classifyShotAgainstTarget` logic; y-axis auto-scaled to data
+- [x] Yield vs time scatter (all shots) — dots color-coded on-target/off-target/no-target/failed using the shared `classifyShotAgainstTarget` logic; y-axis auto-scaled to data; light-blue reference bands + labels for all six pull styles (Turbo Ristretto → Lungo) positioned at the average dose across logged shots
 - [x] Target accuracy bar chart — On/Off counts (bars scaled to each other, not crushed by the much larger "no target" bucket) with a "X% on target" stat line; no-target count shown as a footnote
 - [x] Grinder retention trend — connected dots to surface drift/cleaning need
 - [x] Roast age vs taste scatter — validates freshness window effectiveness
