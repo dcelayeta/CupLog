@@ -236,6 +236,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - **SVG server components for charts** — all stat charts and per-bag charts render server-side as inline SVG; no charting library
 - **Extraction ratio ≠ extraction quality** — `yield_g / dose_g` is brew ratio (ristretto/normale/lungo style), not EY%. True extraction yield requires TDS measurement (refractometer). Charts label by rating instead of over/under extracted
 - **Macro region mapping** — country → macro region (Latin America, East Africa, etc.) is a static JS lookup; not stored in DB
+- **All "today" comparisons must resolve in `America/Chicago`, not server time** — Vercel runs UTC, so any `new Date()` used as a day-boundary in server-rendered code (e.g. `getDaysSinceRoast`) drifts a day early whenever UTC crosses midnight (as early as 7pm Chicago during CDT). Client components are unaffected (browser's local clock), but shared lib functions callable from server code must explicitly convert via `toLocaleDateString("en-CA", { timeZone: "America/Chicago" })` before diffing dates
 
 ---
 

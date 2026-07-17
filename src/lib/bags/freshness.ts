@@ -1,7 +1,11 @@
 export function getDaysSinceRoast(roastDateISO: string): number {
   const roast = new Date(roastDateISO + "T00:00:00");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Server components run in UTC on Vercel — always resolve "today" in the
+  // user's actual timezone rather than the runtime's system clock, or the
+  // freshness countdown jumps a day early whenever UTC crosses midnight
+  // (as early as 7pm Chicago time during CDT).
+  const todayLocal = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const today = new Date(todayLocal + "T00:00:00");
   return Math.floor((today.getTime() - roast.getTime()) / (1000 * 60 * 60 * 24));
 }
 
