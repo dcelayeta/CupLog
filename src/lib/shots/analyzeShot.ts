@@ -276,6 +276,44 @@ function trimBeanContexts(contexts: import("@/lib/analysis/queries").BeanContext
   return [...active, ...finished];
 }
 
+// ─── Known Patterns Compression ───────────────────────────────────────────────
+
+const KNOWN_PATTERNS_MAX_CHARS = 2500;
+const KNOWN_PATTERNS_TARGET_CHARS = 1500;
+
+/**
+ * known_patterns accumulates across every analysis and the model doesn't
+ * reliably self-trim despite prompt instructions — left unchecked it keeps
+ * growing and eventually crowds out the response token budget (the bug this
+ * was added to fix). Once it crosses a threshold, run one small dedicated
+ * call to condense it instead of truncating blindly, so older-but-still-load-
+ * bearing facts (grind settings, bean quirks) survive while stale/superseded/
+ * redundant entries get dropped. Only fires when actually needed — most
+ * analyses don't pay for this extra call.
+ */
+async function compressKnownPatterns(text: string): Promise<string> {
+  if (text.length <= KNOWN_PATTERNS_MAX_CHARS) return text;
+
+  try {
+    const client = new Anthropic();
+    const message = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system: `You compress an espresso home barista's accumulated brewing notes so they stay within a token budget. Condense the given text to under ${KNOWN_PATTERNS_TARGET_CHARS} characters while preserving every specific, still-relevant, actionable fact — grind settings, ratios, bean-specific quirks, technique fixes that worked. Drop entries that are clearly superseded by a later more-specific entry on the same bean/topic, stale one-off observations, or redundant restatements. Keep the terse, telegraphic writing style of the input. Respond with ONLY the condensed text — no preamble, no markdown, no surrounding quotes.`,
+      messages: [{ role: "user", content: text }],
+    });
+    if (message.stop_reason === "max_tokens") return text; // fall back rather than risk a cut-off result
+    const content = message.content[0];
+    if (content.type !== "text") return text;
+    const compressed = content.text.trim();
+    // Never accept a "compression" that didn't actually shrink anything
+    return compressed.length > 0 && compressed.length < text.length ? compressed : text;
+  } catch (err) {
+    console.error("Failed to compress known_patterns:", err);
+    return text; // fail open — keep the original rather than losing accumulated context
+  }
+}
+
 // ─── User Message Assembly ────────────────────────────────────────────────────
 
 async function assembleUserMessage(shotId: number) {
@@ -495,10 +533,22 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
   try {
     const message = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 3000,
+      // Generous headroom — the full response (summary, numbers, recommendation,
+      // bean context, progress note, and the echoed-back coaching_state with all
+      // bean_contexts) can run well past 3000 tokens once coaching_state has
+      // accumulated history across many beans. A truncated response produces
+      // invalid JSON, which used to get stored verbatim as a garbled "summary".
+      max_tokens: 8000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: JSON.stringify(userMessage) }],
     });
+    if (message.stop_reason === "max_tokens") {
+      // The response is guaranteed truncated/invalid JSON — don't even try to
+      // parse or persist it. Surface as a normal failure so the existing
+      // "Analyze with AI" / "Re-analyze" button is the natural retry path.
+      console.error(`Anthropic response hit max_tokens for shot ${shotId} — response truncated, discarding.`);
+      return null;
+    }
     const content = message.content[0];
     if (content.type !== "text") return null;
     rawText = content.text;
@@ -517,16 +567,18 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
     overall_verdict?: string;
     is_stable?: boolean;
     updated_coaching_state?: CoachingStateData | null;
-  } = {};
+  };
 
   try {
     // Extract the first {...} JSON block, handling optional code fences or preamble
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON object found");
     parsed = JSON.parse(jsonMatch[0]);
-  } catch {
-    // Fallback: store raw text as summary
-    parsed = { summary: rawText, overall_verdict: "needs_work" };
+  } catch (err) {
+    // Don't persist a garbled fallback — a shot with no analysis (retriable)
+    // is a much better state than one with a broken record cluttering the UI.
+    console.error(`Failed to parse AI analysis JSON for shot ${shotId}:`, err);
+    return null;
   }
 
   // Persist analysis
@@ -552,8 +604,10 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
   // Upsert coaching_state for recent shots only — trim before saving to prevent DB bloat
   if (analysisMode === "recent" && parsed.updated_coaching_state) {
     const cs = parsed.updated_coaching_state;
+    const knownPatterns = cs.known_patterns ? await compressKnownPatterns(cs.known_patterns) : cs.known_patterns;
     await upsertCoachingState({
       ...cs,
+      known_patterns: knownPatterns,
       bean_contexts: trimBeanContexts(cs.bean_contexts ?? []),
     });
   }

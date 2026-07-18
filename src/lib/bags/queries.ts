@@ -223,7 +223,10 @@ export type BagChartShot = {
   pulledAt: string;
   grindSetting: number | null;
   doseG: number;
+  grinderRetentionG: number | null;
   yieldG: number | null;
+  shotTimeSeconds: number | null;
+  targetRatioLabel: string | null;
   tasteBalance: number | null;
   shotRating: number | null;
   isFailed: boolean;
@@ -236,7 +239,10 @@ export async function getBagShotChartData(bagId: number): Promise<BagChartShot[]
       pulledAt: shots.pulledAt,
       grindSetting: shots.grindSetting,
       doseG: shots.doseG,
+      grinderRetentionG: shots.grinderRetentionG,
       yieldG: shots.yieldG,
+      shotTimeSeconds: shots.shotTimeSeconds,
+      targetRatioLabel: shots.targetRatioLabel,
       tasteBalance: shots.tasteBalance,
       shotRating: shots.shotRating,
       isFailed: shots.isFailed,
