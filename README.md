@@ -70,7 +70,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 ### Infrastructure
 - [x] Next.js App Router with TypeScript and Tailwind CSS v4
 - [x] Drizzle ORM with libSQL (local SQLite) and Turso (production) support
-- [x] Full database schema — 10 tables
+- [x] Full database schema — 11 tables
 - [x] PWA configuration — `manifest.json`, service worker, iOS meta tags, home screen icons
 - [x] iOS-native design system: CSS tokens, light + dark + auto theme, typography scale, spacing
 - [x] Theme stored in `localStorage` with inline script to apply before first paint (no flash)
@@ -96,7 +96,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Bag cards: roaster, name, roast level, days since roast + freshness label, decaf/blend badges, origin countries
 - [x] Per-bag freshness windows — auto-estimated from roast level + processing method (15 combinations); user-overridable
 - [x] Bag detail — 5-zone freshness timeline with today marker; context-specific writeup per roast+process combination; shot history stats
-- [x] Add / edit bag — all fields, multi-origin support, peak freshness override
+- [x] Add / edit bag — all fields, multi-origin support, peak freshness override; Roaster field is a type-ahead picker over the Roasters directory (see More → Roasters) — pick an existing roaster or type a new name to leave it unlinked until formalized later
 - [x] Mark as finished / remove (soft delete)
 - [x] Duplicate bag detection — Replace / Add as new / Cancel modal
 - [x] AI bag entry — three independent inputs: bag photo, product URL (fetched server-side), and free-text notes; any combination works; Claude extracts and merges structured fields from all provided sources; graceful URL fetch fallback (shows warning, continues with remaining sources); strict anti-hallucination — never infers region/farm/variety from training knowledge; after parsing, DB lookup backfills missing coffee-level fields (roast level, process, origins) from any prior bag of same roaster+name; if name doesn't match exactly but is similar (Jaccard word overlap ≥ 0.35), prompts "Same coffee as [X]?" — confirm to backfill fields and use that bag's shot history as primary dial-in reference; dial-in tip uses shot history from previous bags of same coffee as primary grind reference
@@ -174,6 +174,11 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Drink rating over time trend — rolling average overlay
 - [x] Shot vs drink rating bubble chart — diagonal reference line; bubble size = count
 
+### More → Roasters
+- [x] Roaster directory — name, website, location, notes; bag count per roaster
+- [x] Add / edit / delete roaster — renaming cascades to every linked bag's denormalized `roaster` text; deleting unlinks bags (`roaster_id = null`) without touching their existing roaster name
+- [x] Bag form roaster field is a type-ahead combobox — shows existing roasters as tappable chips (all of them when empty, filtered as you type); linking is derived purely from an exact case-insensitive name match against the roasters table, both client-side (for the suggestion UI) and server-side (`findRoasterIdByName` in `createBag`/`updateBag`, which re-verifies rather than trusting a client value — needed because the duplicate/fuzzy-match backfill flow can override the typed roaster name to a canonical prior spelling)
+
 ### More → Equipment
 - [x] Multiple equipment profiles, switch active profile
 - [x] Add / edit profile: machine, grinder, tamper, default spring weight, cleaning intervals, notes
@@ -210,10 +215,11 @@ npx tsx scripts/sync-prod-to-dev.ts
 
 ---
 
-## Database Schema (10 tables)
+## Database Schema (11 tables)
 
 | Table | Purpose |
 |---|---|
+| `roasters` | Roaster directory — name, website, location, notes; bags link via nullable `roaster_id`, kept in sync with the denormalized `bags.roaster` text on rename |
 | `bags` | Bean inventory — roaster, name, roast level, processing method, freshness window, blend flag |
 | `bag_origins` | Per-bean origin data (country, region); supports blends with multiple origins |
 | `equipment_profiles` | Machine + grinder config, cleaning intervals, last-cleaned dates |

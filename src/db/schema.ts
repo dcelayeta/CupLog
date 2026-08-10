@@ -6,11 +6,28 @@ import {
   text,
 } from "drizzle-orm/sqlite-core";
 
+// ─── roasters ────────────────────────────────────────────────────────────────
+
+export const roasters = sqliteTable("roasters", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  website: text("website"),
+  location: text("location"),
+  notes: text("notes"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 // ─── bags ────────────────────────────────────────────────────────────────────
 
 export const bags = sqliteTable("bags", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   roaster: text("roaster").notNull(),
+  roasterId: integer("roaster_id").references(() => roasters.id),
   name: text("name").notNull(),
   isBlend: integer("is_blend", { mode: "boolean" }).notNull().default(false),
   isDecaf: integer("is_decaf", { mode: "boolean" }).notNull().default(false),
@@ -262,6 +279,8 @@ export const appConfig = sqliteTable("app_config", {
 
 export type Bag = typeof bags.$inferSelect;
 export type NewBag = typeof bags.$inferInsert;
+export type Roaster = typeof roasters.$inferSelect;
+export type NewRoaster = typeof roasters.$inferInsert;
 export type BagOrigin = typeof bagOrigins.$inferSelect;
 export type NewBagOrigin = typeof bagOrigins.$inferInsert;
 export type EquipmentProfile = typeof equipmentProfiles.$inferSelect;

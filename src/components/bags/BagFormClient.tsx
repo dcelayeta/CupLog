@@ -179,11 +179,13 @@ export default function BagFormClient({
   initialData,
   createAction,
   updateAction,
+  roasters,
 }: {
   mode: "add" | "edit";
   initialData?: BagWithOrigins;
   createAction: typeof createBag;
   updateAction?: BoundUpdateAction;
+  roasters: { id: number; name: string }[];
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -198,6 +200,16 @@ export default function BagFormClient({
   // Active data source: AI result takes priority over initialData
   const activeData = aiData ?? initialData;
 
+  const [roasterText, setRoasterText] = useState(activeData?.roaster ?? "");
+  const [showRoasterSuggestions, setShowRoasterSuggestions] = useState(false);
+  const trimmedRoaster = roasterText.trim();
+  // Linking is purely name-derived — no separate "selected" state to track.
+  // Renaming a roaster elsewhere keeps bags.roaster in sync (see updateRoaster),
+  // so an exact case-insensitive match here always means "linked."
+  const matchedRoaster = roasters.find((r) => r.name.toLowerCase() === trimmedRoaster.toLowerCase());
+  const roasterSuggestions = matchedRoaster
+    ? []
+    : (trimmedRoaster.length === 0 ? roasters : roasters.filter((r) => r.name.toLowerCase().includes(trimmedRoaster.toLowerCase()))).slice(0, 8);
   const [isBlend, setIsBlend] = useState(activeData?.isBlend ?? false);
   const [isDecaf, setIsDecaf] = useState(activeData?.isDecaf ?? false);
   const [price, setPrice] = useState(activeData?.price != null ? String(activeData.price) : "");
@@ -238,6 +250,7 @@ export default function BagFormClient({
 
   const handleAIParsed = (data: ParsedBagData) => {
     setAiData(data);
+    setRoasterText(data.roaster ?? "");
     setIsBlend(data.isBlend ?? false);
     setIsDecaf(data.isDecaf ?? false);
     setOrigins(
@@ -466,12 +479,40 @@ export default function BagFormClient({
                   name="roaster"
                   type="text"
                   required
-                  defaultValue={activeData?.roaster ?? ""}
+                  value={roasterText}
+                  onChange={(e) => setRoasterText(e.target.value)}
+                  onFocus={() => setShowRoasterSuggestions(true)}
+                  onBlur={() => setShowRoasterSuggestions(false)}
                   placeholder="e.g. Metric"
                   className="text-right w-full bg-transparent outline-none text-[17px] placeholder:text-[var(--text-secondary)]"
                   style={{ color: "var(--text-primary)" }}
+                  autoComplete="off"
                 />
               </FieldRow>
+              {showRoasterSuggestions && roasterSuggestions.length > 0 && (
+                <>
+                  <Divider />
+                  <div className="px-6 py-3">
+                    <p className="text-[12px] mb-2" style={{ color: "var(--text-secondary)" }}>
+                      Existing roasters
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {roasterSuggestions.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { setRoasterText(r.name); setShowRoasterSuggestions(false); }}
+                          className="text-[13px] font-medium px-3 py-1.5 rounded-full"
+                          style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}
+                        >
+                          {r.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
               <Divider />
               <FieldRow label="Name">
                 <input

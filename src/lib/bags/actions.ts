@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db/client";
-import { bags, bagOrigins, shots } from "@/db/schema";
+import { bags, bagOrigins, shots, roasters } from "@/db/schema";
 import { eq, sql, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -47,6 +47,19 @@ function nameSimilarity(a: string, b: string): number {
   const charScore = 0.8 * (charTotal / shorter.length);
 
   return Math.max(wordJaccard, charScore);
+}
+
+// Bags store the roaster name denormalized, so "linked" is derived by an
+// exact case-insensitive name match rather than trusting a client-submitted
+// id — the priorBagId backfill path below can override `roaster` to a
+// canonical spelling after the client already computed its own match.
+async function findRoasterIdByName(name: string): Promise<number | null> {
+  const [match] = await db
+    .select({ id: roasters.id })
+    .from(roasters)
+    .where(sql`lower(${roasters.name}) = lower(${name})`)
+    .limit(1);
+  return match?.id ?? null;
 }
 
 type OriginInput = {
@@ -177,6 +190,7 @@ export async function createBag(
 
   const bagData: NewBag = {
     roaster,
+    roasterId: await findRoasterIdByName(roaster),
     name,
     isBlend,
     isDecaf,
@@ -237,11 +251,13 @@ export async function updateBag(
     ? Math.max(1, Number(formData.get("peakEndDay")))
     : estimated.peakEndDay;
   const peakEndDay = rawPeakEndDay <= peakStartDay ? peakStartDay + 7 : rawPeakEndDay;
+  const roaster = (formData.get("roaster") as string).trim();
 
   await db
     .update(bags)
     .set({
-      roaster: (formData.get("roaster") as string).trim(),
+      roaster,
+      roasterId: await findRoasterIdByName(roaster),
       name: (formData.get("name") as string).trim(),
       isBlend: formData.get("isBlend") === "true",
       isDecaf,

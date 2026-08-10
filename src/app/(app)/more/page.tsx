@@ -91,6 +91,14 @@ export default async function MorePage() {
         <NavRow href="/more/yield-calculator" label="Yield Calculator" description="Yields for standard ratios given a dose" />
       </div>
 
+      <SectionHeader title="Roasters" />
+      <div
+        className="mx-4 rounded-2xl overflow-hidden"
+        style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}
+      >
+        <NavRow href="/more/roasters" label="Roasters" description="Manage roaster profiles" />
+      </div>
+
       <SectionHeader title="Appearance" />
       <div
         className="mx-4 rounded-2xl overflow-hidden"
@@ -123,7 +131,7 @@ export default async function MorePage() {
       </div>
 
       <div className="mt-8 mb-2 flex flex-col items-center gap-0.5">
-        <p className="text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.5 }}>Yield v3.21</p>
+        <p className="text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.5 }}>Yield v3.22</p>
         <p className="text-[12px]" style={{ color: "var(--text-secondary)", opacity: 0.5 }}>© {new Date().getFullYear()} Diego Celayeta. All rights reserved.</p>
       </div>
     </div>
