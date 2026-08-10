@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { bags, bagOrigins, shots } from "@/db/schema";
+import { bags, bagOrigins, shots, drinks } from "@/db/schema";
 import { eq, sql, and, or, like, ne, asc, desc } from "drizzle-orm";
 import type { Bag, BagOrigin } from "@/db/schema";
 
@@ -17,16 +17,22 @@ export type BagWithOrigins = Bag & {
   bestGrindRange?: GrindRange | null;
   referenceGrindRange?: GrindRange | null;
   avgShotRating?: number | null;
+  avgDrinkRating?: number | null;
 };
 
 async function fetchShotCountsAndCounters(bagIds: number[]) {
   const idList = sql.join(bagIds.map((id) => sql`${id}`), sql`, `);
 
-  const [ratingRows, shotCountRows, bagCounterRows] = await Promise.all([
+  const [ratingRows, drinkRatingRows, shotCountRows, bagCounterRows] = await Promise.all([
     db.all(sql`
       SELECT bag_id, ROUND(AVG(shot_rating), 1) as avg_shot_rating
       FROM shots WHERE bag_id IN (${idList}) GROUP BY bag_id
     `) as Promise<{ bag_id: number; avg_shot_rating: number | null }[]>,
+    db.all(sql`
+      SELECT s.bag_id as bag_id, ROUND(AVG(d.overall_rating), 1) as avg_drink_rating
+      FROM drinks d JOIN shots s ON d.shot_id = s.id
+      WHERE s.bag_id IN (${idList}) GROUP BY s.bag_id
+    `) as Promise<{ bag_id: number; avg_drink_rating: number | null }[]>,
     db.all(sql`
       SELECT bag_id, COUNT(*) as shot_count, COALESCE(SUM(dose_g), 0) as total_dose_g,
         SUM(CASE WHEN is_failed = 1 THEN 1 ELSE 0 END) as failed_shot_count
@@ -42,17 +48,19 @@ async function fetchShotCountsAndCounters(bagIds: number[]) {
   ]);
 
   const ratingMap = Object.fromEntries(ratingRows.map((r) => [r.bag_id, r.avg_shot_rating]));
+  const drinkRatingMap = Object.fromEntries(drinkRatingRows.map((r) => [r.bag_id, r.avg_drink_rating]));
   const shotCountMap = Object.fromEntries(shotCountRows.map((r) => [r.bag_id, r.shot_count]));
   const totalDoseMap = Object.fromEntries(shotCountRows.map((r) => [r.bag_id, r.total_dose_g]));
   const failedShotMap = Object.fromEntries(shotCountRows.map((r) => [r.bag_id, r.failed_shot_count ?? 0]));
   const bagCounterMap = Object.fromEntries(bagCounterRows.map((r) => [r.id, { bagIndex: r.bag_index, bagTotal: r.bag_total }]));
 
-  return { ratingMap, shotCountMap, totalDoseMap, failedShotMap, bagCounterMap };
+  return { ratingMap, drinkRatingMap, shotCountMap, totalDoseMap, failedShotMap, bagCounterMap };
 }
 
 function attachStats<T extends { id: number }>(
   bag: T,
   ratingMap: Record<number, number | null>,
+  drinkRatingMap: Record<number, number | null>,
   shotCountMap: Record<number, number>,
   totalDoseMap: Record<number, number>,
   bagCounterMap: Record<number, { bagIndex: number; bagTotal: number }>,
@@ -61,6 +69,7 @@ function attachStats<T extends { id: number }>(
   return {
     ...bag,
     avgShotRating: ratingMap[bag.id] ?? null,
+    avgDrinkRating: drinkRatingMap[bag.id] ?? null,
     shotCount: shotCountMap[bag.id] ?? 0,
     failedShotCount: failedShotMap[bag.id] ?? 0,
     totalDoseG: totalDoseMap[bag.id] ?? 0,
@@ -90,7 +99,7 @@ export async function getBags(
 
   if (bagRows.length === 0) return [];
 
-  const [originRows, { ratingMap, shotCountMap, totalDoseMap, failedShotMap, bagCounterMap }] = await Promise.all([
+  const [originRows, { ratingMap, drinkRatingMap, shotCountMap, totalDoseMap, failedShotMap, bagCounterMap }] = await Promise.all([
     db.select().from(bagOrigins).where(
       sql`${bagOrigins.bagId} IN (${sql.join(bagRows.map((b) => sql`${b.id}`), sql`, `)})`
     ),
@@ -98,7 +107,7 @@ export async function getBags(
   ]);
 
   const result = bagRows.map((bag) => ({
-    ...attachStats(bag, ratingMap, shotCountMap, totalDoseMap, bagCounterMap, failedShotMap),
+    ...attachStats(bag, ratingMap, drinkRatingMap, shotCountMap, totalDoseMap, bagCounterMap, failedShotMap),
     origins: originRows.filter((o) => o.bagId === bag.id),
   }));
 
@@ -158,6 +167,12 @@ export async function getBagById(id: number): Promise<BagWithOrigins | null> {
     .from(shots)
     .where(and(eq(shots.bagId, id), eq(shots.isFailed, false)));
 
+  const [{ avgDrinkRating }] = await db
+    .select({ avgDrinkRating: sql<number | null>`avg(${drinks.overallRating})` })
+    .from(drinks)
+    .innerJoin(shots, eq(drinks.shotId, shots.id))
+    .where(eq(shots.bagId, id));
+
   // Best grind range: from non-failed shots rated 4+ on this bag; fallback to highest-rated shots
   const [grindRow] = await db.all(sql`
     SELECT MIN(grind_setting) as min_grind, MAX(grind_setting) as max_grind
@@ -215,7 +230,7 @@ export async function getBagById(id: number): Promise<BagWithOrigins | null> {
     .from(shots)
     .where(eq(shots.bagId, id));
 
-  return { ...bag, origins, shotCount: Number(count), failedShotCount: Number(failedCount ?? 0), totalDoseG: totalDoseG ?? 0, avgTasteBalance: avgTasteBalance ?? null, avgRetentionG: avgRetentionG != null ? Math.round(avgRetentionG * 100) / 100 : null, avgShotRating: avgShotRating != null ? Math.round(avgShotRating * 10) / 10 : null, bestGrindRange, referenceGrindRange };
+  return { ...bag, origins, shotCount: Number(count), failedShotCount: Number(failedCount ?? 0), totalDoseG: totalDoseG ?? 0, avgTasteBalance: avgTasteBalance ?? null, avgRetentionG: avgRetentionG != null ? Math.round(avgRetentionG * 100) / 100 : null, avgShotRating: avgShotRating != null ? Math.round(avgShotRating * 10) / 10 : null, avgDrinkRating: avgDrinkRating != null ? Math.round(avgDrinkRating * 10) / 10 : null, bestGrindRange, referenceGrindRange };
 }
 
 export type BagChartShot = {
@@ -248,6 +263,25 @@ export async function getBagShotChartData(bagId: number): Promise<BagChartShot[]
       isFailed: shots.isFailed,
     })
     .from(shots)
+    .where(eq(shots.bagId, bagId))
+    .orderBy(asc(shots.pulledAt));
+}
+
+export type BagChartDrink = {
+  id: number;
+  pulledAt: string;
+  overallRating: number | null;
+};
+
+export async function getBagDrinkChartData(bagId: number): Promise<BagChartDrink[]> {
+  return db
+    .select({
+      id: drinks.id,
+      pulledAt: shots.pulledAt,
+      overallRating: drinks.overallRating,
+    })
+    .from(drinks)
+    .innerJoin(shots, eq(drinks.shotId, shots.id))
     .where(eq(shots.bagId, bagId))
     .orderBy(asc(shots.pulledAt));
 }
@@ -309,7 +343,7 @@ export async function searchBags(
 
   if (bagRows.length === 0) return [];
 
-  const [originRows, { ratingMap, shotCountMap, totalDoseMap, failedShotMap, bagCounterMap }] = await Promise.all([
+  const [originRows, { ratingMap, drinkRatingMap, shotCountMap, totalDoseMap, failedShotMap, bagCounterMap }] = await Promise.all([
     db.select().from(bagOrigins).where(
       sql`${bagOrigins.bagId} IN (${sql.join(bagRows.map((b) => sql`${b.id}`), sql`, `)})`
     ),
@@ -317,7 +351,7 @@ export async function searchBags(
   ]);
 
   const result = bagRows.map((bag) => ({
-    ...attachStats(bag, ratingMap, shotCountMap, totalDoseMap, bagCounterMap, failedShotMap),
+    ...attachStats(bag, ratingMap, drinkRatingMap, shotCountMap, totalDoseMap, bagCounterMap, failedShotMap),
     origins: originRows.filter((o) => o.bagId === bag.id),
   }));
 

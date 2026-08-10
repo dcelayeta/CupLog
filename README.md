@@ -101,7 +101,8 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Duplicate bag detection — Replace / Add as new / Cancel modal
 - [x] AI bag entry — three independent inputs: bag photo, product URL (fetched server-side), and free-text notes; any combination works; Claude extracts and merges structured fields from all provided sources; graceful URL fetch fallback (shows warning, continues with remaining sources); strict anti-hallucination — never infers region/farm/variety from training knowledge; after parsing, DB lookup backfills missing coffee-level fields (roast level, process, origins) from any prior bag of same roaster+name; if name doesn't match exactly but is similar (Jaccard word overlap ≥ 0.35), prompts "Same coffee as [X]?" — confirm to backfill fields and use that bag's shot history as primary dial-in reference; dial-in tip uses shot history from previous bags of same coffee as primary grind reference
 - [x] "New bag of same coffee" shortcut on bag detail
-- [x] Per-bag shot analysis charts — Grind vs Taste scatter, Rating Trend (true bag-scoped shot number on X, not a filtered index — unrated shots leave a visible gap), Extraction Ratio bar, Yield vs. Time scatter with target-ratio reference zones at the bag's average dose (dot color: green on-target, orange off-target, gray no-target, red failed) (server-side SVG)
+- [x] Per-bag shot analysis charts — Grind vs Taste scatter, Rating Trend (true bag-scoped shot number on X, not a filtered index — unrated shots leave a visible gap), Drink Rating Trend (same pattern, scoped to this bag's drinks joined through their shot, dot colored by the drink's own rating), Extraction Ratio bar, Yield vs. Time scatter with target-ratio reference zones at the bag's average dose (dot color: green on-target, orange off-target, gray no-target, red failed) (server-side SVG)
+- [x] Avg Drink Rating — alongside Avg Shot Rating on the bag detail info list and as a ☕ chip on bag cards; averages `drinks.overall_rating` for drinks whose shot belongs to the bag
 - [x] Cups remaining per active bag — shown on bag card; calculated from rolling avg dose window (fallback: all-time avg, then 18g); highlights in orange below 5 cups
 - [x] Auto-zero weight correction on finish — when marking a bag finished, `weightCorrectionG` is set to account for family/non-logged consumption; re-finishing after reactivation recomputes correctly
 - [x] Buy Planner — candidate bag input (roast level, process, weight); phase-based cascade run-out for caf and decaf bags independently; three-state buy decision (Buy it / Caution / Pass) with past-peak stale detection; freshness timeline with bean-type visual hierarchy (non-matching type dimmed); per-bag phase-aware rate labels; rolling consumption window slider; daily rate includes apportioned bag weight corrections (family consumption + grinder purge)
@@ -166,6 +167,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Shots per coffee — stacked rating bar per bag
 
 **Drinks section**
+- [x] Drink rating distribution histogram (colored bars 1★–5★, same format as the Shots section's rating histogram) with average stat
 - [x] Drink types — stacked rating bar (logged drinks only, not inferred from shots)
 - [x] Drink rating over time trend — rolling average overlay
 - [x] Shot vs drink rating bubble chart — diagonal reference line; bubble size = count

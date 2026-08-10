@@ -1,4 +1,4 @@
-import type { BagChartShot } from "@/lib/bags/queries";
+import type { BagChartShot, BagChartDrink } from "@/lib/bags/queries";
 import { classifyShotAgainstTarget } from "@/lib/shots/targetHit";
 import { TARGET_RATIOS } from "@/lib/shots/targetRatios";
 
@@ -183,6 +183,65 @@ function RatingTrendChart({ shots }: { shots: BagChartShot[] }) {
         const y = toY(s.shotRating!);
         const color = s.tasteBalance ? TASTE_COLORS[Math.round(s.tasteBalance)] : "#8E8E93";
         return <circle key={s.id} cx={x} cy={y} r="4" fill={color} fillOpacity="0.85" />;
+      })}
+    </svg>
+  );
+}
+
+// Chart 2b: Drink rating trend — bag-scoped drink number (in pull order),
+// dot colored by the drink's own rating since drinks have no separate
+// taste-balance dimension to color by like shots do.
+function DrinkRatingTrendChart({ drinks }: { drinks: BagChartDrink[] }) {
+  const numbered = drinks.map((d, i) => ({ ...d, drinkNumber: i + 1 }));
+  const rated = numbered.filter((d) => d.overallRating != null);
+  if (rated.length < 2) return null;
+
+  const totalDrinks = numbered.length;
+  const W = 320, H = 180;
+  const PAD = { l: 24, r: 16, t: 16, b: 30 };
+  const cw = W - PAD.l - PAD.r;
+  const ch = H - PAD.t - PAD.b;
+
+  const toX = (drinkNumber: number) =>
+    totalDrinks <= 1 ? PAD.l + cw / 2 : PAD.l + ((drinkNumber - 1) / (totalDrinks - 1)) * cw;
+  const toY = (r: number) => PAD.t + ch - ((r - 1) / 4) * ch;
+
+  const points = rated.map((d) => `${toX(d.drinkNumber)},${toY(d.overallRating!)}`).join(" ");
+
+  const xTickStep = totalDrinks > 20 ? 5 : totalDrinks > 10 ? 2 : 1;
+  const xTicks: number[] = [];
+  for (let n = 1; n <= totalDrinks; n += xTickStep) xTicks.push(n);
+  if (xTicks[xTicks.length - 1] !== totalDrinks) xTicks.push(totalDrinks);
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block", overflow: "hidden" }}>
+      {/* Grid lines */}
+      {[1, 2, 3, 4, 5].map((r) => (
+        <line key={r} x1={PAD.l} y1={toY(r)} x2={PAD.l + cw} y2={toY(r)}
+          stroke="currentColor" strokeOpacity={r === 3 ? 0.2 : 0.08} strokeWidth="1" />
+      ))}
+
+      {/* Y labels */}
+      {[1, 3, 5].map((r) => (
+        <text key={r} x={PAD.l - 4} y={toY(r)} textAnchor="end" dominantBaseline="middle"
+          fontSize="9" fill="var(--text-secondary)">{r}★</text>
+      ))}
+
+      {/* X ticks — drink number */}
+      {xTicks.map((n) => (
+        <text key={n} x={toX(n)} y={H - 6} textAnchor="middle" fontSize="8"
+          fill="var(--text-secondary)">{n}</text>
+      ))}
+
+      {/* Line */}
+      <polyline points={points} fill="none" stroke="var(--text-secondary)" strokeOpacity="0.25" strokeWidth="1.5" />
+
+      {/* Dots */}
+      {rated.map((d) => {
+        const x = toX(d.drinkNumber);
+        const y = toY(d.overallRating!);
+        const color = RATING_COLORS[Math.round(d.overallRating!)] ?? "#8E8E93";
+        return <circle key={d.id} cx={x} cy={y} r="4" fill={color} fillOpacity="0.85" />;
       })}
     </svg>
   );
@@ -399,15 +458,16 @@ function YieldTimeTargetChart({ shots }: { shots: BagChartShot[] }) {
   );
 }
 
-export default function BagShotCharts({ shots }: { shots: BagChartShot[] }) {
+export default function BagShotCharts({ shots, drinks }: { shots: BagChartShot[]; drinks: BagChartDrink[] }) {
   const hasGrindTaste = shots.some(
     (s) => !s.isFailed && s.grindSetting != null && s.tasteBalance != null
   );
   const hasRating = shots.filter((s) => !s.isFailed && s.shotRating != null).length >= 2;
+  const hasDrinkRating = drinks.filter((d) => d.overallRating != null).length >= 2;
   const hasRatio = shots.some((s) => s.doseG > 0 && s.yieldG != null && s.yieldG > 0);
   const hasYieldTime = shots.some((s) => s.yieldG != null && s.shotTimeSeconds != null);
 
-  if (!hasGrindTaste && !hasRating && !hasRatio && !hasYieldTime) return null;
+  if (!hasGrindTaste && !hasRating && !hasDrinkRating && !hasRatio && !hasYieldTime) return null;
 
   return (
     <div className="flex flex-col gap-4 mx-4">
@@ -442,6 +502,21 @@ export default function BagShotCharts({ shots }: { shots: BagChartShot[] }) {
           }
         >
           <RatingTrendChart shots={shots} />
+        </ChartCard>
+      )}
+
+      {hasDrinkRating && (
+        <ChartCard
+          title="Drink Rating Trend"
+          legend={
+            <>
+              {[1, 2, 3, 4, 5].map((r) => (
+                <LegendDot key={r} color={RATING_COLORS[r]} label={`${r}★`} />
+              ))}
+            </>
+          }
+        >
+          <DrinkRatingTrendChart drinks={drinks} />
         </ChartCard>
       )}
 

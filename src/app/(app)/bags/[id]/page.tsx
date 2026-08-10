@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getBagById, getBagShotChartData, getLockedShotForBag } from "@/lib/bags/queries";
+import { getBagById, getBagShotChartData, getBagDrinkChartData, getLockedShotForBag } from "@/lib/bags/queries";
 import { getBagAnalysis } from "@/lib/bags/bagAnalysis";
 import FreshnessIndicator from "@/components/bags/FreshnessIndicator";
 import BagActions from "@/components/bags/BagActions";
@@ -314,10 +314,11 @@ export default async function BagDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [bag, existingAnalysis, shotChartData, lockedShot] = await Promise.all([
+  const [bag, existingAnalysis, shotChartData, drinkChartData, lockedShot] = await Promise.all([
     getBagById(Number(id)),
     getBagAnalysis(Number(id)),
     getBagShotChartData(Number(id)),
+    getBagDrinkChartData(Number(id)),
     getLockedShotForBag(Number(id)),
   ]);
   if (!bag) notFound();
@@ -664,6 +665,17 @@ export default async function BagDetailPage({
                 </div>
               </>
             )}
+            {bag.avgDrinkRating != null && (
+              <>
+                <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
+                <div className="flex items-center justify-between px-6 min-h-[52px]">
+                  <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Avg Drink Rating</span>
+                  <span className="text-[17px]" style={{ color: "var(--accent)" }}>
+                    {"★".repeat(Math.round(bag.avgDrinkRating))}{"☆".repeat(5 - Math.round(bag.avgDrinkRating))} {bag.avgDrinkRating}
+                  </span>
+                </div>
+              </>
+            )}
             {bag.bestGrindRange != null && (
               <>
                 <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
@@ -717,7 +729,7 @@ export default async function BagDetailPage({
         {(bag.shotCount ?? 0) > 0 && (
           <div>
             <SectionHeader label="Shot Analysis" />
-            <BagShotCharts shots={shotChartData} />
+            <BagShotCharts shots={shotChartData} drinks={drinkChartData} />
           </div>
         )}
 

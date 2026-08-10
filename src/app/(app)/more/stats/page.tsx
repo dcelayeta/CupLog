@@ -1232,6 +1232,13 @@ export default async function StatsPage() {
   const drinkTypeRows = drinkTypeDist;
   const totalDrinks = drinkTypeDist.reduce((a, r) => a + r.total, 0);
 
+  const drinkRatingBars: BarSpec[] = [1, 2, 3, 4, 5].map(n => ({
+    label: `${n}★`,
+    count: drinkRatingTrend.filter(r => r.rating === n).length,
+    color: RATING_COLORS[n],
+  }));
+  const totalDrinksRated = drinkRatingTrend.length;
+
   const drinkRatingWindow = Math.max(3, Math.round(drinkRatingTrend.length / 8));
   const avgDrinkRating = drinkRatingTrend.length > 0
     ? drinkRatingTrend.reduce((a, r) => a + r.rating, 0) / drinkRatingTrend.length
@@ -1401,6 +1408,12 @@ export default async function StatsPage() {
         />
         {(drinkTypeRows.length > 0 || drinkRatingTrend.length > 0 || shotVsDrinkRatings.length > 0 || latteArtStats.trend.length > 0) && (
           <SectionLabel title="Drinks" />
+        )}
+        {totalDrinksRated > 0 && (
+          <BarChart bars={drinkRatingBars} title="Drink ratings" subtitle={`${totalDrinksRated} rated`}
+            stat={avgDrinkRating != null ? `★ ${avgDrinkRating.toFixed(1)}` : undefined}
+            statColor="#FF9500"
+          />
         )}
         {drinkTypeRows.length > 0 && (
           <RatingStackedHorizontalBarChart
