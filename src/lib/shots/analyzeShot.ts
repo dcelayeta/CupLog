@@ -145,7 +145,8 @@ Update experience_level in your coaching_state response if the current stats sug
 ## Data Integrity — No Hallucination
 
 CRITICAL: Every number, name, and fact you state must be directly traceable to the user message. Do not invent, estimate, or infer any value not explicitly present in the provided data. Specifically:
-- Shot counts (shot_number, total_shots, total_shots_on_bag) must come verbatim from the data — do not add, subtract, or approximate
+- Shot counts (shot_number, total_shots, total_shots_on_bag) must come verbatim from the data — do not add, subtract, or approximate. This applies everywhere you state a number, including prose in the summary/bean_context text (e.g. "Shot 3 on the X") — never derive that number from how many times you've been asked to analyze this shot or from a prior response. Re-analyzing the same shot_id is not a new shot: if you are re-analyzing shot 143 for the fourth time and current_bean.bean_stats.total_shots_on_bag is 1, every mention of shot count in this response — prose and structured fields alike — must say 1, exactly as it did the first time
+- bean_contexts[].shots_pulled for the entry matching current_bean.bag_id MUST be set to current_bean.bean_stats.total_shots_on_bag exactly, every time — never increment, estimate, or carry forward a self-tracked count. This holds even when re-analyzing the same shot: total_shots_on_bag is the sole source of truth, not how many times you've previously returned a count. For every other bag_id in bean_contexts, copy the existing shots_pulled value unchanged — you have no fresh count for beans other than the current one
 - Grind settings, dose, yield, and times must reference actual values from current_shot or context_shots only
 - Bean names and flavor notes must come from current_bean or coaching_state.bean_contexts — never invent tasting notes
 - If a field is null or missing, acknowledge the gap; never substitute a plausible-sounding value
@@ -153,7 +154,7 @@ CRITICAL: Every number, name, and fact you state must be directly traceable to t
 ## How to Analyze
 
 ### 1. Shot Summary (2-3 sentences)
-Summarize what happened — ratio, time, balance, and any notable observations from notes. Be direct. If good, say so. Don't manufacture problems.
+Summarize what happened — ratio, time, balance, and any notable observations from notes. Be direct. If good, say so. Don't manufacture problems. If you reference which shot-on-this-bean this is (e.g. "Shot 2 on the X"), that number must equal current_bean.bean_stats.total_shots_on_bag verbatim — it does not change just because this shot is being re-analyzed.
 
 ### 2. What the Numbers Say
 - Compare time and ratio against database labels. Only bring in the industry standard comparison if the shot falls outside the industry standard ranges (time < 20s or > 45s; ratio < 1.5 or > 3.0) OR if Diego's configured label and the industry standard disagree — skip the standard comparison entirely when both say the same thing (e.g. both call it "fast"), as stating both adds no value
@@ -239,7 +240,7 @@ CRITICAL: Respond with ONLY a raw JSON object. No markdown, no code fences, no h
         "dialed_in_grind": number or null,
         "dialed_in_yield_g": number or null,
         "current_grind": number or null,
-        "shots_pulled": integer,
+        "shots_pulled": integer, // for bag_id === current_bean.bag_id, must equal current_bean.bean_stats.total_shots_on_bag verbatim — never self-incremented
         "profile": "string — brief flavor/roast description",
         "notes": "string — key learnings on this bean"
       }
@@ -430,6 +431,7 @@ async function assembleUserMessage(shotId: number) {
     },
 
     current_bean: {
+      bag_id: shot.bagId,
       roaster: shot.roasterName,
       name: shot.bagName,
       is_blend: bagDetails?.bag.isBlend ?? false,
