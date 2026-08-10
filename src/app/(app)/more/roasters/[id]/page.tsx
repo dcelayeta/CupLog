@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getRoasterById } from "@/lib/roasters/queries";
+import { getRoasterById, getBagsForRoaster } from "@/lib/roasters/queries";
 import {
   getRoasterShotRatingDist,
   getRoasterTasteDist,
@@ -10,6 +10,12 @@ import {
 import RoasterFormClient from "@/components/roasters/RoasterFormClient";
 import RoasterDeleteButton from "@/components/roasters/RoasterDeleteButton";
 import { BarChart, RATING_COLORS, type BarSpec } from "@/components/stats/StatsCharts";
+import MiniFreshnessBar from "@/components/bags/MiniFreshnessBar";
+import { getDaysSinceRoast, getFreshnessLabel, getFreshnessColor, FRESHNESS_CSS } from "@/lib/bags/freshness";
+
+const BAG_STATUS_LABELS: Record<string, string> = {
+  reserve: "Reserve", finished: "Finished",
+};
 
 const ROAST_LEVEL_LABELS: Record<string, string> = {
   light: "Light", medium_light: "Med-Light", medium: "Medium",
@@ -48,11 +54,12 @@ export default async function RoasterDetailPage({
   const roaster = await getRoasterById(Number(id));
   if (!roaster) notFound();
 
-  const [ratingDist, tasteDist, roastDist, processDist] = await Promise.all([
+  const [ratingDist, tasteDist, roastDist, processDist, bags] = await Promise.all([
     getRoasterShotRatingDist(roaster.id),
     getRoasterTasteDist(roaster.id),
     getRoasterRoastLevelDist(roaster.id),
     getRoasterProcessDist(roaster.id),
+    getBagsForRoaster(roaster.id),
   ]);
 
   const ratingBars: BarSpec[] = [1, 2, 3, 4, 5].map(n => ({
@@ -95,7 +102,11 @@ export default async function RoasterDetailPage({
           </h1>
           <span
             className="text-[13px] font-medium px-2.5 py-1 rounded-full"
-            style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }}
+            style={
+              roaster.activeBagCount > 0
+                ? { backgroundColor: "var(--accent)" + "22", color: "var(--accent)" }
+                : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+            }
           >
             {roaster.bagCount} {roaster.bagCount === 1 ? "bag" : "bags"}
           </span>
@@ -122,6 +133,9 @@ export default async function RoasterDetailPage({
           </a>
         )}
       </div>
+
+      <SectionHeader title="Profile" />
+      <RoasterFormClient roaster={roaster} />
 
       <SectionHeader title="Stats" />
       <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
@@ -176,8 +190,63 @@ export default async function RoasterDetailPage({
         </>
       )}
 
-      <SectionHeader title="Profile" />
-      <RoasterFormClient roaster={roaster} />
+      {bags.length > 0 && (
+        <>
+          <SectionHeader title="Bags" />
+          <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+            {bags.map((bag, i) => {
+              const isActive = bag.status === "active";
+              const days = getDaysSinceRoast(bag.roastDate);
+              const peakStart = bag.peakStartDay ?? 7;
+              const peakEnd = bag.peakEndDay ?? 35;
+              const freshnessLabel = getFreshnessLabel(days, peakStart, peakEnd);
+              const freshnessColor = getFreshnessColor(days, peakStart, peakEnd);
+              return (
+                <Link
+                  key={bag.id}
+                  href={`/bags/${bag.id}`}
+                  className={`block px-6 py-3 active:opacity-70 transition-opacity${i > 0 ? " row-divider" : ""}`}
+                >
+                  <div className="flex items-center justify-between mb-1.5 gap-2">
+                    <p className="text-[15px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{bag.name}</p>
+                    {!isActive && (
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }}>
+                        {BAG_STATUS_LABELS[bag.status] ?? bag.status}
+                      </span>
+                    )}
+                  </div>
+                  {isActive && (
+                    <>
+                      <MiniFreshnessBar days={days} peakStart={peakStart} peakEnd={peakEnd} />
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[12px]" style={{ color: FRESHNESS_CSS[freshnessColor] }}>{freshnessLabel}</span>
+                        {days >= 0 && (
+                          <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{days}d</span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  <div className="flex items-center gap-3 mt-1">
+                    {bag.avgShotRating != null && (
+                      <span className="text-[12px] font-medium" style={{ color: "#FF9500" }}>
+                        ★ {bag.avgShotRating.toFixed(1)}
+                      </span>
+                    )}
+                    {bag.avgDrinkRating != null && (
+                      <span className="text-[12px] font-medium" style={{ color: "var(--accent)" }}>
+                        ★ {bag.avgDrinkRating.toFixed(1)}
+                      </span>
+                    )}
+                    <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                      {bag.shotCount} {bag.shotCount === 1 ? "shot" : "shots"}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <RoasterDeleteButton roasterId={roaster.id} bagCount={roaster.bagCount} />
     </div>

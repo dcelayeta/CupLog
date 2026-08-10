@@ -84,7 +84,14 @@ export default async function RoastersPage() {
                   </a>
                 )}
                 <Link href={`/more/roasters/${roaster.id}`} className="flex items-center gap-3 active:opacity-70 transition-opacity">
-                  <span className="text-[13px] font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }}>
+                  <span
+                    className="text-[13px] font-medium px-2.5 py-1 rounded-full"
+                    style={
+                      roaster.activeBagCount > 0
+                        ? { backgroundColor: "var(--accent)" + "22", color: "var(--accent)" }
+                        : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                    }
+                  >
                     {roaster.bagCount} {roaster.bagCount === 1 ? "bag" : "bags"}
                   </span>
                   <svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-secondary)" }}>
