@@ -72,17 +72,22 @@ export default async function RoasterDetailPage({
   }));
   const totalTasted = tasteBars.reduce((a, b) => a + b.count, 0);
 
+  // Totals come from the bars actually being rendered, not the raw
+  // distribution — that distribution includes an "unspecified" bucket with
+  // no bar of its own, so a roaster tagged entirely "unspecified" would
+  // otherwise pass the > 0 gate below and render a chart with zero visible
+  // bars.
   const roastCountMap = Object.fromEntries(roastDist.map(r => [r.roastLevel, r.count]));
-  const roastTotal = roastDist.reduce((a, r) => a + r.count, 0);
   const roastBars: BarSpec[] = (["light", "medium_light", "medium", "medium_dark", "dark"] as const).map(level => ({
     label: ROAST_LEVEL_LABELS[level], count: roastCountMap[level] ?? 0, color: ROAST_LEVEL_COLORS[level],
   }));
+  const roastTotal = roastBars.reduce((a, b) => a + b.count, 0);
 
   const processCountMap = Object.fromEntries(processDist.map(r => [r.method, r.count]));
-  const processTotal = processDist.reduce((a, r) => a + r.count, 0);
   const processBars: BarSpec[] = (["washed", "natural", "honey", "anaerobic", "ea_washed", "swiss_water", "other"] as const).map(m => ({
     label: PROCESS_LABELS[m], count: processCountMap[m] ?? 0, color: PROCESS_COLORS[m],
   }));
+  const processTotal = processBars.reduce((a, b) => a + b.count, 0);
 
   return (
     <div className="pt-4 pb-24">
