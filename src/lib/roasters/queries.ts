@@ -25,11 +25,14 @@ const statsSelect = {
   notes: roasters.notes,
   createdAt: roasters.createdAt,
   updatedAt: roasters.updatedAt,
-  bagCount: sql<number>`(SELECT COUNT(*) FROM bags WHERE roaster_id = roasters.id)`.as("bagCount"),
+  // Every subquery here excludes status = 'removed' — a soft-deleted bag
+  // shouldn't inflate the count shown when getBagsForRoaster (which already
+  // excludes them) lists fewer bags than this roaster's own pill.
+  bagCount: sql<number>`(SELECT COUNT(*) FROM bags WHERE roaster_id = roasters.id AND status != 'removed')`.as("bagCount"),
   activeBagCount: sql<number>`(SELECT COUNT(*) FROM bags WHERE roaster_id = roasters.id AND status IN ('active', 'reserve'))`.as("activeBagCount"),
-  shotCount: sql<number>`(SELECT COUNT(*) FROM shots WHERE bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id))`.as("shotCount"),
-  avgShotRating: sql<number | null>`(SELECT AVG(shot_rating) FROM shots WHERE is_failed = 0 AND bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id))`.as("avgShotRating"),
-  avgDrinkRating: sql<number | null>`(SELECT AVG(overall_rating) FROM drinks WHERE shot_id IN (SELECT id FROM shots WHERE bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id)))`.as("avgDrinkRating"),
+  shotCount: sql<number>`(SELECT COUNT(*) FROM shots WHERE bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id AND status != 'removed'))`.as("shotCount"),
+  avgShotRating: sql<number | null>`(SELECT AVG(shot_rating) FROM shots WHERE is_failed = 0 AND bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id AND status != 'removed'))`.as("avgShotRating"),
+  avgDrinkRating: sql<number | null>`(SELECT AVG(overall_rating) FROM drinks WHERE shot_id IN (SELECT id FROM shots WHERE bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id AND status != 'removed')))`.as("avgDrinkRating"),
 };
 
 type StatsRow = Roaster & {

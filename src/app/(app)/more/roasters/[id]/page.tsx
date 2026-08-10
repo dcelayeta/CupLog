@@ -210,7 +210,7 @@ export default async function RoasterDetailPage({
                 <Link
                   key={bag.id}
                   href={`/bags/${bag.id}`}
-                  className={`block px-6 py-3 active:opacity-70 transition-opacity${i > 0 ? " row-divider" : ""}`}
+                  className={`block px-6 py-3 active:opacity-70 transition-opacity${i < bags.length - 1 ? " row-divider" : ""}`}
                 >
                   <div className="flex items-center justify-between mb-1.5 gap-2">
                     <p className="text-[15px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{bag.name}</p>

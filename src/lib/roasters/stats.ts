@@ -9,7 +9,7 @@ export async function getRoasterShotRatingDist(roasterId: number): Promise<Recor
     SELECT shot_rating, COUNT(*) as count
     FROM shots
     WHERE shot_rating IS NOT NULL AND is_failed = 0
-      AND bag_id IN (SELECT id FROM bags WHERE roaster_id = ${roasterId})
+      AND bag_id IN (SELECT id FROM bags WHERE roaster_id = ${roasterId} AND status != 'removed')
     GROUP BY shot_rating
   `) as { shot_rating: number; count: number }[];
   const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -32,7 +32,7 @@ export async function getRoasterTasteDist(roasterId: number): Promise<Record<num
       COUNT(*) as count
     FROM shots
     WHERE taste_balance IS NOT NULL AND is_failed = 0
-      AND bag_id IN (SELECT id FROM bags WHERE roaster_id = ${roasterId})
+      AND bag_id IN (SELECT id FROM bags WHERE roaster_id = ${roasterId} AND status != 'removed')
     GROUP BY bucket
   `) as { bucket: number; count: number }[];
   const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
@@ -45,7 +45,7 @@ export async function getRoasterRoastLevelDist(roasterId: number): Promise<{ roa
     SELECT b.roast_level as roastLevel, COUNT(s.id) as count
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
-    WHERE b.roaster_id = ${roasterId}
+    WHERE b.roaster_id = ${roasterId} AND b.status != 'removed'
     GROUP BY b.roast_level
     ORDER BY count DESC
   `) as { roastLevel: string; count: number }[];
@@ -57,7 +57,7 @@ export async function getRoasterProcessDist(roasterId: number): Promise<{ method
     SELECT b.processing_method as method, COUNT(s.id) as count
     FROM shots s
     JOIN bags b ON s.bag_id = b.id
-    WHERE b.roaster_id = ${roasterId}
+    WHERE b.roaster_id = ${roasterId} AND b.status != 'removed'
     GROUP BY b.processing_method
     ORDER BY count DESC
   `) as { method: string; count: number }[];
