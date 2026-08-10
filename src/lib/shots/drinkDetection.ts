@@ -84,8 +84,8 @@ export function detectDrink(params: {
     matches.push("Cortado");
   }
 
-  // Flat White: base=doppio, milkMl 80–149, foamMl 0–20
-  if (base === "Doppio" && milkMl >= 80 && milkMl <= 149 && foamMl >= 0 && foamMl <= 20 && hotWaterMl === 0 && !hasChocolate && !hasChai) {
+  // Flat White: base=doppio or ristretto, milkMl 56–149, foamMl 0–20
+  if ((base === "Doppio" || base === "Ristretto") && milkMl >= 56 && milkMl <= 149 && foamMl >= 0 && foamMl <= 20 && hotWaterMl === 0 && !hasChocolate && !hasChai) {
     matches.push("Flat White");
   }
 

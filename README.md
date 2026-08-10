@@ -118,6 +118,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Target Ratio picker in log form — Turbo Ristretto/Ristretto/Espresso/Normale/Long Pull/Lungo presets (shared with Yield Calculator); selecting one live-fills yield + shot time from the adjusted dose and tracks dose/retention changes; defaults to the nearest preset for the bean's last shot; shows a "target Xg in Y–Zs (stop at ~Wg)" hint using that bean's average lag; clears if yield/time are edited manually; purely a pull guide — doesn't affect Fast/Normal/Slow classification, which stays calibrated to standard espresso ratios
 - [x] Taste section: sour↔bitter spectrum (1=Very Sour · 4=Balanced · 7=Very Bitter) + 5-star shot rating
 - [x] Drink section: milk type/quantity, foam (5ml steps), hot water, live drink detection badge
+- [x] Flat White detection widened — accepts a Ristretto base (not just Doppio) and a 56–149ml milk floor (was 80ml), closing a gap where a 56–79ml pour matched nothing; backfilled 17 historical drinks that had silently gone unlabeled
 - [x] Pressure and temperature stored as schema defaults (9 bar, 93°C) — not shown in UI
 - [x] Shot history — filters: bag chips, text search, date range, time/ratio classification chips, AI badge toggle, Locked toggle, star rating filter (1–5★)
 - [x] Time-based section dividers in history — Today / This Week / This Month / Older (rolling windows, browser-local time)
