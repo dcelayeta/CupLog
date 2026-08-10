@@ -88,7 +88,7 @@ export default async function RoastersPage() {
                     className="text-[13px] font-medium px-2.5 py-1 rounded-full"
                     style={
                       roaster.activeBagCount > 0
-                        ? { backgroundColor: "var(--accent)" + "22", color: "var(--accent)" }
+                        ? { backgroundColor: "var(--accent)", color: "#fff" }
                         : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
                     }
                   >
