@@ -55,6 +55,7 @@ async function getLastShot() {
       b.roaster,
       b.name as bag_name,
       d.detected_drink_name,
+      d.overall_rating as drink_rating,
       d.milk_quantity_ml,
       d.foam_ml,
       d.hot_water_ml,
@@ -384,7 +385,10 @@ export default async function HomePage() {
                   const defaults = DRINK_DEFAULTS[drinkName as keyof typeof DRINK_DEFAULTS];
                   return (
                     <div className="mb-2">
-                      <p className="text-[13px] mb-1.5" style={{ color: "var(--accent)" }}>{drinkName}</p>
+                      <p className="text-[13px] mb-1.5" style={{ color: "var(--accent)" }}>
+                        {drinkName}
+                        {lastShot.drink_rating != null && ` ★${lastShot.drink_rating}`}
+                      </p>
                       <DrinkCompositionBar
                         espressoMl={Number(lastShot.yield_g) || 0}
                         milkMl={Number(lastShot.milk_quantity_ml) || 0}
@@ -496,6 +500,11 @@ export default async function HomePage() {
                   {bag.avgShotRating != null && (
                     <span className="text-[12px] font-medium" style={{ color: "#FF9500" }}>
                       ★ {bag.avgShotRating.toFixed(1)}
+                    </span>
+                  )}
+                  {bag.avgDrinkRating != null && (
+                    <span className="text-[12px] font-medium" style={{ color: "var(--accent)" }}>
+                      ★ {bag.avgDrinkRating.toFixed(1)}
                     </span>
                   )}
                   <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>

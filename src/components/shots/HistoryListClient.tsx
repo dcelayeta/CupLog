@@ -514,6 +514,7 @@ export default function HistoryListClient({
                         }}
                       >
                         {shot.drink.detectedDrinkName}
+                        {shot.drink.overallRating != null && ` ★${shot.drink.overallRating}`}
                       </span>
                     )}
                     {shot.isLocked && (

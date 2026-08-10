@@ -170,7 +170,7 @@ export default function BagCard({ bag, avgDose }: { bag: BagWithOrigins; avgDose
           )}
           {bag.avgDrinkRating != null && (
             <span className="text-[13px] font-medium" style={{ color: "var(--accent)" }}>
-              ☕ {bag.avgDrinkRating.toFixed(1)}
+              ★ {bag.avgDrinkRating.toFixed(1)}
             </span>
           )}
           <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
