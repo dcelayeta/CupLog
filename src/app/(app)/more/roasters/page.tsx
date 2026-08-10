@@ -37,13 +37,28 @@ export default async function RoastersPage() {
             <Link
               key={roaster.id}
               href={`/more/roasters/${roaster.id}`}
-              className={`flex items-center px-6 min-h-[64px] active:opacity-70 transition-opacity${i < roasters.length - 1 ? " row-divider" : ""}`}
+              className={`flex items-center px-6 py-3 min-h-[64px] active:opacity-70 transition-opacity${i < roasters.length - 1 ? " row-divider" : ""}`}
             >
               <div className="flex-1">
                 <p className="text-[17px]" style={{ color: "var(--text-primary)" }}>{roaster.name}</p>
                 <p className="text-[13px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
                   {[roaster.location, roaster.website].filter(Boolean).join(" · ") || "No details"}
                 </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                    {roaster.shotCount} {roaster.shotCount === 1 ? "shot" : "shots"}
+                  </span>
+                  {roaster.avgShotRating != null && (
+                    <span className="text-[13px] font-medium" style={{ color: "#FF9500" }}>
+                      ★ {roaster.avgShotRating.toFixed(1)}
+                    </span>
+                  )}
+                  {roaster.avgDrinkRating != null && (
+                    <span className="text-[13px] font-medium" style={{ color: "var(--accent)" }}>
+                      ★ {roaster.avgDrinkRating.toFixed(1)}
+                    </span>
+                  )}
+                </div>
               </div>
               <span className="text-[13px] font-medium px-2.5 py-1 rounded-full ml-3" style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }}>
                 {roaster.bagCount} {roaster.bagCount === 1 ? "bag" : "bags"}

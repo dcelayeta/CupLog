@@ -44,6 +44,36 @@ export default async function RoasterDetailPage({
         </span>
       </div>
 
+      <SectionHeader title="Stats" />
+      <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+        <div className="flex items-center justify-between px-6 min-h-[52px]">
+          <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Shots Pulled</span>
+          <span className="text-[17px]" style={{ color: "var(--text-secondary)" }}>{roaster.shotCount}</span>
+        </div>
+        {roaster.avgShotRating != null && (
+          <>
+            <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
+            <div className="flex items-center justify-between px-6 min-h-[52px]">
+              <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Avg Shot Rating</span>
+              <span className="text-[17px]" style={{ color: "#FF9500" }}>
+                {"★".repeat(Math.round(roaster.avgShotRating))}{"☆".repeat(5 - Math.round(roaster.avgShotRating))} {roaster.avgShotRating.toFixed(1)}
+              </span>
+            </div>
+          </>
+        )}
+        {roaster.avgDrinkRating != null && (
+          <>
+            <div className="ml-4" style={{ height: "1px", backgroundColor: "var(--divider)" }} />
+            <div className="flex items-center justify-between px-6 min-h-[52px]">
+              <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Avg Drink Rating</span>
+              <span className="text-[17px]" style={{ color: "var(--accent)" }}>
+                {"★".repeat(Math.round(roaster.avgDrinkRating))}{"☆".repeat(5 - Math.round(roaster.avgDrinkRating))} {roaster.avgDrinkRating.toFixed(1)}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
       <SectionHeader title="Profile" />
       <RoasterFormClient roaster={roaster} />
 

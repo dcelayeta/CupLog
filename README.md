@@ -175,7 +175,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Shot vs drink rating bubble chart — diagonal reference line; bubble size = count
 
 ### More → Roasters
-- [x] Roaster directory — name, website, location, notes; bag count per roaster
+- [x] Roaster directory — name, website, location, notes; bag count, total shots pulled, avg shot rating, avg drink rating per roaster (each a scalar correlated subquery through bags → shots → drinks; null averages hidden rather than shown as 0 when a roaster has no rated shots/drinks yet)
 - [x] Add / edit / delete roaster — renaming cascades to every linked bag's denormalized `roaster` text; deleting unlinks bags (`roaster_id = null`) without touching their existing roaster name
 - [x] Bag form roaster field is a type-ahead combobox — shows existing roasters as tappable chips (all of them when empty, filtered as you type); linking is derived purely from an exact case-insensitive name match against the roasters table, both client-side (for the suggestion UI) and server-side (`findRoasterIdByName` in `createBag`/`updateBag`, which re-verifies rather than trusting a client value — needed because the duplicate/fuzzy-match backfill flow can override the typed roaster name to a canonical prior spelling)
 
