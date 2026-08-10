@@ -11,6 +11,7 @@ import {
 export const roasters = sqliteTable("roasters", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  alias: text("alias"),
   website: text("website"),
   location: text("location"),
   notes: text("notes"),

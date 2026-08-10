@@ -40,7 +40,14 @@ export default async function RoastersPage() {
               className={`flex items-center px-6 py-3 min-h-[64px] active:opacity-70 transition-opacity${i < roasters.length - 1 ? " row-divider" : ""}`}
             >
               <div className="flex-1">
-                <p className="text-[17px]" style={{ color: "var(--text-primary)" }}>{roaster.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[17px]" style={{ color: "var(--text-primary)" }}>{roaster.name}</p>
+                  {roaster.alias && (
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--accent)" + "22", color: "var(--accent)" }}>
+                      {roaster.alias}
+                    </span>
+                  )}
+                </div>
                 <p className="text-[13px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
                   {[roaster.location, roaster.website].filter(Boolean).join(" · ") || "No details"}
                 </p>

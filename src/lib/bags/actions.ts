@@ -50,16 +50,22 @@ function nameSimilarity(a: string, b: string): number {
 }
 
 // Bags store the roaster name denormalized, so "linked" is derived by an
-// exact case-insensitive name match rather than trusting a client-submitted
-// id — the priorBagId backfill path below can override `roaster` to a
-// canonical spelling after the client already computed its own match.
-async function findRoasterIdByName(name: string): Promise<number | null> {
+// exact case-insensitive match against the roaster's name OR alias, rather
+// than trusting a client-submitted id — the priorBagId backfill path below
+// can override `roaster` to a canonical spelling after the client already
+// computed its own match. The resolved display name (alias when the roaster
+// has one, since that's what should show up everywhere the bag's roaster
+// text is read) always wins over whatever the user actually typed, so a bag
+// ends up with the same roaster text regardless of whether they typed the
+// full name, the alias, or a slightly different case.
+async function resolveRoasterLink(typedName: string): Promise<{ roasterId: number | null; displayName: string }> {
   const [match] = await db
-    .select({ id: roasters.id })
+    .select({ id: roasters.id, name: roasters.name, alias: roasters.alias })
     .from(roasters)
-    .where(sql`lower(${roasters.name}) = lower(${name})`)
+    .where(sql`lower(${roasters.name}) = lower(${typedName}) OR lower(${roasters.alias}) = lower(${typedName})`)
     .limit(1);
-  return match?.id ?? null;
+  if (!match) return { roasterId: null, displayName: typedName };
+  return { roasterId: match.id, displayName: match.alias?.trim() || match.name };
 }
 
 type OriginInput = {
@@ -188,9 +194,12 @@ export async function createBag(
     if ("tip" in tipResult) dialInTip = tipResult.tip;
   }
 
+  const roasterLink = await resolveRoasterLink(roaster);
+  roaster = roasterLink.displayName;
+
   const bagData: NewBag = {
     roaster,
-    roasterId: await findRoasterIdByName(roaster),
+    roasterId: roasterLink.roasterId,
     name,
     isBlend,
     isDecaf,
@@ -251,13 +260,13 @@ export async function updateBag(
     ? Math.max(1, Number(formData.get("peakEndDay")))
     : estimated.peakEndDay;
   const peakEndDay = rawPeakEndDay <= peakStartDay ? peakStartDay + 7 : rawPeakEndDay;
-  const roaster = (formData.get("roaster") as string).trim();
+  const roasterLink = await resolveRoasterLink((formData.get("roaster") as string).trim());
 
   await db
     .update(bags)
     .set({
-      roaster,
-      roasterId: await findRoasterIdByName(roaster),
+      roaster: roasterLink.displayName,
+      roasterId: roasterLink.roasterId,
       name: (formData.get("name") as string).trim(),
       isBlend: formData.get("isBlend") === "true",
       isDecaf,

@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
 import { roasters } from "@/db/schema";
-import { eq, asc, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Roaster } from "@/db/schema";
 
 export type RoasterWithStats = Roaster & {
@@ -18,15 +18,16 @@ export type RoasterWithStats = Roaster & {
 const statsSelect = {
   id: roasters.id,
   name: roasters.name,
+  alias: roasters.alias,
   website: roasters.website,
   location: roasters.location,
   notes: roasters.notes,
   createdAt: roasters.createdAt,
   updatedAt: roasters.updatedAt,
-  bagCount: sql<number>`(SELECT COUNT(*) FROM bags WHERE roaster_id = roasters.id)`,
-  shotCount: sql<number>`(SELECT COUNT(*) FROM shots WHERE bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id))`,
-  avgShotRating: sql<number | null>`(SELECT AVG(shot_rating) FROM shots WHERE is_failed = 0 AND bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id))`,
-  avgDrinkRating: sql<number | null>`(SELECT AVG(overall_rating) FROM drinks WHERE shot_id IN (SELECT id FROM shots WHERE bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id)))`,
+  bagCount: sql<number>`(SELECT COUNT(*) FROM bags WHERE roaster_id = roasters.id)`.as("bagCount"),
+  shotCount: sql<number>`(SELECT COUNT(*) FROM shots WHERE bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id))`.as("shotCount"),
+  avgShotRating: sql<number | null>`(SELECT AVG(shot_rating) FROM shots WHERE is_failed = 0 AND bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id))`.as("avgShotRating"),
+  avgDrinkRating: sql<number | null>`(SELECT AVG(overall_rating) FROM drinks WHERE shot_id IN (SELECT id FROM shots WHERE bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id)))`.as("avgDrinkRating"),
 };
 
 type StatsRow = Roaster & {
@@ -46,8 +47,13 @@ function toStats(row: StatsRow): RoasterWithStats {
   };
 }
 
+// Ordered by overall shot rating (best first, unrated roasters last), then
+// by bag count as a tiebreaker.
 export async function getRoasters(): Promise<RoasterWithStats[]> {
-  const rows = await db.select(statsSelect).from(roasters).orderBy(asc(roasters.name));
+  const rows = await db
+    .select(statsSelect)
+    .from(roasters)
+    .orderBy(sql`avgShotRating DESC NULLS LAST, bagCount DESC`);
   return rows.map(toStats);
 }
 
@@ -57,8 +63,11 @@ export async function getRoasterById(id: number): Promise<RoasterWithStats | nul
   return toStats(row);
 }
 
-export type RoasterOption = { id: number; name: string };
+export type RoasterOption = { id: number; name: string; alias: string | null };
 
 export async function getRoasterOptions(): Promise<RoasterOption[]> {
-  return db.select({ id: roasters.id, name: roasters.name }).from(roasters).orderBy(asc(roasters.name));
+  return db
+    .select({ id: roasters.id, name: roasters.name, alias: roasters.alias })
+    .from(roasters)
+    .orderBy(roasters.name);
 }

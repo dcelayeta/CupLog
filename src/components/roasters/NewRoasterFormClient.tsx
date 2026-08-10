@@ -30,7 +30,8 @@ export default function NewRoasterFormClient() {
   return (
     <form action={formAction}>
       <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
-        <Row label="Name"><TextInput name="name" placeholder="e.g. Metric" /></Row>
+        <Row label="Name"><TextInput name="name" placeholder="e.g. Metric Coffee Co." /></Row>
+        <Row label="Alias"><TextInput name="alias" placeholder="e.g. Metric — shown across the app" /></Row>
         <Row label="Website"><TextInput name="website" type="url" placeholder="https://…" /></Row>
         <div className="flex items-center px-6 min-h-[52px]">
           <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Location</span>

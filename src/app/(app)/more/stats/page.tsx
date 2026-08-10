@@ -5,6 +5,13 @@ import { db } from "@/db/client";
 import { sql } from "drizzle-orm";
 import { classifyShotAgainstTarget } from "@/lib/shots/targetHit";
 import { TARGET_RATIOS } from "@/lib/shots/targetRatios";
+import {
+  BarChart,
+  RatingStackedHorizontalBarChart,
+  RATING_COLORS,
+  type BarSpec,
+  type RatingBreakdownRow,
+} from "@/components/stats/StatsCharts";
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
@@ -282,6 +289,34 @@ async function getShotsPerCoffee(): Promise<RatingBreakdownRow[]> {
   }));
 }
 
+// Grouped by roaster_id when a bag is linked (so merged/renamed roasters
+// stay one bucket regardless of residual text differences), falling back to
+// the raw roaster text for bags that were never linked to a roaster row.
+async function getShotsPerRoaster(): Promise<RatingBreakdownRow[]> {
+  const rows = await db.all(sql`
+    SELECT
+      COALESCE(r.name, b.roaster) as label,
+      COUNT(s.id) as total,
+      SUM(CASE WHEN s.shot_rating = 1 THEN 1 ELSE 0 END) as r1,
+      SUM(CASE WHEN s.shot_rating = 2 THEN 1 ELSE 0 END) as r2,
+      SUM(CASE WHEN s.shot_rating = 3 THEN 1 ELSE 0 END) as r3,
+      SUM(CASE WHEN s.shot_rating = 4 THEN 1 ELSE 0 END) as r4,
+      SUM(CASE WHEN s.shot_rating = 5 THEN 1 ELSE 0 END) as r5,
+      SUM(CASE WHEN s.shot_rating IS NULL THEN 1 ELSE 0 END) as unrated
+    FROM shots s
+    JOIN bags b ON s.bag_id = b.id
+    LEFT JOIN roasters r ON r.id = b.roaster_id
+    GROUP BY COALESCE(b.roaster_id, 'unlinked:' || lower(b.roaster))
+    ORDER BY total DESC
+  `) as { label: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number }[];
+  return rows.map(r => ({
+    label: String(r.label),
+    total: Number(r.total),
+    r1: Number(r.r1), r2: Number(r.r2), r3: Number(r.r3), r4: Number(r.r4), r5: Number(r.r5),
+    unrated: Number(r.unrated),
+  }));
+}
+
 async function getFailedShotStats(): Promise<{ total: number; totalShots: number; byReason: { reason: string; count: number }[] }> {
   const [row] = await db.all(sql`
     SELECT
@@ -304,8 +339,6 @@ async function getFailedShotStats(): Promise<{ total: number; totalShots: number
     byReason: byReason.map(r => ({ reason: String(r.reason), count: Number(r.count) })),
   };
 }
-
-type RatingBreakdownRow = { label: string; total: number; r1: number; r2: number; r3: number; r4: number; r5: number; unrated: number };
 
 async function getDrinkTypeDistribution(): Promise<RatingBreakdownRow[]> {
   const rows = await db.all(sql`
@@ -451,10 +484,6 @@ async function getLatteArtStats(): Promise<{
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const RATING_COLORS: Record<number, string> = {
-  1: "#FF3B30", 2: "#FF9500", 3: "#FFD60A", 4: "#34C759", 5: "#30D158",
-};
-
 const TASTE_ZONE_COLORS = [
   "#FF3B30", "#FF6B35", "#FFB347", "#34C759", "#FF9500", "#8B5CF6", "#6D28D9",
 ];
@@ -495,61 +524,6 @@ function catmullRomPath(pts: [number, number][]): string {
 }
 
 // ─── Chart components ─────────────────────────────────────────────────────────
-
-interface BarSpec { label: string; count: number; color: string; }
-
-function BarChart({ bars, title, subtitle, labelFontSize = 9, stat, statColor, footnote }: {
-  bars: BarSpec[]; title: string; subtitle: string; labelFontSize?: number;
-  stat?: string; statColor?: string; footnote?: string;
-}) {
-  const n = bars.length;
-  const W = 280, H = 110, padL = 8, padR = 8, padTop = 22, padBottom = 22;
-  const chartW = W - padL - padR, chartH = H - padTop - padBottom;
-  const baseY = padTop + chartH;
-  const slotW = chartW / n;
-  const barW = Math.min(22, slotW * 0.55);
-  const maxCount = Math.max(...bars.map(b => b.count), 1);
-  const computed = bars.map((b, i) => {
-    const cx = padL + slotW * i + slotW / 2;
-    const barH = (b.count / maxCount) * chartH;
-    return { ...b, cx, barH, y: baseY - barH };
-  });
-  return (
-    <div className="rounded-2xl overflow-hidden mb-4"
-      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
-      <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
-        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
-      </div>
-      {stat && (
-        <p className="px-4 pb-2 text-[13px]" style={{ color: statColor ?? "var(--text-primary)" }}>{stat}</p>
-      )}
-      {footnote && (
-        <p className="px-4 pb-1 text-[11px]" style={{ color: "var(--text-secondary)", opacity: 0.65 }}>{footnote}</p>
-      )}
-      <div className="px-2 pb-3">
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
-          {computed.map(b => b.barH > 0 && (
-            <rect key={b.label} x={b.cx - barW / 2} y={b.y} width={barW} height={b.barH}
-              rx={4} fill={b.color} opacity={0.85} />
-          ))}
-          {computed.map(b => b.count > 0 && (
-            <text key={`cnt-${b.label}`} x={b.cx} y={b.y - 5} textAnchor="middle" fontSize={9}
-              fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
-              {b.count}
-            </text>
-          ))}
-          {computed.map(b => (
-            <text key={`lbl-${b.label}`} x={b.cx} y={H - 5} textAnchor="middle" fontSize={labelFontSize}
-              fill="var(--text-secondary)" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
-              {b.label}
-            </text>
-          ))}
-        </svg>
-      </div>
-    </div>
-  );
-}
 
 function ScatterPlot({ points, title, subtitle, xMin, xMax, xTicks, xFormat }: {
   points: ScatterPoint[]; title: string; subtitle: string;
@@ -934,85 +908,6 @@ function HorizontalBarChart({ rows, title, subtitle }: {
   );
 }
 
-
-const RATING_SEG_COLORS = ["#FF3B30", "#FF9500", "#FFD60A", "#34C759", "#30D158"];
-
-function RatingStackedHorizontalBarChart({ rows, title, subtitle }: {
-  rows: RatingBreakdownRow[];
-  title: string;
-  subtitle: string;
-}) {
-  const maxTotal = Math.max(...rows.map(r => r.total), 1);
-
-  return (
-    <div className="rounded-2xl overflow-hidden mb-4"
-      style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
-      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-        <p className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{title}</p>
-        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{subtitle}</p>
-      </div>
-      <div className="px-4 pb-2 flex items-center gap-3 flex-wrap">
-        {RATING_SEG_COLORS.map((color, i) => (
-          <span key={i} className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
-            <span className="inline-block w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
-            {i + 1}★
-          </span>
-        ))}
-        <span className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
-          <span className="inline-block w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: "#8E8E93" }} />
-          Unrated
-        </span>
-      </div>
-      <div className="px-4 pb-3 flex flex-col gap-2.5">
-        {rows.map((row, i) => {
-          const counts = [row.r1, row.r2, row.r3, row.r4, row.r5, row.unrated];
-          const segColors = [...RATING_SEG_COLORS, "#8E8E93"];
-          const segments: { left: number; width: number; color: string }[] = [];
-          let offset = 0;
-          counts.forEach((count, j) => {
-            if (count > 0) {
-              segments.push({ left: (offset / maxTotal) * 100, width: (count / maxTotal) * 100, color: segColors[j] });
-              offset += count;
-            }
-          });
-          const pctLabels = counts
-            .map((count, j) => ({ count, color: segColors[j], label: j < 5 ? `${j + 1}★` : "unr" }))
-            .filter(s => s.count > 0)
-            .map(s => ({ ...s, pct: Math.round((s.count / row.total) * 100) }));
-          return (
-            <div key={i}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[13px] truncate mr-3" style={{ color: "var(--text-primary)", maxWidth: "75%" }}>
-                  {row.label}
-                </span>
-                <span className="text-[12px] flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
-                  {row.total}
-                </span>
-              </div>
-              <div className="relative rounded-full overflow-hidden" style={{ height: 8, backgroundColor: "var(--card-secondary)" }}>
-                {segments.map((seg, j) => (
-                  <div key={j} className="absolute inset-y-0" style={{
-                    left: `${seg.left.toFixed(2)}%`,
-                    width: `${seg.width.toFixed(2)}%`,
-                    backgroundColor: seg.color,
-                  }} />
-                ))}
-              </div>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                {pctLabels.map((s, j) => (
-                  <span key={j} className="text-[10px]" style={{ color: "var(--text-secondary)", opacity: 0.65 }}>
-                    {s.label} {s.pct}%
-                  </span>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function StatsPage() {
@@ -1020,7 +915,7 @@ export default async function StatsPage() {
     ratingDist, tasteDist,
     [ratioPoints, timePoints],
     ratingTrend, freshnessPoints, retentionValues, flowRateDist,
-    roastTypeDist, shotsPerCoffee, processMethodDist, originRatingDist, blendDist,
+    roastTypeDist, shotsPerCoffee, shotsPerRoaster, processMethodDist, originRatingDist, blendDist,
     drinkTypeDist, drinkRatingTrend, shotVsDrinkRatings,
     failedStats, flowCharStats, latteArtStats, targetTracking,
   ] = await Promise.all([
@@ -1033,6 +928,7 @@ export default async function StatsPage() {
     getFlowRateDistribution(),
     getRoastTypeDistribution(),
     getShotsPerCoffee(),
+    getShotsPerRoaster(),
     getProcessMethodDistribution(),
     getOriginRatingDistribution(),
     getBlendDistribution(),
@@ -1227,6 +1123,7 @@ export default async function StatsPage() {
   const macroRows = [...macroMap.values()].sort((a, b) => b.total - a.total);
 
   const coffeeRows: RatingBreakdownRow[] = shotsPerCoffee;
+  const roasterRows: RatingBreakdownRow[] = shotsPerRoaster;
 
   // Drinks section data
   const drinkTypeRows = drinkTypeDist;
@@ -1394,6 +1291,9 @@ export default async function StatsPage() {
         )}
         {blendDist.length > 0 && (
           <RatingStackedHorizontalBarChart rows={blendDist} title="Single origin vs blend" subtitle={`${blendDist.reduce((a, r) => a + r.total, 0)} shots`} />
+        )}
+        {roasterRows.length > 0 && (
+          <RatingStackedHorizontalBarChart rows={roasterRows} title="Shots per roaster" subtitle={`${roasterRows.length} roasters`} />
         )}
         {coffeeRows.length > 0 && (
           <RatingStackedHorizontalBarChart rows={coffeeRows} title="Shots per coffee" subtitle={`${coffeeRows.length} coffees`} />

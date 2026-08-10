@@ -185,7 +185,7 @@ export default function BagFormClient({
   initialData?: BagWithOrigins;
   createAction: typeof createBag;
   updateAction?: BoundUpdateAction;
-  roasters: { id: number; name: string }[];
+  roasters: { id: number; name: string; alias: string | null }[];
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -204,12 +204,22 @@ export default function BagFormClient({
   const [showRoasterSuggestions, setShowRoasterSuggestions] = useState(false);
   const trimmedRoaster = roasterText.trim();
   // Linking is purely name-derived — no separate "selected" state to track.
-  // Renaming a roaster elsewhere keeps bags.roaster in sync (see updateRoaster),
-  // so an exact case-insensitive match here always means "linked."
-  const matchedRoaster = roasters.find((r) => r.name.toLowerCase() === trimmedRoaster.toLowerCase());
+  // Matches against either the roaster's full name or its alias, since the
+  // displayed chip label is alias-or-name and the user may type either.
+  // Renaming/aliasing elsewhere keeps bags.roaster in sync (see
+  // updateRoaster), so an exact case-insensitive match here always means
+  // "linked."
+  const matchedRoaster = roasters.find(
+    (r) => r.name.toLowerCase() === trimmedRoaster.toLowerCase() || r.alias?.toLowerCase() === trimmedRoaster.toLowerCase()
+  );
   const roasterSuggestions = matchedRoaster
     ? []
-    : (trimmedRoaster.length === 0 ? roasters : roasters.filter((r) => r.name.toLowerCase().includes(trimmedRoaster.toLowerCase()))).slice(0, 8);
+    : (trimmedRoaster.length === 0
+        ? roasters
+        : roasters.filter(
+            (r) => r.name.toLowerCase().includes(trimmedRoaster.toLowerCase()) || r.alias?.toLowerCase().includes(trimmedRoaster.toLowerCase())
+          )
+      ).slice(0, 8);
   const [isBlend, setIsBlend] = useState(activeData?.isBlend ?? false);
   const [isDecaf, setIsDecaf] = useState(activeData?.isDecaf ?? false);
   const [price, setPrice] = useState(activeData?.price != null ? String(activeData.price) : "");
@@ -502,11 +512,11 @@ export default function BagFormClient({
                           key={r.id}
                           type="button"
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => { setRoasterText(r.name); setShowRoasterSuggestions(false); }}
+                          onClick={() => { setRoasterText(r.alias || r.name); setShowRoasterSuggestions(false); }}
                           className="text-[13px] font-medium px-3 py-1.5 rounded-full"
                           style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-primary)" }}
                         >
-                          {r.name}
+                          {r.alias || r.name}
                         </button>
                       ))}
                     </div>

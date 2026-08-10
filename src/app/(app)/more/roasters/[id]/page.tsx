@@ -1,8 +1,35 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getRoasterById } from "@/lib/roasters/queries";
+import {
+  getRoasterShotRatingDist,
+  getRoasterTasteDist,
+  getRoasterRoastLevelDist,
+  getRoasterProcessDist,
+} from "@/lib/roasters/stats";
 import RoasterFormClient from "@/components/roasters/RoasterFormClient";
 import RoasterDeleteButton from "@/components/roasters/RoasterDeleteButton";
+import { BarChart, RATING_COLORS, type BarSpec } from "@/components/stats/StatsCharts";
+
+const ROAST_LEVEL_LABELS: Record<string, string> = {
+  light: "Light", medium_light: "Med-Light", medium: "Medium",
+  medium_dark: "Med-Dark", dark: "Dark",
+};
+const ROAST_LEVEL_COLORS: Record<string, string> = {
+  light: "#FFD60A", medium_light: "#FF9500", medium: "#C84B31",
+  medium_dark: "#8B3A2A", dark: "#4A2315",
+};
+const PROCESS_LABELS: Record<string, string> = {
+  washed: "Washed", natural: "Natural", honey: "Honey",
+  anaerobic: "Anaerob.", ea_washed: "EA W.",
+  swiss_water: "Swiss W.", other: "Other",
+};
+const PROCESS_COLORS: Record<string, string> = {
+  washed: "#34AADC", natural: "#E8735A", honey: "#F5A623",
+  anaerobic: "#8B5CF6", ea_washed: "#34C759",
+  swiss_water: "#30D158", other: "#8E8E93",
+};
+const TASTE_LABELS = ["V.Sour", "Sour", "Sl.Sour", "Balanced", "Sl.Bitter", "Bitter", "V.Bitter"];
 
 function SectionHeader({ title }: { title: string }) {
   return (
@@ -21,6 +48,35 @@ export default async function RoasterDetailPage({
   const roaster = await getRoasterById(Number(id));
   if (!roaster) notFound();
 
+  const [ratingDist, tasteDist, roastDist, processDist] = await Promise.all([
+    getRoasterShotRatingDist(roaster.id),
+    getRoasterTasteDist(roaster.id),
+    getRoasterRoastLevelDist(roaster.id),
+    getRoasterProcessDist(roaster.id),
+  ]);
+
+  const ratingBars: BarSpec[] = [1, 2, 3, 4, 5].map(n => ({
+    label: `${n}★`, count: ratingDist[n], color: RATING_COLORS[n],
+  }));
+  const totalRated = ratingBars.reduce((a, b) => a + b.count, 0);
+
+  const tasteBars: BarSpec[] = [1, 2, 3, 4, 5, 6, 7].map((n, i) => ({
+    label: TASTE_LABELS[i], count: tasteDist[n], color: "var(--accent)",
+  }));
+  const totalTasted = tasteBars.reduce((a, b) => a + b.count, 0);
+
+  const roastCountMap = Object.fromEntries(roastDist.map(r => [r.roastLevel, r.count]));
+  const roastTotal = roastDist.reduce((a, r) => a + r.count, 0);
+  const roastBars: BarSpec[] = (["light", "medium_light", "medium", "medium_dark", "dark"] as const).map(level => ({
+    label: ROAST_LEVEL_LABELS[level], count: roastCountMap[level] ?? 0, color: ROAST_LEVEL_COLORS[level],
+  }));
+
+  const processCountMap = Object.fromEntries(processDist.map(r => [r.method, r.count]));
+  const processTotal = processDist.reduce((a, r) => a + r.count, 0);
+  const processBars: BarSpec[] = (["washed", "natural", "honey", "anaerobic", "ea_washed", "swiss_water", "other"] as const).map(m => ({
+    label: PROCESS_LABELS[m], count: processCountMap[m] ?? 0, color: PROCESS_COLORS[m],
+  }));
+
   return (
     <div className="pt-4 pb-24">
       <div className="px-4 mb-2">
@@ -32,16 +88,23 @@ export default async function RoasterDetailPage({
         </Link>
       </div>
 
-      <div className="px-4 mb-4 flex items-center gap-2">
-        <h1 className="text-[34px] font-display flex-1" style={{ color: "var(--text-primary)" }}>
-          {roaster.name}
-        </h1>
-        <span
-          className="text-[13px] font-medium px-2.5 py-1 rounded-full"
-          style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }}
-        >
-          {roaster.bagCount} {roaster.bagCount === 1 ? "bag" : "bags"}
-        </span>
+      <div className="px-4 mb-4">
+        <div className="flex items-center gap-2">
+          <h1 className="text-[34px] font-display flex-1" style={{ color: "var(--text-primary)" }}>
+            {roaster.name}
+          </h1>
+          <span
+            className="text-[13px] font-medium px-2.5 py-1 rounded-full"
+            style={{ backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }}
+          >
+            {roaster.bagCount} {roaster.bagCount === 1 ? "bag" : "bags"}
+          </span>
+        </div>
+        {roaster.alias && (
+          <p className="text-[15px] mt-0.5" style={{ color: "var(--accent)" }}>
+            Shown as “{roaster.alias}” across the app
+          </p>
+        )}
       </div>
 
       <SectionHeader title="Stats" />
@@ -73,6 +136,29 @@ export default async function RoasterDetailPage({
           </>
         )}
       </div>
+
+      {(totalRated > 0 || totalTasted > 0 || roastTotal > 0 || processTotal > 0) && (
+        <>
+          <SectionHeader title="Charts" />
+          <div className="px-4">
+            {totalRated > 0 && (
+              <BarChart bars={ratingBars} title="Shot ratings" subtitle={`${totalRated} rated`}
+                stat={roaster.avgShotRating != null ? `★ ${roaster.avgShotRating.toFixed(1)}` : undefined}
+                statColor="#FF9500"
+              />
+            )}
+            {totalTasted > 0 && (
+              <BarChart bars={tasteBars} title="Taste balance" subtitle={`${totalTasted} logged`} labelFontSize={8} />
+            )}
+            {roastTotal > 0 && (
+              <BarChart bars={roastBars} title="Roast level" subtitle={`${roastTotal} shots`} />
+            )}
+            {processTotal > 0 && (
+              <BarChart bars={processBars} title="Process method" subtitle={`${processTotal} shots`} labelFontSize={8} />
+            )}
+          </div>
+        </>
+      )}
 
       <SectionHeader title="Profile" />
       <RoasterFormClient roaster={roaster} />

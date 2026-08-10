@@ -166,6 +166,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Origin by macro region — stacked rating bar (1★–5★) per region (Latin America, East Africa, etc.)
 - [x] Origin — stacked rating bar per region·country
 - [x] Single origin vs blend — stacked rating bar
+- [x] Shots per roaster — stacked rating bar grouped by `roaster_id` when a bag is linked (so a rename/alias/merge stays one bucket), falling back to raw roaster text for unlinked bags
 - [x] Shots per coffee — stacked rating bar per bag
 
 **Drinks section**
@@ -175,9 +176,11 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Shot vs drink rating bubble chart — diagonal reference line; bubble size = count
 
 ### More → Roasters
-- [x] Roaster directory — name, website, location, notes; bag count, total shots pulled, avg shot rating, avg drink rating per roaster (each a scalar correlated subquery through bags → shots → drinks; null averages hidden rather than shown as 0 when a roaster has no rated shots/drinks yet)
-- [x] Add / edit / delete roaster — renaming cascades to every linked bag's denormalized `roaster` text; deleting unlinks bags (`roaster_id = null`) without touching their existing roaster name
-- [x] Bag form roaster field is a type-ahead combobox — shows existing roasters as tappable chips (all of them when empty, filtered as you type); linking is derived purely from an exact case-insensitive name match against the roasters table, both client-side (for the suggestion UI) and server-side (`findRoasterIdByName` in `createBag`/`updateBag`, which re-verifies rather than trusting a client value — needed because the duplicate/fuzzy-match backfill flow can override the typed roaster name to a canonical prior spelling)
+- [x] Roaster directory — name, alias, website, location, notes; bag count, total shots pulled, avg shot rating, avg drink rating per roaster (each a scalar correlated subquery through bags → shots → drinks; null averages hidden rather than shown as 0 when a roaster has no rated shots/drinks yet); list ordered by avg shot rating (unrated last), then bag count
+- [x] Alias — an optional short name shown everywhere bags.roaster is displayed instead of the full name (e.g. "Metric" instead of "Metric Coffee Co."); saving cascades `alias || name` to every linked bag's denormalized `roaster` text, the same mechanism a plain rename uses
+- [x] Add / edit / delete roaster — name/alias must be unique against every other roaster's name/alias (resolution below would otherwise be ambiguous); deleting unlinks bags (`roaster_id = null`) without touching their existing roaster name
+- [x] Per-roaster charts — shot ratings, taste balance, roast level, process method — same components as the global Stats tab, scoped to this roaster's bags
+- [x] Bag form roaster field is a type-ahead combobox — shows existing roasters as tappable chips (all of them when empty, filtered as you type, matched against name or alias); linking is derived purely from an exact case-insensitive match against the roaster's name or alias, both client-side (for the suggestion UI) and server-side (`resolveRoasterLink` in `createBag`/`updateBag`, which re-verifies rather than trusting a client value — needed because the duplicate/fuzzy-match backfill flow can override the typed roaster name to a canonical prior spelling — and always writes back the resolved alias-or-name, not whatever the user actually typed)
 
 ### More → Equipment
 - [x] Multiple equipment profiles, switch active profile
@@ -219,7 +222,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 
 | Table | Purpose |
 |---|---|
-| `roasters` | Roaster directory — name, website, location, notes; bags link via nullable `roaster_id`, kept in sync with the denormalized `bags.roaster` text on rename |
+| `roasters` | Roaster directory — name, alias, website, location, notes; bags link via nullable `roaster_id`, kept in sync with the denormalized `bags.roaster` text (set to `alias \|\| name`) on rename or alias change |
 | `bags` | Bean inventory — roaster, name, roast level, processing method, freshness window, blend flag |
 | `bag_origins` | Per-bean origin data (country, region); supports blends with multiple origins |
 | `equipment_profiles` | Machine + grinder config, cleaning intervals, last-cleaned dates |

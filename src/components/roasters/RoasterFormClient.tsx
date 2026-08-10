@@ -34,6 +34,7 @@ export default function RoasterFormClient({ roaster }: { roaster: Roaster }) {
     <form action={formAction}>
       <div className="mx-4 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
         <Row label="Name"><TextInput name="name" defaultValue={roaster.name} /></Row>
+        <Row label="Alias"><TextInput name="alias" defaultValue={roaster.alias} placeholder="Shown across the app" /></Row>
         <Row label="Website"><TextInput name="website" type="url" defaultValue={roaster.website} placeholder="https://…" /></Row>
         <div className="flex items-center px-6 min-h-[52px]">
           <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Location</span>
@@ -62,7 +63,7 @@ export default function RoasterFormClient({ roaster }: { roaster: Roaster }) {
       )}
       {state && "success" in state && (
         <div className="mx-4 mt-3 px-4 py-3 rounded-2xl" style={{ backgroundColor: "var(--success)" + "22" }}>
-          <p className="text-[15px]" style={{ color: "var(--success)" }}>Saved. Renaming updates every bag linked to this roaster.</p>
+          <p className="text-[15px]" style={{ color: "var(--success)" }}>Saved. The name shown across the app for every linked bag is the alias, when set — otherwise the full name.</p>
         </div>
       )}
 
