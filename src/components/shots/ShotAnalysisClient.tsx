@@ -3,6 +3,8 @@
 import { useTransition, useState } from "react";
 import { analyzeShotById, type AnalysisResult } from "@/lib/shots/analyzeShot";
 
+const FALLBACK_ERROR_MESSAGE = "Something went wrong. Try again.";
+
 // Verdict → color
 const VERDICT_COLORS: Record<string, string> = {
   great: "#34C759",
@@ -50,11 +52,13 @@ function AnalysisDisplay({
   cached,
   onReanalyze,
   isPending,
+  errorMessage,
 }: {
   analysis: AnalysisResult;
   cached: boolean;
   onReanalyze: () => void;
   isPending: boolean;
+  errorMessage: string | null;
 }) {
   return (
     <div
@@ -115,6 +119,11 @@ function AnalysisDisplay({
           {isPending ? "Analyzing…" : "Re-analyze"}
         </button>
       </div>
+      {errorMessage && (
+        <p className="text-right text-[13px] mt-1.5" style={{ color: "var(--destructive)" }}>
+          {errorMessage}
+        </p>
+      )}
     </div>
   );
 }
@@ -129,21 +138,21 @@ export default function ShotAnalysisClient({
   const [isPending, startTransition] = useTransition();
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(existingAnalysis);
   const [isCached, setIsCached] = useState(existingAnalysis !== null);
-  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleAnalyze = () => {
-    setHasError(false);
+    setErrorMessage(null);
     startTransition(async () => {
       try {
         const result = await analyzeShotById(shotId);
-        if (result) {
-          setAnalysis(result);
+        if (result.success) {
+          setAnalysis(result.analysis);
           setIsCached(false);
         } else {
-          setHasError(true);
+          setErrorMessage(result.message);
         }
-      } catch {
-        setHasError(true);
+      } catch (err) {
+        setErrorMessage(err instanceof Error ? err.message : FALLBACK_ERROR_MESSAGE);
       }
     });
   };
@@ -155,6 +164,7 @@ export default function ShotAnalysisClient({
         cached={isCached}
         onReanalyze={handleAnalyze}
         isPending={isPending}
+        errorMessage={errorMessage}
       />
     );
   }
@@ -181,9 +191,9 @@ export default function ShotAnalysisClient({
           <>✦ Analyze with AI</>
         )}
       </button>
-      {hasError && (
+      {errorMessage && (
         <p className="text-center text-[13px] mt-2" style={{ color: "var(--destructive)" }}>
-          Something went wrong. Try again.
+          {errorMessage}
         </p>
       )}
     </div>

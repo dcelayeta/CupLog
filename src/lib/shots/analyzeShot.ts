@@ -30,6 +30,20 @@ import {
 
 export type AnalysisResult = StoredAnalysis;
 
+export type AnalyzeShotFailureReason =
+  | "not_found"
+  | "rate_limited"
+  | "auth_error"
+  | "connection_error"
+  | "api_error"
+  | "truncated"
+  | "empty_response"
+  | "parse_error";
+
+export type AnalyzeShotResult =
+  | { success: true; analysis: AnalysisResult }
+  | { success: false; reason: AnalyzeShotFailureReason; message: string };
+
 // ─── System Prompt ────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are a personal espresso coach for a home barista named Diego who logs and tracks his espresso shots. Your role is to analyze shots and provide specific, actionable coaching grounded in his setup, history, and palate. His partner Gaby uses the machine but does not log — this is Diego's personal log.
@@ -146,7 +160,7 @@ Update experience_level in your coaching_state response if the current stats sug
 
 CRITICAL: Every number, name, and fact you state must be directly traceable to the user message. Do not invent, estimate, or infer any value not explicitly present in the provided data. Specifically:
 - Shot counts (shot_number, total_shots, total_shots_on_bag) must come verbatim from the data — do not add, subtract, or approximate. This applies everywhere you state a number, including prose in the summary/bean_context text (e.g. "Shot 3 on the X") — never derive that number from how many times you've been asked to analyze this shot or from a prior response. Re-analyzing the same shot_id is not a new shot: if you are re-analyzing shot 143 for the fourth time and current_bean.bean_stats.total_shots_on_bag is 1, every mention of shot count in this response — prose and structured fields alike — must say 1, exactly as it did the first time
-- bean_contexts[].shots_pulled for the entry matching current_bean.bag_id MUST be set to current_bean.bean_stats.total_shots_on_bag exactly, every time — never increment, estimate, or carry forward a self-tracked count. This holds even when re-analyzing the same shot: total_shots_on_bag is the sole source of truth, not how many times you've previously returned a count. For every other bag_id in bean_contexts, copy the existing shots_pulled value unchanged — you have no fresh count for beans other than the current one
+- bean_contexts[] you return MUST include an entry for current_bean.bag_id with shots_pulled set to current_bean.bean_stats.total_shots_on_bag exactly, every time — never increment, estimate, or carry forward a self-tracked count. This holds even when re-analyzing the same shot: total_shots_on_bag is the sole source of truth, not how many times you've previously returned a count. Do not include entries for any other bag_id unless that bean's info actually changed this turn (see Bean Context Size Limits) — the app merges your update into the stored state, so omitted bags keep their existing entry unchanged; never copy other bags forward just to keep them present
 - Grind settings, dose, yield, and times must reference actual values from current_shot or context_shots only
 - Bean names and flavor notes must come from current_bean or coaching_state.bean_contexts — never invent tasting notes
 - If a field is null or missing, acknowledge the gap; never substitute a plausible-sounding value
@@ -205,10 +219,12 @@ current_bean.bean_stats and context_shots are scoped **exclusively to the curren
 
 ## Bean Context Size Limits
 
-bean_contexts is your persistent memory — keep it tight or it will overflow. Rules:
+bean_contexts in your response is a **sparse update, not a full re-send**. The app stores every bean's context and merges whatever you return into it by bag_id — anything you omit stays exactly as stored. Sending the full list back every time is the single biggest cause of your response getting cut off, so:
+- Always include current_bean.bag_id (see Data Integrity above).
+- Include any other bag_id only if something about it actually changed or is newly relevant this turn (e.g. you referenced it as a similar-bean starting point, or you learned something new about it).
+- Never include a bag_id purely to "keep it in the list" — an unchanged bean should simply not appear in your response at all.
 - notes field: max 120 characters. One crisp sentence with the key learning. No padding.
 - profile field: max 80 characters. Roast level, origin, 2-3 flavor words only.
-- Finished beans: only update if there is a new learning. Do not re-write unchanged entries.
 
 ## Response Format
 
@@ -232,7 +248,7 @@ CRITICAL: Respond with ONLY a raw JSON object. No markdown, no code fences, no h
     "last_recommendation": "string",
     "last_analysis_date": "ISO datetime",
     "last_analyzed_shot_id": integer,
-    "bean_contexts": [
+    "bean_contexts": [ // SPARSE — only current_bean.bag_id plus any other bag with an actual change this turn. Omit everything else; the app merges by bag_id.
       {
         "bag_id": integer,
         "name": "Roaster — Bean Name",
@@ -275,6 +291,22 @@ function trimBeanContexts(contexts: import("@/lib/analysis/queries").BeanContext
       notes: c.notes.slice(0, 120),
     }));
   return [...active, ...finished];
+}
+
+/**
+ * The model now returns bean_contexts as a sparse update (only bags it
+ * actually touched this turn) instead of re-echoing every bag on every
+ * call — re-sending the full list was the main driver of output size
+ * growing with total bag count and hitting max_tokens on some calls.
+ * Merge that update into the previously stored full set by bag_id.
+ */
+function mergeBeanContexts(
+  existing: import("@/lib/analysis/queries").BeanContext[],
+  updates: import("@/lib/analysis/queries").BeanContext[]
+) {
+  const byBagId = new Map(existing.map((c) => [c.bag_id, c]));
+  for (const update of updates) byBagId.set(update.bag_id, update);
+  return Array.from(byBagId.values());
 }
 
 // ─── Known Patterns Compression ───────────────────────────────────────────────
@@ -532,13 +564,19 @@ async function assembleUserMessage(shotId: number) {
     },
   };
 
-  return { userMessage, shot, analysisMode };
+  return { userMessage, shot, analysisMode, coachingStateData };
 }
 
 // ─── Main Action ──────────────────────────────────────────────────────────────
 
-export async function analyzeShotById(shotId: number): Promise<AnalysisResult | null> {
-  const { userMessage, shot, analysisMode } = await assembleUserMessage(shotId);
+export async function analyzeShotById(shotId: number): Promise<AnalyzeShotResult> {
+  let userMessage, analysisMode, coachingStateData;
+  try {
+    ({ userMessage, analysisMode, coachingStateData } = await assembleUserMessage(shotId));
+  } catch (err) {
+    console.error(`Failed to assemble AI analysis request for shot ${shotId}:`, err);
+    return { success: false, reason: "not_found", message: "Couldn't find that shot's data." };
+  }
 
   const client = new Anthropic();
   let rawText: string;
@@ -546,11 +584,14 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
     const message = await client.messages.create({
       model: "claude-sonnet-4-6",
       // Generous headroom — the full response (summary, numbers, recommendation,
-      // bean context, progress note, and the echoed-back coaching_state with all
-      // bean_contexts) can run well past 3000 tokens once coaching_state has
-      // accumulated history across many beans. A truncated response produces
-      // invalid JSON, which used to get stored verbatim as a garbled "summary".
-      max_tokens: 8000,
+      // bean context, progress note, and coaching_state) can run well past
+      // 8000 tokens on a bad day even though bean_contexts is now a sparse
+      // update rather than a full echo (see mergeBeanContexts). 16000 is the
+      // safe non-streaming ceiling before HTTP timeouts become a concern —
+      // see the claude-api skill's max_tokens guidance. A truncated response
+      // produces invalid JSON, which used to get stored verbatim as a
+      // garbled "summary".
+      max_tokens: 16000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: JSON.stringify(userMessage) }],
     });
@@ -559,14 +600,38 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
       // parse or persist it. Surface as a normal failure so the existing
       // "Analyze with AI" / "Re-analyze" button is the natural retry path.
       console.error(`Anthropic response hit max_tokens for shot ${shotId} — response truncated, discarding.`);
-      return null;
+      return {
+        success: false,
+        reason: "truncated",
+        message: "The AI's response was cut off before it finished — this usually resolves itself on retry.",
+      };
     }
     const content = message.content[0];
-    if (content.type !== "text") return null;
+    if (!content || content.type !== "text") {
+      return { success: false, reason: "empty_response", message: "The AI returned an empty response." };
+    }
     rawText = content.text;
   } catch (err) {
     console.error("Anthropic API error:", err);
-    return null;
+    // Most-specific-first: distinguish retryable/transient failures from
+    // ones the user can't do anything about, per the typed-exception chain.
+    if (err instanceof Anthropic.RateLimitError) {
+      return { success: false, reason: "rate_limited", message: "The AI service is rate-limited right now — wait a moment and try again." };
+    }
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+      return { success: false, reason: "auth_error", message: "The AI service rejected the request (authentication issue) — this needs a fix on the backend, not a retry." };
+    }
+    if (err instanceof Anthropic.APIConnectionError) {
+      return { success: false, reason: "connection_error", message: "Couldn't reach the AI service — check your connection and try again." };
+    }
+    if (err instanceof Anthropic.APIError) {
+      return { success: false, reason: "api_error", message: `AI service error (${err.status ?? "unknown"}): ${err.message}` };
+    }
+    return {
+      success: false,
+      reason: "api_error",
+      message: err instanceof Error ? err.message : "Unknown error calling the AI service.",
+    };
   }
 
   // Parse JSON response
@@ -589,8 +654,12 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
   } catch (err) {
     // Don't persist a garbled fallback — a shot with no analysis (retriable)
     // is a much better state than one with a broken record cluttering the UI.
-    console.error(`Failed to parse AI analysis JSON for shot ${shotId}:`, err);
-    return null;
+    console.error(`Failed to parse AI analysis JSON for shot ${shotId}:`, err, "\nRaw response:", rawText.slice(0, 500));
+    return {
+      success: false,
+      reason: "parse_error",
+      message: "The AI's response wasn't in the expected format — try again.",
+    };
   }
 
   // Persist analysis
@@ -613,16 +682,23 @@ export async function analyzeShotById(shotId: number): Promise<AnalysisResult | 
     await db.update(shots).set({ isLocked: true }).where(eq(shots.id, shotId));
   }
 
-  // Upsert coaching_state for recent shots only — trim before saving to prevent DB bloat
+  // Upsert coaching_state for recent shots only — merge the model's sparse
+  // bean_contexts update into the previously stored full set, then trim
+  // before saving to prevent DB bloat
   if (analysisMode === "recent" && parsed.updated_coaching_state) {
     const cs = parsed.updated_coaching_state;
     const knownPatterns = cs.known_patterns ? await compressKnownPatterns(cs.known_patterns) : cs.known_patterns;
+    const mergedBeanContexts = mergeBeanContexts(coachingStateData.bean_contexts, cs.bean_contexts ?? []);
     await upsertCoachingState({
       ...cs,
       known_patterns: knownPatterns,
-      bean_contexts: trimBeanContexts(cs.bean_contexts ?? []),
+      bean_contexts: trimBeanContexts(mergedBeanContexts),
     });
   }
 
-  return getAnalysisForShot(shotId);
+  const analysis = await getAnalysisForShot(shotId);
+  if (!analysis) {
+    return { success: false, reason: "api_error", message: "Analysis was generated but couldn't be saved — try again." };
+  }
+  return { success: true, analysis };
 }
