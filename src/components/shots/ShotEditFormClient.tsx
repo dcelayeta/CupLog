@@ -476,7 +476,7 @@ export default function ShotEditFormClient({
                         : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
                     }
                   >
-                    {kit.portafilter || (kit.type === "naked" ? "Naked" : "Spouted")}
+                    {kit.type === "naked" ? "Bottomless" : "Spouted"}
                   </button>
                 ))}
               </div>

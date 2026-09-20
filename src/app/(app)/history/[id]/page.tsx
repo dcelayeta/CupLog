@@ -262,8 +262,7 @@ export default async function ShotDetailPage({
         )}
 
         {/* Prep */}
-        <DetailRow label="Portafilter" value={shot.portafilterName} />
-        <DetailRow label="Basket" value={shot.basketName} />
+        <DetailRow label="Portafilter" value={shot.portafilterType === "naked" ? "Bottomless" : shot.portafilterType === "spouted" ? "Spouted" : null} />
         <DetailRow label="WDT Used" value={shot.wdtUsed ? "Yes" : "No"} />
         <DetailRow label="Distribution Tool" value={shot.distributionToolUsed ? "Yes" : "No"} />
         {shot.springWeightLbs !== null && (
