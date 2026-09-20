@@ -39,7 +39,7 @@ const SYSTEM_PROMPT = `You are a personal espresso coach for a home barista name
 Machine: Breville Bambino
 Grinder: Baratza Encore ESP Pro (stepless, numbered settings)
 Tamper: Normcore self-leveling, currently using 30lb spring
-Portafilter: 54mm stock, non-pressurized single-wall basket
+Portafilter: Diego switches between a stock spouted portafilter and a naked/bottomless one. Don't assume which — current_shot.portafilter_type ("spouted" or "naked"), portafilter_name, and basket_name say exactly what was used for that shot. A naked portafilter shows the puck/stream directly, so flow issues are far more visible and diagnostic than on a spouted one, where only what happens at the spout tips is visible.
 Workflow: Grind into dosing cup → flip onto portafilter → shake to settle → attach funnel → WDT (~30 seconds, random pattern, full depth) → remove funnel → Normcore tamp → clean rim → brew
 Milk: Uses the Bambino steam wand for milk drinks — steaming microfoam directly
 
@@ -83,8 +83,8 @@ Diego is sensitive to acidity. Slight sourness on a bright bean is often correct
 
 ## How to Use Shot Notes
 
-Diego writes notes describing taste and flow. These are often the most diagnostic data available:
-- Flow notes (uneven spouts, spurting, restricted start) → channeling or puck prep issues
+Diego writes notes describing taste and flow, and current_shot.flow_characteristics gives a structured flow diagnostic tag for the shot (values differ by portafilter_type — spouted: normal/very_fast/dripping_restricted/one_spout_dominant/both_spouts_uneven; naked: normal/very_fast/dripping_restricted/spraying/uneven_streams). These are often the most diagnostic data available:
+- flow_characteristics and flow notes (uneven spouts, spurting, restricted start, spraying, uneven streams) → channeling or puck prep issues
 - Taste notes (finish quality, lingering acidity, specific flavors) → more reliable than numeric ratings alone
 - If notes contradict numbers, investigate and flag the contradiction rather than ignoring either
 
@@ -461,6 +461,8 @@ async function assembleUserMessage(shotId: number) {
           fail_reason: s.failReason ?? null,
           grind_setting: s.grindSetting,
           dose_g: s.doseG,
+          flow_characteristics: s.flowCharacteristics,
+          portafilter_type: s.portafilterType,
           notes: s.notes ?? null,
         };
       }
@@ -478,6 +480,10 @@ async function assembleUserMessage(shotId: number) {
         time_classification: s.shotTimeSeconds != null ? classifyTime(s.shotTimeSeconds).label : null,
         ratio_classification: r != null ? classifyRatio(r).label : null,
         target_style: s.targetRatioLabel ?? null,
+        flow_characteristics: s.flowCharacteristics,
+        portafilter_type: s.portafilterType,
+        portafilter_name: s.portafilterName,
+        basket_name: s.basketName,
         balance: s.tasteBalance,
         shot_quality: s.shotRating,
         notes: s.notes,
@@ -505,6 +511,10 @@ async function assembleUserMessage(shotId: number) {
       lag_g: shot.lagG,
       days_since_roast_at_pull: daysSinceRoast,
       target: targetInfo,
+      flow_characteristics: shot.flowCharacteristics,
+      portafilter_type: shot.portafilterType ?? equipment?.portafilterType ?? "spouted",
+      portafilter_name: shot.portafilterName ?? equipment?.portafilter ?? null,
+      basket_name: shot.basketName ?? equipment?.basket ?? null,
       taste: {
         balance: shot.tasteBalance,
         shot_quality: shot.shotRating,
