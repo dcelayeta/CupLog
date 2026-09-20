@@ -3,10 +3,12 @@
 import { useActionState, useState, useTransition } from "react";
 import { deleteShot } from "@/lib/shots/actions";
 import type { ShotDetail, BagOption } from "@/lib/shots/queries";
+import type { EquipmentProfile } from "@/db/schema";
 import { classifyTime, classifyRatio } from "@/lib/shots/classification";
 import { detectDrink, detectEspressoBase, ALL_DRINK_NAMES, DRINK_DEFAULTS } from "@/lib/shots/drinkDetection";
 import { TARGET_RATIOS } from "@/lib/shots/targetRatios";
 import ClassificationBadge from "./ClassificationBadge";
+import FlowIllustration from "./FlowIllustration";
 import TasteBalanceControl from "./TasteBalanceControl";
 import ShotStarRating from "./ShotStarRating";
 import PillRating from "./PillRating";
@@ -32,14 +34,43 @@ const FAIL_REASONS: { value: string; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-const FLOW_OPTIONS: { value: string; label: string }[] = [
+const FLOW_OPTIONS_SPOUTED: { value: string; label: string }[] = [
   { value: "normal", label: "Normal" },
   { value: "one_spout_dominant", label: "One spout dominant" },
   { value: "both_spouts_uneven", label: "Both spouts uneven" },
+  { value: "dripping_restricted", label: "Dripping / Restricted" },
+  { value: "very_fast", label: "Very fast" },
+];
+
+const FLOW_OPTIONS_NAKED: { value: string; label: string }[] = [
+  { value: "normal", label: "Normal" },
+  { value: "uneven_streams", label: "Uneven streams" },
   { value: "spraying", label: "Spraying" },
   { value: "dripping_restricted", label: "Dripping / Restricted" },
   { value: "very_fast", label: "Very fast" },
 ];
+
+type PortafilterKit = {
+  type: "spouted" | "naked";
+  portafilter: string | null;
+  basket: string | null;
+};
+
+function getKits(equipmentProfile: EquipmentProfile | null): { defaultKit: PortafilterKit; altKit: PortafilterKit | null } {
+  const defaultKit: PortafilterKit = {
+    type: equipmentProfile?.portafilterType === "naked" ? "naked" : "spouted",
+    portafilter: equipmentProfile?.portafilter ?? null,
+    basket: equipmentProfile?.basket ?? null,
+  };
+  const altKit: PortafilterKit | null = equipmentProfile?.altPortafilterType
+    ? {
+        type: equipmentProfile.altPortafilterType,
+        portafilter: equipmentProfile.altPortafilter ?? null,
+        basket: equipmentProfile.altBasket ?? null,
+      }
+    : null;
+  return { defaultKit, altKit };
+}
 
 const MAX_DRINK_ML = 300;
 
@@ -222,12 +253,21 @@ export default function ShotEditFormClient({
   shot,
   bags,
   action,
+  equipmentProfile,
 }: {
   shot: ShotDetail;
   bags: BagOption[];
   action: BoundUpdateAction;
+  equipmentProfile: EquipmentProfile | null;
 }) {
   const [state, formAction, isPending] = useActionState(action, null);
+
+  const { defaultKit, altKit } = getKits(equipmentProfile);
+  const [useAltKit, setUseAltKit] = useState(
+    !!altKit && (shot.portafilterName ? shot.portafilterName === altKit.portafilter : shot.portafilterType === altKit.type)
+  );
+  const activeKit = useAltKit && altKit ? altKit : defaultKit;
+  const flowOptions = activeKit.type === "naked" ? FLOW_OPTIONS_NAKED : FLOW_OPTIONS_SPOUTED;
 
   // Shot fields — pre-populate from existing shot
   const [bagId, setBagId] = useState(shot.bagId.toString());
@@ -322,6 +362,9 @@ export default function ShotEditFormClient({
         <input type="hidden" name="isLocked" value={isLocked ? "true" : "false"} />
         <input type="hidden" name="distributionToolUsed" value={distributionToolUsed ? "true" : "false"} />
         <input type="hidden" name="flowCharacteristics" value={flowCharacteristics ?? ""} />
+        <input type="hidden" name="portafilterType" value={activeKit.type} />
+        <input type="hidden" name="portafilterName" value={activeKit.portafilter ?? ""} />
+        <input type="hidden" name="basketName" value={activeKit.basket ?? ""} />
         <input type="hidden" name="targetRatioLabel" value={targetRatioLabel ?? ""} />
         <input type="hidden" name="includeDrink" value={(!isFailed && includeDrink) ? "true" : "false"} />
         <input type="hidden" name="isFailed" value={isFailed ? "true" : "false"} />
@@ -410,6 +453,34 @@ export default function ShotEditFormClient({
           {/* Pull */}
           <Row label="Pre-infusion (s)"><StepperInput name="preinfusionSeconds" value={preinfusionSeconds} onChange={setPreinfusionSeconds} step={1} min={0} max={30} /></Row>
           <div className="px-4 py-3" style={{ borderTop: "1px solid var(--separator)" }}>
+            {altKit && (
+              <div className="flex gap-2 mb-3">
+                {[
+                  { isAlt: false, kit: defaultKit },
+                  { isAlt: true, kit: altKit },
+                ].map(({ isAlt, kit }) => (
+                  <button
+                    key={isAlt ? "alt" : "default"}
+                    type="button"
+                    onClick={() => {
+                      setUseAltKit(isAlt);
+                      const nextOptions = kit.type === "naked" ? FLOW_OPTIONS_NAKED : FLOW_OPTIONS_SPOUTED;
+                      if (flowCharacteristics && !nextOptions.some((o) => o.value === flowCharacteristics)) {
+                        setFlowCharacteristics(null);
+                      }
+                    }}
+                    className="flex-1 text-[13px] font-medium px-3 py-1.5 rounded-full"
+                    style={
+                      useAltKit === isAlt
+                        ? { backgroundColor: "var(--accent)", color: "#fff" }
+                        : { backgroundColor: "var(--card-secondary)", color: "var(--text-secondary)" }
+                    }
+                  >
+                    {kit.portafilter || (kit.type === "naked" ? "Naked" : "Spouted")}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex justify-between items-center mb-2">
               <span className="text-[17px]" style={{ color: "var(--text-primary)" }}>Flow</span>
               {flowCharacteristics !== null && (
@@ -417,7 +488,7 @@ export default function ShotEditFormClient({
               )}
             </div>
             <div className="flex gap-2 flex-wrap">
-              {FLOW_OPTIONS.map((opt) => (
+              {flowOptions.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
@@ -432,6 +503,9 @@ export default function ShotEditFormClient({
                   {opt.label}
                 </button>
               ))}
+            </div>
+            <div className="mt-3">
+              <FlowIllustration flow={flowCharacteristics} portafilterType={activeKit.type} />
             </div>
           </div>
           <Row label="Shot Time (s)"><StepperInput name="shotTimeSeconds" value={shotTimeSeconds} onChange={setShotTimeSeconds} step={1} min={0} max={120} /></Row>

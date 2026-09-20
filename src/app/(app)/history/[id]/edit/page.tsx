@@ -1,14 +1,15 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getShotById, getActiveBags } from "@/lib/shots/queries";
+import { getShotById, getActiveBags, getActiveEquipmentProfile } from "@/lib/shots/queries";
 import { updateShot } from "@/lib/shots/actions";
 import ShotEditFormClient from "@/components/shots/ShotEditFormClient";
 
 export default async function EditShotPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [shot, bags] = await Promise.all([
+  const [shot, bags, equipmentProfile] = await Promise.all([
     getShotById(Number(id)),
     getActiveBags(),
+    getActiveEquipmentProfile(),
   ]);
   if (!shot) notFound();
 
@@ -27,7 +28,7 @@ export default async function EditShotPage({ params }: { params: Promise<{ id: s
       <h1 className="text-[34px] font-display px-4 mb-2" style={{ color: "var(--text-primary)" }}>
         Edit Shot
       </h1>
-      <ShotEditFormClient shot={shot} bags={bags} action={action} />
+      <ShotEditFormClient shot={shot} bags={bags} action={action} equipmentProfile={equipmentProfile} />
     </div>
   );
 }

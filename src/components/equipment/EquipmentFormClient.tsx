@@ -26,6 +26,20 @@ function TextInput({ name, defaultValue, placeholder }: { name: string; defaultV
   );
 }
 
+function PortafilterTypeSelect({ name, defaultValue }: { name: string; defaultValue?: string | null }) {
+  return (
+    <select
+      name={name}
+      defaultValue={defaultValue || "spouted"}
+      className="text-right outline-none bg-transparent text-[17px]"
+      style={{ color: "var(--accent)" }}
+    >
+      <option value="spouted">Spouted</option>
+      <option value="naked">Naked / bottomless</option>
+    </select>
+  );
+}
+
 function NumberInput({ name, defaultValue, placeholder }: { name: string; defaultValue?: number | null; placeholder?: string }) {
   return (
     <input
@@ -53,6 +67,7 @@ export default function EquipmentFormClient({ profile }: { profile: EquipmentPro
         <Row label="Grinder"><TextInput name="grinder" defaultValue={profile.grinder} /></Row>
         <Row label="Tamper"><TextInput name="tamper" defaultValue={profile.tamper} /></Row>
         <Row label="Portafilter"><TextInput name="portafilter" defaultValue={profile.portafilter} /></Row>
+        <Row label="Portafilter Type"><PortafilterTypeSelect name="portafilterType" defaultValue={profile.portafilterType} /></Row>
         <Row label="Basket"><TextInput name="basket" defaultValue={profile.basket} /></Row>
         <Row label="Scale"><TextInput name="scale" defaultValue={profile.scale} /></Row>
         <Row label="WDT Tool"><TextInput name="wdtTool" defaultValue={profile.wdtTool} /></Row>
@@ -63,6 +78,17 @@ export default function EquipmentFormClient({ profile }: { profile: EquipmentPro
           <span className="text-[17px] flex-1" style={{ color: "var(--text-primary)" }}>Grinder Clean (days)</span>
           <NumberInput name="grinderCleaningIntervalDays" defaultValue={profile.grinderCleaningIntervalDays} />
         </div>
+      </div>
+
+      <div className="mx-4 mt-3 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+        <div className="px-6 pt-3 pb-1">
+          <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+            Alternate portafilter — leave blank if you don&apos;t switch. When set, the log form lets you swap to it per shot.
+          </p>
+        </div>
+        <Row label="Alt Portafilter"><TextInput name="altPortafilter" defaultValue={profile.altPortafilter} /></Row>
+        <Row label="Alt Portafilter Type"><PortafilterTypeSelect name="altPortafilterType" defaultValue={profile.altPortafilterType} /></Row>
+        <Row label="Alt Basket"><TextInput name="altBasket" defaultValue={profile.altBasket} /></Row>
       </div>
 
       <div className="mx-4 mt-3 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--card)", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>

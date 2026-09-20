@@ -393,10 +393,11 @@ const FLOW_CHAR_LABELS: Record<string, string> = {
   spraying: "Spraying",
   dripping_restricted: "Dripping / restricted",
   very_fast: "Very fast",
+  uneven_streams: "Uneven streams",
 };
 
 // Sort order: normal first, then by severity
-const FLOW_CHAR_ORDER = ["normal", "one_spout_dominant", "both_spouts_uneven", "dripping_restricted", "very_fast", "spraying"];
+const FLOW_CHAR_ORDER = ["normal", "one_spout_dominant", "both_spouts_uneven", "uneven_streams", "dripping_restricted", "very_fast", "spraying"];
 
 const LATTE_ART_ORDER = ["pollock", "calder", "picasso", "monet", "van_gogh"] as const;
 const LATTE_ART_LABELS: Record<string, string> = {

@@ -89,6 +89,7 @@ const FLOW_LABELS: Record<string, string> = {
   spraying: "Spraying",
   dripping_restricted: "Dripping / Restricted",
   very_fast: "Very fast",
+  uneven_streams: "Uneven streams",
 };
 
 function SectionHeader({ title }: { title: string }) {
@@ -261,6 +262,8 @@ export default async function ShotDetailPage({
         )}
 
         {/* Prep */}
+        <DetailRow label="Portafilter" value={shot.portafilterName} />
+        <DetailRow label="Basket" value={shot.basketName} />
         <DetailRow label="WDT Used" value={shot.wdtUsed ? "Yes" : "No"} />
         <DetailRow label="Distribution Tool" value={shot.distributionToolUsed ? "Yes" : "No"} />
         {shot.springWeightLbs !== null && (
@@ -275,7 +278,7 @@ export default async function ShotDetailPage({
           <>
             <DetailRow label="Flow" value={FLOW_LABELS[shot.flowCharacteristics] ?? shot.flowCharacteristics} />
             <div className="py-2">
-              <FlowIllustration flow={shot.flowCharacteristics} />
+              <FlowIllustration flow={shot.flowCharacteristics} portafilterType={shot.portafilterType as "spouted" | "naked" | null} />
             </div>
           </>
         )}

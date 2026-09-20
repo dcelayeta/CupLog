@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db/client";
-import { equipmentProfiles } from "@/db/schema";
+import { equipmentProfiles, type NewEquipmentProfile } from "@/db/schema";
 import { eq, not } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -20,7 +20,11 @@ export async function updateEquipmentProfile(
     grinder: (formData.get("grinder") as string) || null,
     tamper: (formData.get("tamper") as string) || null,
     portafilter: (formData.get("portafilter") as string) || null,
+    portafilterType: ((formData.get("portafilterType") as string) || null) as NewEquipmentProfile["portafilterType"],
     basket: (formData.get("basket") as string) || null,
+    altPortafilter: (formData.get("altPortafilter") as string) || null,
+    altPortafilterType: ((formData.get("altPortafilterType") as string) || null) as NewEquipmentProfile["altPortafilterType"],
+    altBasket: (formData.get("altBasket") as string) || null,
     scale: (formData.get("scale") as string) || null,
     wdtTool: (formData.get("wdtTool") as string) || null,
     distributionTool: (formData.get("distributionTool") as string) || null,
@@ -53,7 +57,11 @@ export async function addEquipmentProfile(
     grinder: (formData.get("grinder") as string) || null,
     tamper: (formData.get("tamper") as string) || null,
     portafilter: (formData.get("portafilter") as string) || null,
+    portafilterType: ((formData.get("portafilterType") as string) || null) as NewEquipmentProfile["portafilterType"],
     basket: (formData.get("basket") as string) || null,
+    altPortafilter: (formData.get("altPortafilter") as string) || null,
+    altPortafilterType: ((formData.get("altPortafilterType") as string) || null) as NewEquipmentProfile["altPortafilterType"],
+    altBasket: (formData.get("altBasket") as string) || null,
     scale: (formData.get("scale") as string) || null,
     wdtTool: (formData.get("wdtTool") as string) || null,
     distributionTool: (formData.get("distributionTool") as string) || null,

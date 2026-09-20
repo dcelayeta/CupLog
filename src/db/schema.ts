@@ -93,7 +93,11 @@ export const equipmentProfiles = sqliteTable("equipment_profiles", {
   grinder: text("grinder"),
   tamper: text("tamper"),
   portafilter: text("portafilter"),
+  portafilterType: text("portafilter_type", { enum: ["spouted", "naked"] }),
   basket: text("basket"),
+  altPortafilter: text("alt_portafilter"),
+  altPortafilterType: text("alt_portafilter_type", { enum: ["spouted", "naked"] }),
+  altBasket: text("alt_basket"),
   scale: text("scale"),
   wdtTool: text("wdt_tool"),
   distributionTool: text("distribution_tool"),
@@ -157,8 +161,11 @@ export const shots = sqliteTable("shots", {
   tasteBalance: integer("taste_balance"), // 1=very sour … 4=balanced … 7=very bitter
   shotRating: integer("shot_rating"), // 1–5 stars
   flowCharacteristics: text("flow_characteristics", {
-    enum: ["normal", "one_spout_dominant", "both_spouts_uneven", "spraying", "dripping_restricted", "very_fast"],
+    enum: ["normal", "one_spout_dominant", "both_spouts_uneven", "spraying", "dripping_restricted", "very_fast", "uneven_streams"],
   }),
+  portafilterType: text("portafilter_type", { enum: ["spouted", "naked"] }),
+  portafilterName: text("portafilter_name"),
+  basketName: text("basket_name"),
   isLocked: integer("is_locked", { mode: "boolean" }).notNull().default(false),
   isFailed: integer("is_failed", { mode: "boolean" }).notNull().default(false),
   failReason: text("fail_reason", {

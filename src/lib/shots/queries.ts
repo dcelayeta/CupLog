@@ -69,6 +69,9 @@ export type ShotDetail = {
   tasteBalance: number | null;
   shotRating: number | null;
   flowCharacteristics: string | null;
+  portafilterType: string | null;
+  portafilterName: string | null;
+  basketName: string | null;
   isLocked: boolean;
   isFailed: boolean;
   failReason: string | null;
@@ -425,6 +428,9 @@ export async function getShotById(id: number): Promise<ShotDetail | null> {
       tasteBalance: shots.tasteBalance,
       shotRating: shots.shotRating,
       flowCharacteristics: shots.flowCharacteristics,
+      portafilterType: shots.portafilterType,
+      portafilterName: shots.portafilterName,
+      basketName: shots.basketName,
       isLocked: shots.isLocked,
       isFailed: shots.isFailed,
       failReason: shots.failReason,

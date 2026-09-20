@@ -72,6 +72,9 @@ export async function logShot(
   const equipmentProfileId = formData.get("equipmentProfileId")
     ? Number(formData.get("equipmentProfileId"))
     : null;
+  const portafilterType = ((formData.get("portafilterType") as string) || null) as NewShot["portafilterType"];
+  const portafilterName = (formData.get("portafilterName") as string) || null;
+  const basketName = (formData.get("basketName") as string) || null;
 
   const tasteFields = {
     tasteBalance: formData.get("tasteBalance") ? parseInt(formData.get("tasteBalance") as string) : null,
@@ -87,6 +90,9 @@ export async function logShot(
     .values([{
       bagId,
       equipmentProfileId,
+      portafilterType,
+      portafilterName,
+      basketName,
       pulledAt,
       grindSetting,
       doseG,
@@ -197,6 +203,9 @@ function parseShotFields(formData: FormData) {
     tasteBalance: formData.get("tasteBalance") ? parseInt(formData.get("tasteBalance") as string) : null,
     shotRating: formData.get("shotRating") ? parseInt(formData.get("shotRating") as string) : null,
     flowCharacteristics: ((formData.get("flowCharacteristics") as string) || null) as NewShot["flowCharacteristics"],
+    portafilterType: ((formData.get("portafilterType") as string) || null) as NewShot["portafilterType"],
+    portafilterName: (formData.get("portafilterName") as string) || null,
+    basketName: (formData.get("basketName") as string) || null,
     isLocked: formData.get("isLocked") === "true",
     isFailed: formData.get("isFailed") === "true",
     failReason: ((formData.get("failReason") as string) || null) as NewShot["failReason"],
@@ -242,6 +251,9 @@ export async function updateShot(
     tasteBalance: f.isFailed ? null : f.tasteBalance,
     shotRating: f.isFailed ? null : f.shotRating,
     flowCharacteristics: f.flowCharacteristics,
+    portafilterType: f.portafilterType,
+    portafilterName: f.portafilterName,
+    basketName: f.basketName,
     isLocked: f.isLocked,
     isFailed: f.isFailed,
     failReason: f.isFailed ? f.failReason : null,
