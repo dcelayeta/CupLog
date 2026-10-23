@@ -569,6 +569,12 @@ async function assembleUserMessage(shotId: number) {
 
 // ─── Main Action ──────────────────────────────────────────────────────────────
 
+// Lets the client check whether a generation finished server-side after its
+// request was dropped (the Claude call can take minutes on one open request).
+export async function getLatestAnalysisForShot(shotId: number): Promise<AnalysisResult | null> {
+  return getAnalysisForShot(shotId);
+}
+
 export async function analyzeShotById(shotId: number): Promise<AnalyzeShotResult> {
   let userMessage, analysisMode, coachingStateData;
   try {

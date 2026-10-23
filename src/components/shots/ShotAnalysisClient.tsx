@@ -1,9 +1,15 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { analyzeShotById, type AnalysisResult } from "@/lib/shots/analyzeShot";
+import {
+  analyzeShotById,
+  getLatestAnalysisForShot,
+  type AnalysisResult,
+} from "@/lib/shots/analyzeShot";
 
 const FALLBACK_ERROR_MESSAGE = "Something went wrong. Try again.";
+const RECOVERY_POLL_INTERVAL_MS = 3000;
+const RECOVERY_POLL_ATTEMPTS = 100; // ~5 minutes, the server's function ceiling
 
 // Verdict → color
 const VERDICT_COLORS: Record<string, string> = {
@@ -128,6 +134,24 @@ function AnalysisDisplay({
   );
 }
 
+// Polls for an analysis newer than `previousId` (null when none existed yet).
+// Returns null if none appears within the polling window.
+async function waitForSavedAnalysis(
+  shotId: number,
+  previousId: number | null,
+): Promise<AnalysisResult | null> {
+  for (let i = 0; i < RECOVERY_POLL_ATTEMPTS; i++) {
+    await new Promise((resolve) => setTimeout(resolve, RECOVERY_POLL_INTERVAL_MS));
+    try {
+      const latest = await getLatestAnalysisForShot(shotId);
+      if (latest && latest.id !== previousId) return latest;
+    } catch {
+      // Transient failure while polling — keep trying until the window closes.
+    }
+  }
+  return null;
+}
+
 export default function ShotAnalysisClient({
   shotId,
   existingAnalysis,
@@ -142,6 +166,7 @@ export default function ShotAnalysisClient({
 
   const handleAnalyze = () => {
     setErrorMessage(null);
+    const previousId = analysis?.id ?? null;
     startTransition(async () => {
       try {
         const result = await analyzeShotById(shotId);
@@ -152,7 +177,16 @@ export default function ShotAnalysisClient({
           setErrorMessage(result.message);
         }
       } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : FALLBACK_ERROR_MESSAGE);
+        // The connection can drop (e.g. "Load failed" on Safari) while the server
+        // is still generating and will save the analysis. Poll for it before
+        // reporting a failure.
+        const recovered = await waitForSavedAnalysis(shotId, previousId);
+        if (recovered) {
+          setAnalysis(recovered);
+          setIsCached(false);
+        } else {
+          setErrorMessage(err instanceof Error ? err.message : FALLBACK_ERROR_MESSAGE);
+        }
       }
     });
   };
