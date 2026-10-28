@@ -179,7 +179,7 @@ export const shots = sqliteTable("shots", {
   updatedAt: text("updated_at")
     .notNull()
     .default(sql`(datetime('now'))`),
-}, (t) => [index("shots_bag_id_idx").on(t.bagId)]);
+}, (t) => [index("shots_bag_id_idx").on(t.bagId), index("shots_pulled_at_idx").on(t.pulledAt)]);
 
 // ─── drinks ──────────────────────────────────────────────────────────────────
 
