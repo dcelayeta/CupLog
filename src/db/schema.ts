@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  index,
   integer,
   real,
   sqliteTable,
@@ -62,7 +63,7 @@ export const bags = sqliteTable("bags", {
   updatedAt: text("updated_at")
     .notNull()
     .default(sql`(datetime('now'))`),
-});
+}, (t) => [index("bags_roaster_id_idx").on(t.roasterId)]);
 
 // ─── bag_origins ─────────────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ export const bagOrigins = sqliteTable("bag_origins", {
   updatedAt: text("updated_at")
     .notNull()
     .default(sql`(datetime('now'))`),
-});
+}, (t) => [index("bag_origins_bag_id_idx").on(t.bagId)]);
 
 // ─── equipment_profiles ──────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ export const shots = sqliteTable("shots", {
   updatedAt: text("updated_at")
     .notNull()
     .default(sql`(datetime('now'))`),
-});
+}, (t) => [index("shots_bag_id_idx").on(t.bagId)]);
 
 // ─── drinks ──────────────────────────────────────────────────────────────────
 
@@ -206,7 +207,7 @@ export const drinks = sqliteTable("drinks", {
   updatedAt: text("updated_at")
     .notNull()
     .default(sql`(datetime('now'))`),
-});
+}, (t) => [index("drinks_shot_id_idx").on(t.shotId)]);
 
 // ─── coaching_state ──────────────────────────────────────────────────────────
 // Single row, always id=1. Upserted after every recent shot analysis.
@@ -246,7 +247,7 @@ export const shotAnalyses = sqliteTable("shot_analyses", {
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),
-});
+}, (t) => [index("shot_analyses_shot_id_idx").on(t.shotId)]);
 
 // ─── bag_analyses ────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
 import { roasters } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { Roaster } from "@/db/schema";
 
 export type RoasterWithStats = Roaster & {
@@ -9,30 +9,6 @@ export type RoasterWithStats = Roaster & {
   shotCount: number;
   avgShotRating: number | null;
   avgDrinkRating: number | null;
-};
-
-// Scalar correlated subqueries — written as literal SQL text (not drizzle
-// column refs) so "roasters.id" stays table-qualified in the generated SQL.
-// Interpolating `${roasters.id}` here renders as a bare "id", which a nested
-// subquery resolves to its own innermost table instead of the outer row
-// (this bit us once already — see the bag-count bug this replaced).
-const statsSelect = {
-  id: roasters.id,
-  name: roasters.name,
-  alias: roasters.alias,
-  website: roasters.website,
-  location: roasters.location,
-  notes: roasters.notes,
-  createdAt: roasters.createdAt,
-  updatedAt: roasters.updatedAt,
-  // Every subquery here excludes status = 'removed' — a soft-deleted bag
-  // shouldn't inflate the count shown when getBagsForRoaster (which already
-  // excludes them) lists fewer bags than this roaster's own pill.
-  bagCount: sql<number>`(SELECT COUNT(*) FROM bags WHERE roaster_id = roasters.id AND status != 'removed')`.as("bagCount"),
-  activeBagCount: sql<number>`(SELECT COUNT(*) FROM bags WHERE roaster_id = roasters.id AND status IN ('active', 'reserve'))`.as("activeBagCount"),
-  shotCount: sql<number>`(SELECT COUNT(*) FROM shots WHERE bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id AND status != 'removed'))`.as("shotCount"),
-  avgShotRating: sql<number | null>`(SELECT AVG(shot_rating) FROM shots WHERE is_failed = 0 AND bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id AND status != 'removed'))`.as("avgShotRating"),
-  avgDrinkRating: sql<number | null>`(SELECT AVG(overall_rating) FROM drinks WHERE shot_id IN (SELECT id FROM shots WHERE bag_id IN (SELECT id FROM bags WHERE roaster_id = roasters.id AND status != 'removed')))`.as("avgDrinkRating"),
 };
 
 type StatsRow = Roaster & {
@@ -54,18 +30,65 @@ function toStats(row: StatsRow): RoasterWithStats {
   };
 }
 
+// Aggregates each table once (GROUP BY) instead of running correlated
+// subqueries per roaster. The correlated version rescanned shots and drinks
+// for every roaster row, which was the main source of Turso rows-read usage.
+// Removed bags are excluded everywhere, so a soft-deleted bag never inflates
+// a roaster's counts.
+async function queryRoasterStats(roasterId?: number): Promise<StatsRow[]> {
+  const roasterFilter = roasterId != null ? sql`WHERE r.id = ${roasterId}` : sql``;
+  return (await db.all(sql`
+    WITH live_bags AS (
+      SELECT id, roaster_id, status FROM bags
+      WHERE roaster_id IS NOT NULL AND status != 'removed'
+    ),
+    bag_stats AS (
+      SELECT roaster_id,
+        COUNT(*) AS bagCount,
+        SUM(CASE WHEN status IN ('active', 'reserve') THEN 1 ELSE 0 END) AS activeBagCount
+      FROM live_bags GROUP BY roaster_id
+    ),
+    shot_stats AS (
+      SELECT lb.roaster_id,
+        COUNT(s.id) AS shotCount,
+        AVG(CASE WHEN s.is_failed = 0 THEN s.shot_rating END) AS avgShotRating
+      FROM shots s JOIN live_bags lb ON s.bag_id = lb.id
+      GROUP BY lb.roaster_id
+    ),
+    drink_stats AS (
+      SELECT lb.roaster_id, AVG(d.overall_rating) AS avgDrinkRating
+      FROM drinks d
+      JOIN shots s ON d.shot_id = s.id
+      JOIN live_bags lb ON s.bag_id = lb.id
+      GROUP BY lb.roaster_id
+    )
+    SELECT
+      r.id AS id, r.name AS name, r.alias AS alias, r.website AS website,
+      r.location AS location, r.notes AS notes,
+      r.created_at AS createdAt, r.updated_at AS updatedAt,
+      COALESCE(bs.bagCount, 0) AS bagCount,
+      COALESCE(bs.activeBagCount, 0) AS activeBagCount,
+      COALESCE(ss.shotCount, 0) AS shotCount,
+      ss.avgShotRating AS avgShotRating,
+      ds.avgDrinkRating AS avgDrinkRating
+    FROM roasters r
+    LEFT JOIN bag_stats bs ON bs.roaster_id = r.id
+    LEFT JOIN shot_stats ss ON ss.roaster_id = r.id
+    LEFT JOIN drink_stats ds ON ds.roaster_id = r.id
+    ${roasterFilter}
+    ORDER BY avgShotRating DESC NULLS LAST, bagCount DESC
+  `)) as StatsRow[];
+}
+
 // Ordered by overall shot rating (best first, unrated roasters last), then
 // by bag count as a tiebreaker.
 export async function getRoasters(): Promise<RoasterWithStats[]> {
-  const rows = await db
-    .select(statsSelect)
-    .from(roasters)
-    .orderBy(sql`avgShotRating DESC NULLS LAST, bagCount DESC`);
+  const rows = await queryRoasterStats();
   return rows.map(toStats);
 }
 
 export async function getRoasterById(id: number): Promise<RoasterWithStats | null> {
-  const [row] = await db.select(statsSelect).from(roasters).where(eq(roasters.id, id)).limit(1);
+  const [row] = await queryRoasterStats(id);
   if (!row) return null;
   return toStats(row);
 }
