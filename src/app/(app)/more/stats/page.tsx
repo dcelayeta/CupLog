@@ -1123,6 +1123,18 @@ export default async function StatsPage() {
   }
   const macroRows = [...macroMap.values()].sort((a, b) => b.total - a.total);
 
+  const countryMap = new Map<string, RatingBreakdownRow>();
+  for (const row of originRatingDist) {
+    const ex = countryMap.get(row.country) ?? { label: row.country, total: 0, r1: 0, r2: 0, r3: 0, r4: 0, r5: 0, unrated: 0 };
+    countryMap.set(row.country, {
+      label: row.country,
+      total: ex.total + row.total,
+      r1: ex.r1 + row.r1, r2: ex.r2 + row.r2, r3: ex.r3 + row.r3,
+      r4: ex.r4 + row.r4, r5: ex.r5 + row.r5, unrated: ex.unrated + row.unrated,
+    });
+  }
+  const countryRows = [...countryMap.values()].sort((a, b) => b.total - a.total);
+
   const coffeeRows: RatingBreakdownRow[] = shotsPerCoffee;
   const roasterRows: RatingBreakdownRow[] = shotsPerRoaster;
 
@@ -1284,11 +1296,14 @@ export default async function StatsPage() {
             footnote={processUnspecified > 0 ? `${processUnspecified} shot${processUnspecified !== 1 ? "s" : ""} (${Math.round(processUnspecified / processTotal * 100)}%) have no process tagged` : undefined}
           />
         )}
-        {macroRows.length > 0 && (
-          <RatingStackedHorizontalBarChart rows={macroRows} title="Origin by region" subtitle={`${macroRows.length} region${macroRows.length !== 1 ? "s" : ""}`} />
-        )}
         {originRows.length > 0 && (
           <RatingStackedHorizontalBarChart rows={originRows} title="Origin" subtitle={`${originRows.length} origin${originRows.length !== 1 ? "s" : ""}`} />
+        )}
+        {countryRows.length > 1 && (
+          <RatingStackedHorizontalBarChart rows={countryRows} title="Origin by country" subtitle={`${countryRows.length} countries`} />
+        )}
+        {macroRows.length > 0 && (
+          <RatingStackedHorizontalBarChart rows={macroRows} title="Origin by region" subtitle={`${macroRows.length} region${macroRows.length !== 1 ? "s" : ""}`} />
         )}
         {blendDist.length > 0 && (
           <RatingStackedHorizontalBarChart rows={blendDist} title="Single origin vs blend" subtitle={`${blendDist.reduce((a, r) => a + r.total, 0)} shots`} />
