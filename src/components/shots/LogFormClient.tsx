@@ -80,6 +80,18 @@ function getKits(equipmentProfile: EquipmentProfile | null): { defaultKit: Porta
   return { defaultKit, altKit };
 }
 
+// Mirrors the last shot's kit onto the log form: by type when the two kits
+// differ, by name when both kits share a type.
+function shouldUseAltKit(
+  defaults: LastShotDefaults | null | undefined,
+  defaultKit: PortafilterKit,
+  altKit: PortafilterKit | null,
+): boolean {
+  if (!defaults?.portafilterType || !altKit) return false;
+  if (altKit.type !== defaultKit.type) return defaults.portafilterType === altKit.type;
+  return defaults.portafilterName != null && defaults.portafilterName === altKit.portafilter;
+}
+
 
 const MAX_DRINK_ML = 300;
 
@@ -359,7 +371,7 @@ export default function LogFormClient({
   const [showRecentShots, setShowRecentShots] = useState(false);
 
   const { defaultKit, altKit } = getKits(equipmentProfile);
-  const [useAltKit, setUseAltKit] = useState(false);
+  const [useAltKit, setUseAltKit] = useState(() => shouldUseAltKit(effectiveDefaults, defaultKit, altKit));
   const activeKit = useAltKit && altKit ? altKit : defaultKit;
   const flowOptions = activeKit.type === "naked" ? FLOW_OPTIONS_NAKED : FLOW_OPTIONS_SPOUTED;
 
@@ -492,6 +504,14 @@ export default function LogFormClient({
                   setWdtUsed(d.wdtUsed);
                   setDistributionToolUsed(d.distributionToolUsed);
                   setPreinfusionSeconds(d.preinfusionSeconds?.toString() ?? "");
+
+                  const nextUseAlt = shouldUseAltKit(d, defaultKit, altKit);
+                  setUseAltKit(nextUseAlt);
+                  const nextKit = nextUseAlt && altKit ? altKit : defaultKit;
+                  const nextFlowOptions = nextKit.type === "naked" ? FLOW_OPTIONS_NAKED : FLOW_OPTIONS_SPOUTED;
+                  if (flowCharacteristics && !nextFlowOptions.some((o) => o.value === flowCharacteristics)) {
+                    setFlowCharacteristics(null);
+                  }
                 }
                 const newRatioLabel = lastShotRatioLabel(d);
                 setTargetRatioLabel(newRatioLabel);

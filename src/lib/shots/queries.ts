@@ -158,6 +158,8 @@ export type LastShotDefaults = {
   aiRecommendationAction: string | null;
   pulledAt: string;
   shotRating: number | null;
+  portafilterType: string | null;
+  portafilterName: string | null;
 };
 
 export async function getLatestShotId(): Promise<number | null> {
@@ -187,6 +189,8 @@ export async function getLastShotDefaultsPerBag(): Promise<Record<number, LastSh
       aiRecommendationAction: shotAnalyses.recommendationAction,
       pulledAt: shots.pulledAt,
       shotRating: shots.shotRating,
+      portafilterType: shots.portafilterType,
+      portafilterName: shots.portafilterName,
     })
     .from(shots)
     .leftJoin(shotAnalyses, eq(shotAnalyses.shotId, shots.id))
@@ -212,6 +216,8 @@ export async function getLastShotDefaults(): Promise<LastShotDefaults | null> {
       aiRecommendationAction: shotAnalyses.recommendationAction,
       pulledAt: shots.pulledAt,
       shotRating: shots.shotRating,
+      portafilterType: shots.portafilterType,
+      portafilterName: shots.portafilterName,
     })
     .from(shots)
     .leftJoin(shotAnalyses, eq(shotAnalyses.shotId, shots.id))
