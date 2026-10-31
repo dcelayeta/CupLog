@@ -80,7 +80,9 @@ export function getFreshnessLabel(
   peakEndDay = 35
 ): string {
   const midPeak = Math.round((peakStartDay + peakEndDay) / 2);
-  if (days < 0) return `Ready in ${Math.abs(days)}d`;
+  // Future roast: count down to the end of the degas window (roast + peakStartDay),
+  // not to the roast date itself. For days < 0, peakStartDay - days = days until ready.
+  if (days < 0) return `Ready in ${peakStartDay - days}d`;
   if (days < peakStartDay) return `Too fresh — wait (${peakStartDay - days}d)`;
   if (days <= midPeak) return "Peak window";
   if (days <= peakEndDay) return "Still excellent";

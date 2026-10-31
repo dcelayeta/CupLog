@@ -95,6 +95,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] Bag list — active bags by default, toggle to show finished; count badges on Active/Finished/All tabs
 - [x] Bag cards: roaster, name, roast level, days since roast + freshness label, decaf/blend badges, origin countries
 - [x] Per-bag freshness windows — auto-estimated from roast level + processing method (15 combinations); user-overridable
+- [x] Future-roast bags show "Ready in Nd" counting to the end of the degas window (roast + peak start day), not to the roast date
 - [x] Bag detail — 5-zone freshness timeline with today marker; context-specific writeup per roast+process combination; shot history stats
 - [x] Add / edit bag — all fields, multi-origin support, peak freshness override; Roaster field is a type-ahead picker over the Roasters directory (see More → Roasters) — pick an existing roaster or type a new name to leave it unlinked until formalized later
 - [x] Mark as finished / remove (soft delete)
