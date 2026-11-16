@@ -77,7 +77,7 @@ npx tsx scripts/sync-prod-to-dev.ts
 - [x] 480px max-width centered column — app stays phone-width on wide monitors
 - [x] Fixed bottom tab bar with safe-area insets
 - [x] Fixed-position save buttons constrained to the 480px column (`.fixed-col`)
-- [x] Prod → dev database sync script (`scripts/sync-prod-to-dev.ts`)
+- [x] Prod → dev database sync script (`scripts/sync-prod-to-dev.ts`) — copies every table in dependency order, including `roasters` (which `bags.roaster_id` references by foreign key); without it the sync fails with a FOREIGN KEY constraint error on `bags`
 
 ### Home Page
 - [x] All-time averages grid: rating, taste balance, dose, yield, time, ratio

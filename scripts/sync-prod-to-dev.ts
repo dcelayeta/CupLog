@@ -50,6 +50,7 @@ const TABLES = [
   "extraction_thresholds",
   "app_config",
   "coffee_faqs",
+  "roasters",
   "bags",
   "bag_origins",
   "shots",
